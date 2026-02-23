@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Schedule a Consultation | B.A.D People Fitness</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="consultation.css">
+    <script defer src="consultation.js"></script>
+</head>
+
+<body>
+
+    <!-- Background Accent Circles -->
+    <div class="background-accent accent-top"></div>
+    <div class="background-accent accent-bottom"></div>
+
+    <!-- HERO SECTION -->
+    <section class="consultation-hero">
+        <div class="overlay">
+            <h1>Schedule Your Consultation</h1>
+            <p>Begin your fitness journey with professional guidance</p>
+        </div>
+    </section>
+
+    <div class="progress-bar">
+        <div class="step active" id="progStep1"><span>1</span> Type</div>
+        <div class="step" id="progStep2"><span>2</span> Date & Time</div>
+        <div class="step" id="progStep3"><span>3</span> Confirmation</div>
+    </div>
+
+    <!-- CONSULTATION WRAPPER -->
+    <section class="consultation-wrapper">
+
+        <!-- STEP 1 -->
+        <div class="consult-card active" id="step1">
+            <h2>Select Consultation Type</h2>
+            <div class="type-grid">
+                <div class="type-card" data-type="Starter Consultation">
+                    <i class="fas fa-dumbbell fa-2x"></i>
+                    <h3>Starter Consultation</h3>
+                    <p>Perfect for beginners ready to start training.</p>
+                </div>
+                <div class="type-card" data-type="Nutritional Consultation">
+                    <i class="fas fa-apple-alt fa-2x"></i>
+                    <h3>Nutritional Consultation</h3>
+                    <p>Personalized food and supplement guidance.</p>
+                </div>
+            </div>
+            <button class="primary-btn" onclick="goToStep(2)">Continue</button>
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="consult-card" id="step2">
+            <h2>Select Date & Time</h2>
+            <div class="date-time">
+                <div class="input-group">
+                    <label for="date">Date</label>
+                    <input type="date" id="date">
+                </div>
+                <div class="input-group">
+                    <label for="time">Time</label>
+                    <input type="time" id="time">
+                </div>
+            </div>
+            <button class="primary-btn" onclick="confirmBooking()">Confirm Consultation</button>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="consult-card" id="step3">
+            <h2>Confirmation</h2>
+            <div class="summary">
+                <p><strong>Consultation:</strong> <span id="summaryType"></span></p>
+                <p><strong>Date:</strong> <span id="summaryDate"></span></p>
+                <p><strong>Time:</strong> <span id="summaryTime"></span></p>
+            </div>
+            <button class="primary-btn">Proceed to Login</button>
+        </div>
+
+    </section>
+
+</body>
+
+</html>

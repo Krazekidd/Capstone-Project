@@ -1,0 +1,239 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Montserrat", sans-serif;
+    background: #0b0b0b;
+    color: white;
+}
+
+/* HERO */
+.membership-hero {
+    height: 45vh;
+    background: linear-gradient(rgba(0, 0, 0, .7), rgba(0, 0, 0, .7)),
+        url("images/BACKGROUND.png") center/cover;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.hero-content h1 {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.hero-content p {
+    opacity: 0.9;
+}
+
+/* MEMBERSHIPS */
+.membership-section {
+    padding: 80px 40px;
+}
+
+.membership-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 40px;
+    max-width: 1100px;
+    margin: auto;
+}
+
+.membership-card {
+    background: #111;
+    padding: 40px;
+    border-radius: 20px;
+    position: relative;
+    transition: transform .3s, box-shadow .3s;
+}
+
+.membership-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(255, 69, 0, .25);
+}
+
+.highlight {
+    border: 2px solid orangered;
+}
+
+.badge {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: orangered;
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: 20px;
+}
+
+.membership-card h2 {
+    margin-bottom: 10px;
+}
+
+.price {
+    color: orangered;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.membership-card ul {
+    list-style: none;
+    margin-bottom: 25px;
+}
+
+.membership-card li {
+    margin-bottom: 10px;
+}
+
+.membership-card i {
+    color: orangered;
+    margin-right: 10px;
+}
+
+.membership-card label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+.membership-card input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: none;
+    margin-bottom: 20px;
+}
+
+.membership-card button {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 30px;
+    background: orangered;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.membership-card button:hover {
+    box-shadow: 0 0 20px orangered;
+}
+
+/* WHY JOIN */
+.why-join {
+    padding: 80px 40px;
+    text-align: center;
+}
+
+.why-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 40px;
+    max-width: 900px;
+    margin: auto;
+}
+
+.why-grid i {
+    font-size: 36px;
+    color: orangered;
+    margin-bottom: 15px;
+}
+
+/* NEXT STEPS */
+.next-steps {
+    background: #111;
+    padding: 60px 40px;
+    text-align: center;
+}
+
+.next-steps ol {
+    max-width: 600px;
+    margin: auto;
+    text-align: left;
+}
+
+.next-steps li {
+    margin-bottom: 15px;
+}
+
+.after-join {
+    background: #0b0b0b;
+    padding: 80px 40px;
+    font-family: "Montserrat", sans-serif;
+    text-align: center;
+}
+
+.after-title {
+    font-size: 34px;
+    color: white;
+    margin-bottom: 10px;
+}
+
+.after-title::after {
+    content: "";
+    width: 70px;
+    height: 4px;
+    background: orangered;
+    display: block;
+    margin: 15px auto 0;
+    border-radius: 2px;
+}
+
+.after-subtitle {
+    color: #ccc;
+    max-width: 600px;
+    margin: 0 auto 60px;
+    font-size: 15px;
+}
+
+.after-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 40px;
+    max-width: 1000px;
+    margin: auto;
+    position: relative;
+}
+
+.after-step {
+    background: #111;
+    padding: 40px 30px;
+    border-radius: 18px;
+    transition: transform 0.4s, box-shadow 0.4s;
+}
+
+.after-step:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 30px rgba(255, 69, 0, 0.25);
+}
+
+.step-icon {
+    width: 65px;
+    height: 65px;
+    background: rgba(255, 69, 0, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+}
+
+.step-icon i {
+    font-size: 26px;
+    color: orangered;
+}
+
+.after-step h3 {
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+.after-step p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: #ccc;
+}

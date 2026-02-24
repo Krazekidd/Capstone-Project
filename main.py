@@ -1,11 +1,23 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from router import router
+from conversations_router import router as conversations_router
+from database import init_db
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialise database tables on startup."""
+    await init_db()
+    yield
+
 
 app = FastAPI(
-    title="Gym AI Recommender", 
+    title="Gym AI Recommender",
     version="1.0.0",
-    description="FastAPI app for Jamaican meal recommendations using OpenRouter's AI models"
+    description="FastAPI app for Jamaican meal recommendations using OpenRouter's AI models",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware with proper configuration
@@ -16,10 +28,10 @@ app.add_middleware(
         "http://localhost:8080",  # Vue dev server
         "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:8080", 
+        "http://127.0.0.1:8080",
         "http://127.0.0.1:5173",
         "file://",  # Local file access for frontend
-        "*",  # Allow all origins for development (remove in production)
+        "*",        # Allow all origins for development (remove in production)
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -27,8 +39,9 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# Include all routes from router
+# Include all routes
 app.include_router(router, tags=["api"])
+app.include_router(conversations_router)
 
 if __name__ == "__main__":
     import uvicorn

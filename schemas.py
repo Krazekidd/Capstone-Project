@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
+import uuid
 
 class WorkoutPlan(BaseModel):
     name: str
@@ -39,3 +41,42 @@ class ChatbotResponse(BaseModel):
 class RecommendationResponse(BaseModel):
     recommendation: str
     key_insights: List[str]
+
+
+# ---------------------------------------------------------------------------
+# Saved Conversations
+# ---------------------------------------------------------------------------
+
+class SaveConversationRequest(BaseModel):
+    session_id: str
+    title: str = "Untitled Chat"
+
+class SavedConversationOut(BaseModel):
+    id: uuid.UUID
+    session_id: str
+    title: str
+    message_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class ConversationMessageOut(BaseModel):
+    id: uuid.UUID
+    role: str
+    content: str
+    position: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class ConversationDetailOut(BaseModel):
+    id: uuid.UUID
+    session_id: str
+    title: str
+    message_count: int
+    created_at: datetime
+    updated_at: datetime
+    messages: List[ConversationMessageOut]
+
+    model_config = {"from_attributes": True}

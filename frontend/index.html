@@ -3,15 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gym AI Recommender - Streaming (OpenRouter)</title>
+    <title>Gym AI Recommender – OpenRouter</title>
+    <meta name="description" content="AI-powered Jamaican meal recommendations and fitness chatbot with conversation history">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+
+<!-- ====== APP SHELL ====== -->
+<div class="app-shell">
+
+    <!-- ====== SIDEBAR ====== -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2 class="sidebar-title">💾 Saved Chats</h2>
+            <span class="conv-badge" id="convBadge">0 / 5</span>
+        </div>
+
+        <!-- Save current chat -->
+        <div class="sidebar-actions">
+            <button id="saveChatBtn" class="btn btn-save" title="Save current conversation">
+                + Save Current Chat
+            </button>
+        </div>
+
+        <!-- Saved conversations list -->
+        <ul class="saved-list" id="savedList">
+            <li class="saved-empty" id="savedEmpty">No saved conversations yet.</li>
+        </ul>
+
+        <!-- Sidebar footer -->
+        <div class="sidebar-footer">
+            <p>Max 5 conversations saved</p>
+        </div>
+    </aside>
+
+    <!-- ====== SIDEBAR TOGGLE (mobile) ====== -->
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <div class="main-content">
+
         <header>
             <h1>🏋️ Gym AI Recommender</h1>
-            <p>Get Jamaican meal recommendations and fitness advice with real-time streaming</p>
-            <p class="api-badge">🌐 Powered by OpenRouter API</p>
+            <p>Jamaican meal recommendations & fitness advice with real-time streaming</p>
+            <span class="api-badge">🌐 Powered by OpenRouter API</span>
         </header>
 
         <main>
@@ -28,23 +66,30 @@
                 <div class="chat-container">
                     <div id="chatMessages" class="messages"></div>
                     <div class="input-group">
-                        <input type="text" id="chatInput" placeholder="Ask about fitness, nutrition, or Jamaican meals...">
+                        <input type="text" id="chatInput" placeholder="Ask about fitness, nutrition, or Jamaican meals…">
                         <button id="sendChat" class="btn btn-secondary">Send</button>
                     </div>
                 </div>
             </section>
 
-            <!-- Chatbot Section -->
+            <!-- Chatbot Section (with Memory) -->
             <section class="chatbot-section">
-                <h2>🤖 Smart Chatbot (with Memory)</h2>
+                <h2>🤖 Smart Chatbot <span class="badge-memory">Memory On</span></h2>
+
                 <div class="chatbot-container">
-                    <div class="session-info">
-                        <input type="text" id="sessionId" placeholder="Session ID (e.g., user123)" value="user123">
-                        <button id="clearSession" class="btn btn-small">Clear Session</button>
+                    <!-- Session bar -->
+                    <div class="session-bar">
+                        <label for="sessionId" class="session-label">Session ID</label>
+                        <input type="text" id="sessionId" value="user123" placeholder="e.g. user123">
+                        <button id="clearSession" class="btn btn-danger-sm">🗑 Clear</button>
                     </div>
+
+                    <!-- Messages -->
                     <div id="chatbotMessages" class="messages"></div>
+
+                    <!-- Input -->
                     <div class="input-group">
-                        <input type="text" id="chatbotInput" placeholder="Chat with memory-enabled assistant...">
+                        <input type="text" id="chatbotInput" placeholder="Chat with memory-enabled assistant…">
                         <button id="sendChatbot" class="btn btn-secondary">Send</button>
                     </div>
                 </div>
@@ -54,8 +99,22 @@
         <footer>
             <p>Powered by OpenRouter • Real-time streaming responses</p>
         </footer>
-    </div>
+    </div><!-- /.main-content -->
+</div><!-- /.app-shell -->
 
-    <script src="script.js"></script>
+<!-- Save Dialog -->
+<div class="dialog-overlay" id="dialogOverlay" role="dialog" aria-modal="true" aria-label="Save conversation dialog">
+    <div class="dialog-box">
+        <h3>Save Conversation</h3>
+        <p>Give this chat a name:</p>
+        <input type="text" id="chatTitleInput" placeholder="e.g. Meal plan discussion" maxlength="80">
+        <div class="dialog-actions">
+            <button id="dialogCancel" class="btn btn-ghost">Cancel</button>
+            <button id="dialogConfirm" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>

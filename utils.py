@@ -70,7 +70,8 @@ def create_chatbot_prompt(message: str, session_id: str, user_context: Optional[
     if user_context:
         context = f"User Profile: {user_context.weight_kg}kg, {user_context.height_cm}cm, age {user_context.age}, goal: {user_context.goal}, activity level: {user_context.activity_level}. "
     
-    system_prompt = f"""You are a knowledgeable fitness and nutrition assistant specializing in Jamaican cuisine and holistic wellness. {context}
+    # Base system instructions
+    system_instructions = f"""You are a knowledgeable fitness and nutrition assistant specializing in Jamaican cuisine and holistic wellness. {context}
 
 Your role is to provide:
 - Detailed, evidence-based fitness advice
@@ -88,30 +89,51 @@ Always provide comprehensive responses (150-200 words) that are:
 
 Remember previous conversations to provide personalized, context-aware advice. Build rapport by referencing previous discussions when relevant."""
 
-    messages.append({
-        "role": "system",
-        "content": system_prompt
-    })
-    
-    # Add conversation history (last 10 messages to manage token usage)
+    # Build conversation history
+    messages = []
     history_messages = session["messages"][-10:]
-    print(f" Adding {len(history_messages)} messages from history to prompt")
-    for msg in history_messages:
-        messages.append(msg)
     
-    # Add current message
-    messages.append({
-        "role": "user", 
-        "content": message
-    })
+    # Strategy: Merge system instructions into the first available message
+    # This is more compatible with many OpenRouter providers than a separate 'system' role.
     
+    if not history_messages:
+        # No history: system + current user message
+        messages.append({
+            "role": "user",
+            "content": f"INSTRUCTIONS: {system_instructions}\n\nUSER MESSAGE: {message}"
+        })
+    else:
+        # Has history: prepend instructions to the FIRST history message
+        for i, msg in enumerate(history_messages):
+            if i == 0:
+                content = f"CONTEXT & INSTRUCTIONS: {system_instructions}\n\nPREVIOUS MESSAGE: {msg['content']}"
+                messages.append({"role": msg["role"], "content": content})
+            else:
+                messages.append(msg)
+        
+        # Add current message
+        messages.append({
+            "role": "user", 
+            "content": message
+        })
+
+    # Final Check: Ensure roles alternate (User, Assistant, User...) 
+    # to prevent 400 errors from strict providers like Groq/Fireworks
+    final_messages = []
+    last_role = None
+    for msg in messages:
+        if msg["role"] != last_role:
+            final_messages.append(msg)
+            last_role = msg["role"]
+        else:
+            # Merge consecutive same-role messages
+            final_messages[-1]["content"] += "\n\n" + msg["content"]
+
     # Calculate prompt size metrics
-    total_chars = sum(len(str(msg['content'])) for msg in messages)
-    total_tokens_estimate = total_chars // 4  # Rough estimate: 1 token ≈ 4 chars
+    total_chars = sum(len(str(msg['content'])) for msg in final_messages)
+    print(f" Total prompt messages: {len(final_messages)}")
+    print(f" Estimated token count: {total_chars // 4}")
     
-    print(f" Total prompt messages: {len(messages)}")
-    print(f" Prompt character count: {total_chars}")
-    print(f" Estimated token count: {total_tokens_estimate}")
-    print(f" Prompt breakdown: {[(msg['role'], len(msg['content'])) for msg in messages]}")
+    return final_messages
     
     return messages

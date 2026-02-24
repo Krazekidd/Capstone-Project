@@ -34,7 +34,7 @@ async def chatbot_endpoint(request: ChatbotRequest):
     payload = {
         "model": model,
         "messages": messages,
-        "max_tokens": 200,
+        # "max_tokens": 200,
         "temperature": 0.7
     }
     
@@ -135,7 +135,7 @@ async def chat_endpoint(request: ChatRequest):
         "messages": [
             {"role": "user", "content": create_chat_prompt(request.message, request.user_context)}
         ],
-        "max_tokens": 200,
+        # "max_tokens": 200,
         "temperature": 0.7
     }
     
@@ -224,7 +224,7 @@ async def get_recommendation():
         "messages": [
             {"role": "user", "content": prompt_text}
         ],
-        "max_tokens": 300,
+        # "max_tokens": 300,
         "temperature": 0.7
     }
     
@@ -336,7 +336,7 @@ async def chat_stream_endpoint(request: ChatRequest):
             "messages": [
                 {"role": "user", "content": create_chat_prompt(request.message, request.user_context)}
             ],
-            "max_tokens": 400,  # Increased from 200 to 400 tokens
+            # "max_tokens": 400,  # Increased from 200 to 400 tokens
             "temperature": 0.7,
             "stream": True
         }
@@ -344,8 +344,17 @@ async def chat_stream_endpoint(request: ChatRequest):
         try:
             async with AsyncClient() as client:
                 async with client.stream("POST", OPENROUTER_URL, headers=headers, json=payload) as response:
-                    response.raise_for_status()
-                    
+                    if response.status_code != 200:
+                        error_detail = await response.aread()
+                        try:
+                            error_json = json.loads(error_detail)
+                            error_msg = error_json.get("error", {}).get("message", str(error_detail))
+                        except:
+                            error_msg = str(error_detail)
+                        
+                        yield f"data: {json.dumps({'error': f'API Error {response.status_code}: {error_msg}', 'done': True})}\n\n"
+                        return
+
                     full_response = ""
                     async for line in response.aiter_lines():
                         if line.startswith("data: "):
@@ -392,7 +401,7 @@ async def chatbot_stream_endpoint(request: ChatbotRequest):
         payload = {
             "model": AI_MODEL,
             "messages": messages,
-            "max_tokens": 500,  # Increased from 200 to 500 tokens for more verbosity
+            # "max_tokens": 500,  # Increased from 200 to 500 tokens for more verbosity
             "temperature": 0.7,
             "stream": True
         }
@@ -400,8 +409,17 @@ async def chatbot_stream_endpoint(request: ChatbotRequest):
         try:
             async with AsyncClient() as client:
                 async with client.stream("POST", OPENROUTER_URL, headers=headers, json=payload) as response:
-                    response.raise_for_status()
-                    
+                    if response.status_code != 200:
+                        error_detail = await response.aread()
+                        try:
+                            error_json = json.loads(error_detail)
+                            error_msg = error_json.get("error", {}).get("message", str(error_detail))
+                        except:
+                            error_msg = str(error_detail)
+                        
+                        yield f"data: {json.dumps({'error': f'API Error {response.status_code}: {error_msg}', 'done': True})}\n\n"
+                        return
+
                     full_response = ""
                     async for line in response.aiter_lines():
                         if line.startswith("data: "):
@@ -479,7 +497,7 @@ async def recommend_stream_endpoint():
             "messages": [
                 {"role": "user", "content": create_prompt(user_metrics)}
             ],
-            "max_tokens": 600,  # Increased from 300 to 600 tokens for detailed recipes
+            # "max_tokens": 600,  # Increased from 300 to 600 tokens for detailed recipes
             "temperature": 0.7,
             "stream": True
         }

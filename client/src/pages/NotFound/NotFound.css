@@ -1,0 +1,55 @@
+/* ===============================
+   NOT FOUND PAGE STYLES
+================================= */
+:root {
+    --orange: #ff6b00;
+    --black: #0f0f0f;
+    --white: #ffffff;
+    --light: #f4f4f4;
+    --border: #e5e5e5;
+}
+
+.notfound-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: var(--light);
+    color: var(--black);
+}
+
+.notfound-container {
+    text-align: center;
+    padding: 40px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--white);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.notfound-title {
+    font-size: 96px;
+    font-weight: bold;
+    color: var(--orange);
+    margin-bottom: 20px;
+}
+
+.notfound-message {
+    font-size: 18px;
+    margin-bottom: 30px;
+}
+
+.notfound-link {
+    display: inline-block;
+    padding: 10px 20px;
+    font-size: 16px;
+    color: var(--white);
+    background: var(--orange);
+    border-radius: 8px;
+    text-decoration: none;
+    transition: background 0.3s;
+}
+
+.notfound-link:hover {
+    background: var(--black);
+}

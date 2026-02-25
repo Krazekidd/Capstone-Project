@@ -1,19 +1,11 @@
-/* Reset & Font */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Montserrat', sans-serif;
-}
-
-body {
+.consultation-container-wrapper {
     min-height: 100vh;
     background: #f9f9f9;
     color: #333;
     position: relative;
 }
 
-.background-accent {
+.consultation-background-accent {
     position: fixed;
     width: 400px;
     height: 400px;
@@ -22,17 +14,16 @@ body {
     z-index: -1;
 }
 
-.accent-top {
+.consultation-accent-top {
     top: -150px;
     right: -150px;
 }
 
-.accent-bottom {
+.consultation-accent-bottom {
     bottom: -180px;
     left: -180px;
 }
 
-/* HERO */
 .consultation-hero {
     height: 35vh;
     display: flex;
@@ -47,10 +38,9 @@ body {
     position: absolute;
     inset: 0;
     background: rgba(255, 69, 0, 0.05);
-
 }
 
-.consultation-hero .overlay {
+.consultation-hero .consultation-overlay {
     position: relative;
     text-align: center;
     z-index: 1;
@@ -68,15 +58,14 @@ body {
     color: #555;
 }
 
-/* Progress Bar */
-.progress-bar {
+.consultation-progress-bar {
     max-width: 900px;
     margin: 30px auto 20px;
     display: flex;
     justify-content: space-between;
 }
 
-.progress-bar .step {
+.consultation-progress-bar .consultation-step {
     flex: 1;
     text-align: center;
     position: relative;
@@ -85,32 +74,29 @@ body {
     color: #aaa;
 }
 
-.progress-bar .step.active {
+.consultation-progress-bar .consultation-step.active {
     color: #ff4500;
 }
 
-.progress-bar .step span {
+.consultation-progress-bar .consultation-step span {
     display: inline-block;
     width: 30px;
     height: 30px;
     line-height: 30px;
     border-radius: 50%;
     background: #ffe5d1;
-    /* subtle orange circle */
     margin-bottom: 5px;
     color: #ff4500;
 }
 
-/* Wrapper */
 .consultation-wrapper {
     max-width: 900px;
     margin: 0 auto 80px;
     padding: 0 20px;
 }
 
-/* CARD */
-.consult-card {
-    display: none;
+.consultation-card {
+    /* display: none; */
     background: #fff;
     border-radius: 16px;
     padding: 40px;
@@ -120,31 +106,30 @@ body {
     transition: all 0.4s ease;
 }
 
-.consult-card.active {
+.consultation-card.active {
     display: block;
 }
 
-.consult-card h2 {
+.consultation-card h2 {
     font-size: 28px;
     text-transform: uppercase;
     color: #ff4500;
     margin-bottom: 25px;
 }
 
-.consult-card p {
+.consultation-card p {
     opacity: 0.85;
     margin-bottom: 30px;
 }
 
-/* TYPE SELECTION */
-.type-grid {
+.consultation-type-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 25px;
     margin-bottom: 30px;
 }
 
-.type-card {
+.consultation-type-card {
     border: 2px solid #eee;
     border-radius: 12px;
     padding: 30px;
@@ -154,46 +139,45 @@ body {
     background: #fff;
 }
 
-.type-card i {
+.consultation-type-card i {
     font-size: 36px;
     margin-bottom: 15px;
     color: #ff4500;
 }
 
-.type-card h3 {
+.consultation-type-card h3 {
     font-size: 20px;
     color: #ff4500;
     margin-bottom: 8px;
 }
 
-.type-card p {
+.consultation-type-card p {
     font-size: 14px;
     color: #555;
 }
 
-.type-card:hover,
-.type-card.selected {
+.consultation-type-card:hover,
+.consultation-type-card.selected {
     border-color: #ff4500;
     box-shadow: 0 8px 20px rgba(255, 69, 0, 0.15);
     transform: translateY(-3px);
 }
 
-/* DATE TIME */
-.date-time {
+.consultation-date-time {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 25px;
     margin-bottom: 40px;
 }
 
-.input-group label {
+.consultation-input-group label {
     font-size: 14px;
     margin-bottom: 6px;
     display: block;
     color: #333;
 }
 
-.input-group input {
+.consultation-input-group input {
     width: 100%;
     padding: 14px;
     border-radius: 8px;
@@ -203,8 +187,7 @@ body {
     background: #fafafa;
 }
 
-/* BUTTON */
-.primary-btn {
+.consultation-primary-btn {
     width: 100%;
     padding: 16px;
     border: none;
@@ -217,13 +200,12 @@ body {
     transition: all 0.3s ease;
 }
 
-.primary-btn:hover {
+.consultation-primary-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(255, 69, 0, 0.25);
 }
 
-/* SUMMARY */
-.summary {
+.consultation-summary {
     background: #fff;
     color: #333;
     padding: 25px;
@@ -232,7 +214,7 @@ body {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
-.summary p {
+.consultation-summary p {
     font-size: 16px;
     margin-bottom: 12px;
 }

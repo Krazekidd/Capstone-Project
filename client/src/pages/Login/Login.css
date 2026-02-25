@@ -7,7 +7,7 @@
 }
 
 /* Background Gradient Animation */
-body {
+.login-container-wrapper {
     height: 100vh;
     overflow: hidden;
     display: flex;
@@ -185,14 +185,14 @@ body {
 }
 
 /* Divider */
-.divider {
+.login-logo-divider {
     text-align: center;
     margin: 25px 0;
     position: relative;
 }
 
-.divider::before,
-.divider::after {
+.login-logo-divider::before,
+.login-logo-divider::after {
     content: "";
     position: absolute;
     top: 50%;
@@ -201,15 +201,15 @@ body {
     background: #ccc;
 }
 
-.divider::before {
+.login-logo-divider::before {
     left: 0;
 }
 
-.divider::after {
+.login-logo-divider::after {
     right: 0;
 }
 
-.divider span {
+.login-logo-divider span {
     display: inline-block;
     padding: 0 10px;
     color: #666;

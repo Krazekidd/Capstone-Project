@@ -1,0 +1,7 @@
+pgadmin-data/
+pgdata
+__pycache__
+.env
+venv/
+node_modules
+package-lock.json

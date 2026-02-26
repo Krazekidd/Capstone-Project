@@ -66,7 +66,7 @@ export default function Home() {
     },
     {
       link: 'https://jamaica-gleaner.com',
-      image: '/images/gleaner-logo.png',
+      image: 'images/gleaner-logo.png',
       title: 'Title of the Article',
       description: 'A short snippet or summary of the article goes here...',
       source: '— The Gleaner'
@@ -77,7 +77,7 @@ export default function Home() {
     <div>
       {/* Navigation */}
       <nav>
-        <img src="/images/triallogo.png" alt="B.A.D People Fitness Logo" width="150" height="175" />
+        <img src="images/triallogo.png" alt="B.A.D People Fitness Logo" width="150" height="175" />
         <div className="heading">
           <h4>B.A.D People Fitness</h4>
         </div>
@@ -99,7 +99,7 @@ export default function Home() {
 
       {/* Hero Section */}
       <section className="hero">
-        <img src="/images/BACKGROUND.png" alt="People working out in a gym" />
+        <img src="images/BACKGROUND.png" alt="People working out in a gym" />
         <div className="hero-overlay">
           <h1>WELCOME TO</h1>
           <h2>B.A.D People Fitness</h2>

@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import "./Shop.css";
 
 const Shop = () => {
@@ -15,11 +16,11 @@ const Shop = () => {
         </div>
 
         <div className="shop-header-right">
-          <a href="index.html">Home</a>
-          <a href="#" className="active">
+          <Link to="/">Home</Link>
+          <Link to="/shop" className="active">
             Shop
-          </a>
-          <a href="membership.html">Membership</a>
+          </Link>
+          <Link to="/membership">Membership</Link>
 
           <div className="shop-header-cart">
             <i className="fas fa-shopping-cart"></i>

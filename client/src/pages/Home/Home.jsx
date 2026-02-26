@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import './Home.css';
 
 export default function Home() {
@@ -81,18 +82,18 @@ export default function Home() {
           <h4>B.A.D People Fitness</h4>
         </div>
         <ul className="nav-links">
-          <li><a className="active" href="#home">Home</a></li>
+          <li><Link className="active" to="/">Home</Link></li>
           <li className="dropdown">
             <a href="#services">Services ▾</a>
             <ul className="dropdown-content">
-              <li><a href="#consultation">Consultation</a></li>
-              <li><a href="#membership">Membership</a></li>
+              <li><Link to="/consultation">Consultation</Link></li>
+              <li><Link to="/membership">Membership</Link></li>
               <li><a href="#excursions">Excursions</a></li>
             </ul>
           </li>
-          <li><a href="#about">About</a></li>
-          <li><a href="#account">My Account</a></li>
-          <li><a href="#cart" className="cart active">🛒</a></li>
+          <li><Link to="/about">About</Link></li>
+          <li><Link to="/account">My Account</Link></li>
+          <li><Link to="/shop" className="cart active">🛒</Link></li>
         </ul>
       </nav>
 
@@ -103,7 +104,7 @@ export default function Home() {
           <h1>WELCOME TO</h1>
           <h2>B.A.D People Fitness</h2>
           <p>BODY . AESTHETIC . DEVELOPMENT</p>
-          <a href="#login" className="hero-btn">Start Your Journey</a>
+          <Link to="/login" className="hero-btn">Start Your Journey</Link>
         </div>
       </section>
 

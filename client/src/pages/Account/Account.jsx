@@ -1,7 +1,63 @@
-import React from "react";
+import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import { sendNutriMessage } from "../../api/nutriAI";
 import "./Account.css";
 
 const Account = () => {
+  const [chatMessages, setChatMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const chatBoxRef = useRef(null);
+
+  useEffect(() => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isLoading) return;
+
+    const userMessage = inputMessage.trim();
+    setInputMessage('');
+    
+    // Add user message to chat
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setIsLoading(true);
+
+    try {
+      let aiResponse = '';
+      
+      // Add empty AI message that will be updated with streaming content
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      await sendNutriMessage(userMessage, (chunk) => {
+        aiResponse += chunk;
+        // Update the last message (AI response) with new content
+        setChatMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { role: 'assistant', content: aiResponse };
+          return updated;
+        });
+      });
+    } catch (error) {
+      console.error('Error:', error);
+      setChatMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Sorry, I encountered an error. Please try again.' 
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
   return (
     <div className="account-container-wrapper">
       <div className="account-header-banner">
@@ -100,14 +156,39 @@ const Account = () => {
           {/* NUTRI-AI */}
           <div className="account-section">
             <h2>Nutri-AI</h2>
-            <div className="account-chat-box" id="chatBox"></div>
+            <div className="account-chat-box" id="chatBox" ref={chatBoxRef}>
+              {chatMessages.length === 0 ? (
+                <div style={{ color: '#999', textAlign: 'center', padding: '20px' }}>
+                  Ask me anything about nutrition, meal planning, or dietary advice!
+                </div>
+              ) : (
+                chatMessages.map((msg, index) => (
+                  <div 
+                    key={index} 
+                    className={`chat-message ${msg.role}`}
+                  >
+                    {msg.role === 'user' ? (
+                      msg.content
+                    ) : (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
             <div className="account-chat-input">
               <input
                 type="text"
                 id="chatInput"
                 placeholder="Ask for nutrition advice..."
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={isLoading}
               />
-              <button onClick={() => sendMessage()}>Send</button>
+              <button onClick={handleSendMessage} disabled={isLoading}>
+                {isLoading ? 'Sending...' : 'Send'}
+              </button>
             </div>
           </div>
 

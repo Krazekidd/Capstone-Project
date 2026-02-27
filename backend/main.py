@@ -24,14 +24,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",  # React dev server
-        "http://localhost:8080",  # Vue dev server
         "http://localhost:5173",  # Vite dev server
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:5173",
-        "file://",  # Local file access for frontend
-        "*",        # Allow all origins for development (remove in production)
+        "http://127.0.0.1:5173",  # Vite dev server (alternative)
+        "https://capstone-project-sage-six.vercel.app",  # Production Vercel URL
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -45,4 +40,5 @@ app.include_router(conversations_router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=9943, reload=True)
+    from config import HOST, PORT
+    uvicorn.run("main:app", host=HOST, port=PORT, reload=True)

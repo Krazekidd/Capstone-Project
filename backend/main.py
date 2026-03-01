@@ -4,13 +4,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from router import router
 from conversations_router import router as conversations_router
 from database import init_db
+import logging
+
+# Configure logging to print to terminal
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()  # Print to console/terminal
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialise database tables on startup."""
+    logger.info("🚀 Starting application...")
     await init_db()
+    logger.info("✅ Application started successfully")
     yield
+    logger.info("👋 Shutting down application...")
 
 
 app = FastAPI(

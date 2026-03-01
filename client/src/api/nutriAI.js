@@ -2,7 +2,7 @@ import api from './axiosConfig';
 
 export const sendNutriMessage = async (message, onChunk) => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/chat/stream`, {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/chatbot/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import { sendNutriMessage } from "../../api/nutriAI";
+import { SendHorizontal } from 'lucide-react';
 import "./Account.css";
 
 const Account = () => {
@@ -154,19 +155,40 @@ const Account = () => {
           </div>
 
           {/* NUTRI-AI */}
-          <div className="account-section">
-            <h2>Nutri-AI</h2>
-            <div className="account-chat-box" id="chatBox" ref={chatBoxRef}>
+          <div className="account-section nutri-ai-section">
+
+            {/* AI HEADER */}
+            <div className="nutri-ai-header">
+              <div className="nutri-ai-header-content">
+                <img 
+                  src="images/nutri.png"
+                  alt="AI"
+                  className="nutri-ai-avatar"
+                />
+                <div>
+                  <h2>Nutri-AI</h2>
+                  <p>Your Smart Nutrition Assistant</p>
+                </div>
+              </div>
+
+              {/* SVG WAVE */}
+              <svg className="nutri-ai-wave" viewBox="0 0 1440 120">
+                <path
+                  fill="#ffffff"
+                  d="M0,64L80,80C160,96,320,128,480,128C640,128,800,96,960,85.3C1120,75,1280,85,1360,90.7L1440,96L1440,160L0,160Z"
+                ></path>
+              </svg>
+            </div>
+
+            {/* CHAT BOX */}
+            <div className="account-chat-box" ref={chatBoxRef}>
               {chatMessages.length === 0 ? (
-                <div style={{ color: '#999', textAlign: 'center', padding: '20px' }}>
+                <div className="chat-placeholder">
                   Ask me anything about nutrition, meal planning, or dietary advice!
                 </div>
               ) : (
                 chatMessages.map((msg, index) => (
-                  <div 
-                    key={index} 
-                    className={`chat-message ${msg.role}`}
-                  >
+                  <div key={index} className={`chat-message ${msg.role}`}>
                     {msg.role === 'user' ? (
                       msg.content
                     ) : (
@@ -176,10 +198,10 @@ const Account = () => {
                 ))
               )}
             </div>
+
             <div className="account-chat-input">
               <input
                 type="text"
-                id="chatInput"
                 placeholder="Ask for nutrition advice..."
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
@@ -187,9 +209,10 @@ const Account = () => {
                 disabled={isLoading}
               />
               <button onClick={handleSendMessage} disabled={isLoading}>
-                {isLoading ? 'Sending...' : 'Send'}
+                {isLoading ? 'Sending...' : <SendHorizontal />}
               </button>
             </div>
+
           </div>
 
           {/* BADGES */}

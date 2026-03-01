@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from httpx import AsyncClient, HTTPError
 import json
 import asyncio
+import logging
 from config import OPENROUTER_API_KEY, OPENROUTER_URL, AI_MODEL
 from schemas import (
     ChatRequest, ChatbotRequest, ChatResponse, ChatbotResponse,
@@ -10,6 +11,7 @@ from schemas import (
 )
 from utils import create_prompt, create_chat_prompt, create_chatbot_prompt, chat_sessions
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/")
@@ -320,9 +322,14 @@ async def get_recommendation():
 @router.post("/chat/stream")
 async def chat_stream_endpoint(request: ChatRequest):
     """Streaming version of chat endpoint"""
+    logger.info("🌊 CHAT STREAM ENDPOINT CALLED")
+    logger.info(f"📨 Message: {request.message[:100]}..." if len(request.message) > 100 else f"📨 Message: {request.message}")
+    logger.info(f"🆔 Session ID: {request.session_id}")
+    logger.info(f"👤 User Context: {'Provided' if request.user_context else 'None'}")
     
     async def generate_stream():
         if not OPENROUTER_API_KEY:
+            logger.error("❌ OpenRouter API key not configured")
             yield f"data: {json.dumps({'error': 'OpenRouter API key not configured', 'done': True})}\n\n"
             return
         

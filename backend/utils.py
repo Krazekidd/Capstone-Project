@@ -1,12 +1,14 @@
 from typing import List, Dict, Optional
 from datetime import datetime
 from schemas import UserMetrics
+from config import MAX_CONTEXT_MESSAGES
 import logging
 
 logger = logging.getLogger(__name__)
 
 # In-memory storage for chat sessions (for demo purposes)
 chat_sessions: Dict[str, Dict[str, any]] = {}
+
 
 def create_prompt(user_metrics: UserMetrics) -> str:
     logger.info("=" * 80)
@@ -110,10 +112,10 @@ Be conversational for casual chat (hi, how are you, etc.) but expert and thoroug
 
     logger.info(f"📋 System instructions length: {len(system_instructions)} chars")
 
-    # Build conversation history - limit to last 6 messages (3 exchanges) to save tokens
-    history_messages = session["messages"][-6:]
+    # Build conversation history - limit to last MAX_CONTEXT_MESSAGES to save tokens
+    history_messages = session["messages"][-MAX_CONTEXT_MESSAGES:]
     
-    logger.info(f"📜 Including last {len(history_messages)} messages from history")
+    logger.info(f"📜 Including last {len(history_messages)} messages from history (max: {MAX_CONTEXT_MESSAGES})")
     
     messages = []
     

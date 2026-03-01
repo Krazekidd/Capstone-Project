@@ -17,3 +17,6 @@ DATABASE_URL = os.getenv(
 # Server configuration
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
+
+# Chatbot context window configuration
+MAX_CONTEXT_MESSAGES = int(os.getenv("MAX_CONTEXT_MESSAGES", "8"))

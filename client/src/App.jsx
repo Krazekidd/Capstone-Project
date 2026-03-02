@@ -8,6 +8,7 @@ import Shop from './pages/Shop/Shop'
 import Account from './pages/Account/Account'
 import NotFound from './pages/NotFound/NotFound'
 import Excursions from './pages/Excursions/Excursions';
+import TrainerPage from './pages/Trainer/Traineracc'
 
 function App() {
 
@@ -22,6 +23,7 @@ function App() {
         <Route path="/shop" element={<Shop />} />
         <Route path="/account" element={<Account />} />
         <Route path="/excursions" element={<Excursions />} />
+        <Route path="/trainer" element={<TrainerPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>

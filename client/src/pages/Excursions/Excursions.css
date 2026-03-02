@@ -1,0 +1,384 @@
+.excursions-container-wrapper {
+    min-height: 100vh;
+    background: #f9f9f9;
+    color: #333;
+    position: relative;
+}
+
+.excursions-background-accent {
+    position: fixed;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255, 69, 0, 0.15), transparent 70%);
+    filter: blur(100px);
+    z-index: -1;
+}
+
+.excursions-accent-top {
+    top: -150px;
+    right: -150px;
+}
+
+.excursions-accent-bottom {
+    bottom: -180px;
+    left: -180px;
+}
+
+.excursions-hero {
+    height: 35vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    background: #fff;
+}
+
+.excursions-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 69, 0, 0.05);
+}
+
+.excursions-hero .excursions-overlay {
+    position: relative;
+    text-align: center;
+    z-index: 1;
+}
+
+/* Floating home button – fixed to viewport, always visible */
+.excursions-home-link-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1000;
+}
+
+.excursions-home-link {
+    display: inline-block;
+    color: #ff4500;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 0.4rem 1rem;
+    border-radius: 30px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.2s;
+}
+
+.excursions-home-link:hover {
+    background: #fff;
+    color: #cc3700;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 69, 0, 0.2);
+}
+
+.excursions-hero h1 {
+    font-size: 44px;
+    color: #ff4500;
+    font-weight: 700;
+}
+
+.excursions-hero p {
+    margin-top: 10px;
+    font-size: 18px;
+    color: #555;
+}
+
+.excursions-progress-bar {
+    max-width: 900px;
+    margin: 30px auto 20px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.excursions-progress-bar .excursions-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    font-weight: 600;
+    font-size: 14px;
+    color: #aaa;
+}
+
+.excursions-progress-bar .excursions-step.active {
+    color: #ff4500;
+}
+
+.excursions-progress-bar .excursions-step span {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    border-radius: 50%;
+    background: #ffe5d1;
+    margin-bottom: 5px;
+    color: #ff4500;
+}
+
+.excursions-wrapper {
+    max-width: 1200px;
+    margin: 0 auto 80px;
+    padding: 0 20px;
+}
+
+.excursions-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 40px;
+    max-width: 1100px;
+    margin: 30px auto;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    transition: all 0.4s ease;
+}
+
+.excursions-card h2 {
+    font-size: 28px;
+    text-transform: uppercase;
+    color: #ff4500;
+    margin-bottom: 25px;
+    text-align: center;
+}
+
+/* holy map batman */
+.excursions-main-map {
+    margin-bottom: 30px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.leaflet-container {
+    border-radius: 12px;
+    height: 400px; 
+    width: 100%;
+}
+
+/* Excursion grid */
+.excursions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.excursions-card-item {
+    border: 2px solid #eee;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+}
+
+.excursions-card-item:hover {
+    border-color: #ff4500;
+    box-shadow: 0 8px 20px rgba(255, 69, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+.excursions-card-content {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.excursions-card-content h3 {
+    font-size: 20px;
+    color: #ff4500;
+    margin-bottom: 8px;
+}
+
+.excursions-description {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.excursions-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 13px;
+    color: #777;
+    margin-bottom: 20px;
+}
+
+.excursions-details span {
+    background: #f5f5f5;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+
+.excursions-price {
+    font-weight: bold;
+    color: #ff4500;
+}
+
+.excursions-select-btn {
+    background: #ff4500;
+    color: #fff;
+    border: none;
+    padding: 12px 0;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: auto;
+    width: 100%;
+}
+
+.excursions-select-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 69, 0, 0.25);
+}
+
+/* Selected summary and form */
+.excursions-selected-summary {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border: 1px solid #ff4500;
+}
+
+.excursions-selected-summary p {
+    font-size: 16px;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.excursions-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.excursions-input-group label {
+    font-size: 14px;
+    margin-bottom: 6px;
+    display: block;
+    color: #333;
+    font-weight: 500;
+}
+
+.excursions-input-group input {
+    width: 100%;
+    padding: 14px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+    color: #333;
+    background: #fafafa;
+    transition: border 0.3s ease;
+}
+
+.excursions-input-group input:focus {
+    outline: none;
+    border-color: #ff4500;
+    background: #fff;
+}
+
+/* Buttons */
+.excursions-button-group {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.excursions-primary-btn {
+    flex: 1;
+    padding: 16px;
+    border: none;
+    background: #ff4500;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.excursions-primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(255, 69, 0, 0.25);
+}
+
+.excursions-secondary-btn {
+    flex: 1;
+    padding: 16px;
+    border: 2px solid #ff4500;
+    background: transparent;
+    color: #ff4500;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.excursions-secondary-btn:hover {
+    background: rgba(255, 69, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+/* confirmation */
+.excursions-summary {
+    background: #fff;
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    border: 1px solid #ff4500;
+}
+
+.excursions-summary p {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.excursions-thanks {
+    text-align: center;
+    font-size: 18px;
+    color: #28a745;
+    margin: 30px 0;
+    font-weight: 500;
+}
+
+/* Mobile comp */
+@media (max-width: 768px) {
+    .excursions-hero h1 {
+        font-size: 32px;
+    }
+    .excursions-progress-bar {
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+    }
+    .excursions-progress-bar .excursions-step {
+        width: 100%;
+    }
+    .excursions-card {
+        padding: 20px;
+    }
+    .excursions-button-group {
+        flex-direction: column;
+    }
+    /* Floating home button adjustments for mobile */
+    .excursions-home-link-container {
+        top: 10px;
+        left: 10px;
+    }
+    .excursions-home-link {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.8rem;
+    }
+}

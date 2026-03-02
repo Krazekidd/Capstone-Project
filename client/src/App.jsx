@@ -7,6 +7,7 @@ import Consultation from './pages/Consultation/Consultation'
 import Shop from './pages/Shop/Shop'
 import Account from './pages/Account/Account'
 import NotFound from './pages/NotFound/NotFound'
+import Excursions from './pages/Excursions/Excursions';
 
 function App() {
 
@@ -20,6 +21,7 @@ function App() {
         <Route path="/consultation" element={<Consultation />} />
         <Route path="/shop" element={<Shop />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/excursions" element={<Excursions />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>

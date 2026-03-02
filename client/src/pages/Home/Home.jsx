@@ -88,7 +88,7 @@ export default function Home() {
             <ul className="dropdown-content">
               <li><Link to="/consultation">Consultation</Link></li>
               <li><Link to="/membership">Membership</Link></li>
-              <li><a href="#excursions">Excursions</a></li>
+              <li><Link to="/excursions">Excursions</Link></li>
             </ul>
           </li>
           <li><Link to="/about">About</Link></li>

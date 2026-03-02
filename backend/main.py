@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Initialise database tables on startup."""
     logger.info("🚀 Starting application...")
-    await init_db()
+    #await init_db()
     logger.info("✅ Application started successfully")
     yield
     logger.info("👋 Shutting down application...")

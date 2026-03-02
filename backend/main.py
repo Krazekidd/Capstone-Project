@@ -41,7 +41,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:5173",  # Vite dev server (alternative)
-        "https://capstone-project-sage-six.vercel.app",  # Production Vercel URL
+        "https://gym-capstone-app.vercel.app",  # Production Vercel URL
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],

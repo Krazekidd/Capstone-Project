@@ -25,6 +25,15 @@ const Excursions = () => {
     phone: "",
     email: ""
   });
+  const [bookingId, setBookingId] = useState("");
+
+  // Generate a random booking ID when we reach step 3 for now
+  useEffect(() => {
+    if (step === 3) {
+      const id = 'BAD-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+      setBookingId(id);
+    }
+  }, [step]);
 
   // frontend sample for pretty 
   const excursions = [
@@ -36,7 +45,9 @@ const Excursions = () => {
       time: "6:00 AM",
       spots: 12,
       price: "$67",
-      coords: [18.0468, -76.5789]
+      coords: [18.0468, -76.5789],
+      address: "Blue Mountain Peak Trail, Portland, Jamaica",
+      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
     },
     {
       id: 2,
@@ -46,7 +57,9 @@ const Excursions = () => {
       time: "7:30 AM",
       spots: 8,
       price: "$41",
-      coords: [18.0167, -76.3167]
+      coords: [18.0167, -76.3167],
+      address: "Reach Falls, Portland, Jamaica",
+      image: "https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
     },
     {
       id: 3,
@@ -56,7 +69,9 @@ const Excursions = () => {
       time: "6:00 PM",
       spots: 15,
       price: "$1",
-      coords: [18.0833, -76.6667]
+      coords: [18.0833, -76.6667],
+      address: "Holywell Recreation Area, Blue Mountains, Jamaica",
+      image: "https://images.unsplash.com/photo-1519681393784-d120267933ba?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
     }
   ];
 
@@ -175,11 +190,26 @@ const Excursions = () => {
         {step === 2 && selectedExcursion && (
           <div className="excursions-card">
             <h2>Your Information</h2>
+
+            <div className="excursions-location-section">
+              <h3>Meeting Point</h3>
+              <p>{selectedExcursion.address}</p>
+              <div className="excursions-location-map">
+                <iframe
+                  src={`https://www.google.com/maps?q=${selectedExcursion.coords[0]},${selectedExcursion.coords[1]}&z=14&output=embed`}
+                  loading="lazy"
+                  title={`Map of ${selectedExcursion.name}`}
+                  allowFullScreen
+                ></iframe>
+              </div>
+            </div>
+
             <div className="excursions-selected-summary">
               <p><strong>Excursion:</strong> {selectedExcursion.name}</p>
               <p><strong>Date:</strong> {selectedExcursion.date} at {selectedExcursion.time}</p>
               <p><strong>Price:</strong> {selectedExcursion.price}</p>
             </div>
+
             <div className="excursions-form">
               <div className="excursions-input-group">
                 <label htmlFor="name">Full Name</label>
@@ -218,6 +248,7 @@ const Excursions = () => {
                 />
               </div>
             </div>
+
             <div className="excursions-button-group">
               <button className="excursions-secondary-btn" onClick={() => setStep(1)}>
                 Back
@@ -230,22 +261,43 @@ const Excursions = () => {
         )}
 
         {step === 3 && selectedExcursion && (
-          <div className="excursions-card">
-            <h2>Booking Confirmed!</h2>
-            <div className="excursions-summary">
-              <p><strong>Excursion:</strong> {selectedExcursion.name}</p>
-              <p><strong>Date:</strong> {selectedExcursion.date} at {selectedExcursion.time}</p>
-              <p><strong>Name:</strong> {userInfo.name}</p>
-              <p><strong>Phone:</strong> {userInfo.phone}</p>
-              <p><strong>Email:</strong> {userInfo.email}</p>
-              <p><strong>Total:</strong> {selectedExcursion.price}</p>
+          <div className="excursions-card booking-confirmed">
+            <div className="booking-confirmed-content">
+              {/* receipt above excursion name */}
+              <div className="excursion-receipt">
+                <span className="receipt-label">Booking Receipt</span>
+                <div className="receipt-details">
+                  <p><strong>Confirmation #:</strong> {bookingId}</p>
+                  <p><strong>Date:</strong> {new Date().toLocaleDateString()}</p>
+                  <p><strong>Status:</strong> Confirmed</p>
+                </div>
+              </div>
+
+              <h2>Booking Confirmed!</h2>
+
+              {/* Summary card with image inside on left */}
+              <div className="excursions-summary with-image">
+                <div className="summary-image">
+                  <img src={selectedExcursion.image} alt={selectedExcursion.name} />
+                </div>
+                <div className="summary-details">
+                  <p><strong>Excursion:</strong> {selectedExcursion.name}</p>
+                  <p><strong>Date:</strong> {selectedExcursion.date} at {selectedExcursion.time}</p>
+                  <p><strong>Name:</strong> {userInfo.name}</p>
+                  <p><strong>Phone:</strong> {userInfo.phone}</p>
+                  <p><strong>Email:</strong> {userInfo.email}</p>
+                  <p><strong>Total:</strong> {selectedExcursion.price}</p>
+                </div>
+              </div>
+
+              <p className="excursions-thanks">
+                Thank you for booking! You will receive a confirmation email shortly.
+              </p>
+
+              <button className="excursions-primary-btn" onClick={resetBooking}>
+                Book Another Excursion
+              </button>
             </div>
-            <p className="excursions-thanks">
-              Thank you for booking! You will receive a confirmation email shortly.
-            </p>
-            <button className="excursions-primary-btn" onClick={resetBooking}>
-              Book Another Excursion
-            </button>
           </div>
         )}
       </section>

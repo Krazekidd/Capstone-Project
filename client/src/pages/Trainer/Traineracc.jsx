@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import "./trainer.css";
 
 export default function TrainerPage() {
@@ -34,6 +34,7 @@ export default function TrainerPage() {
   const openTrainerModal = (trainerName) => {
     setSelectedTrainer(trainerName);
     setShowTrainerModal(true);
+
     if (!trainerAssessments[trainerName]) {
       setTrainerAssessments(prev => ({
         ...prev,
@@ -58,116 +59,165 @@ export default function TrainerPage() {
   return (
     <div className="trainer-page">
 
-      {/* TOP PROFILE */}
-      <div className="profile-card">
-        <img src="https://via.placeholder.com/150" alt="Trainer" className="trainer-photo" />
-        <h1>{trainer.name}</h1>
-        <span className="trainer-role">{trainer.role}</span>
-        <div className="trainer-rating">
-          {[1,2,3,4,5].map(star => (
-            <span key={star} className={star <= Math.round(trainer.rating) ? "filled" : ""}>★</span>
-          ))}
-          <span className="rating-number">{trainer.rating.toFixed(1)}/5.0</span>
+      {/* HERO */}
+      <div className="hero">
+        <div className="hero-background">
+          <img
+            src="https://images.unsplash.com/photo-1571019613911-ec6d0c1f31b3?auto=format&fit=crop&w=1350&q=80"
+            alt="background"
+            className="hero-bg-img"
+          />
         </div>
-        <p><strong>Experience:</strong> {trainer.yearsExperience} years</p>
-        <p><strong>Certifications:</strong> {trainer.cert}</p>
+
+        <div className="hero-content">
+          <img
+            src="https://randomuser.me/api/portraits/men/32.jpg"
+            alt="trainer"
+            className="avatar"
+          />
+          <h1>{trainer.name}</h1>
+          <div className="role-badge">{trainer.role}</div>
+
+          <div className="stars">
+            {"★".repeat(Math.floor(trainer.rating))}
+            {"☆".repeat(5 - Math.floor(trainer.rating))}
+            <span className="rating-number">{trainer.rating}</span>
+          </div>
+
+          {/* Professional Overview */}
+          <div className="professional-overview">
+            <div className="info-box">
+              <span>Years of Experience</span>
+              <strong>{trainer.yearsExperience} Years</strong>
+            </div>
+            <div className="info-box">
+              <span>Certifications</span>
+              <strong>{trainer.cert}</strong>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* TRAINER ASSESSMENTS */}
-      <div className="card">
-        <h2>Trainer Assessments</h2>
-        <div className="other-trainers">
-          {trainer.otherTrainers.map(t => (
-            <div
-              key={t}
-              className="trainer-card"
-              onClick={() => openTrainerModal(t)}
-            >
-              {t}
+      <div className="container">
+
+        {/* KPI STATS */}
+        <section className="kpi-row">
+          <div className="kpi-card">
+            <h4>Monthly Score</h4>
+            <div className="circle"
+              style={{
+                background: `conic-gradient(#ff6b00 ${trainer.monthlyScore}%, #eee ${trainer.monthlyScore}% 100%)`
+              }}>
+              {trainer.monthlyScore}%
+            </div>
+          </div>
+
+          <div className="kpi-card">
+            <h4>Total Reviews</h4>
+            <div className="big-number">{trainer.publicReviews.length}</div>
+          </div>
+
+          <div className="kpi-card">
+            <h4>Active Alerts</h4>
+            <div className="big-number alert">
+              {trainer.clientsAlerts.length}
+            </div>
+          </div>
+        </section>
+
+        {/* TRAINER ASSESSMENT */}
+        <section className="card">
+          <h3>Trainer Assessment</h3>
+
+          {trainer.otherTrainers.map((t) => (
+            <div key={t} className="trainer-row">
+              <span>{t}</span>
+              <button className="btn" onClick={() => openTrainerModal(t)}>
+                Assess
+              </button>
             </div>
           ))}
-        </div>
-      </div>
+        </section>
 
-      {/* CLIENT ALERTS */}
-      <div className="card">
-        <h2>Client Alerts</h2>
-        {trainer.clientsAlerts.length === 0 ? (
-          <p>No alerts at this time.</p>
-        ) : (
-          <ul className="clients-alerts">
-            {trainer.clientsAlerts.map((c, idx) => (
-              <li key={idx}>⚠ {c.name} - {c.issue}</li>
-            ))}
+        {/* CLIENT ALERTS */}
+        <section className="card">
+          <h3>Clients Needing Attention</h3>
+          {trainer.clientsAlerts.map((c, i) => (
+            <div key={i} className="client-row">
+              <div>
+                <strong>{c.name}</strong>
+                <p>{c.issue}</p>
+              </div>
+              <div className="risk-badge">⚠ Risk</div>
+            </div>
+          ))}
+        </section>
+
+        {/* PUBLIC REVIEWS */}
+        <section className="card">
+          <h3>Public Reviews</h3>
+          {trainer.publicReviews.map((r, i) => (
+            <div key={i} className="review">
+              <strong>{r.user}</strong>
+              <div className="stars small">
+                {"★".repeat(r.rating)}
+                {"☆".repeat(5 - r.rating)}
+              </div>
+              <p>{r.comment}</p>
+            </div>
+          ))}
+        </section>
+
+        {/* ACTIVITY TIMELINE */}
+        <section className="card">
+          <h3>Recent Activity</h3>
+          <ul className="timeline">
+            <li>Completed 12 sessions this week</li>
+            <li>3 new clients onboarded</li>
+            <li>Monthly assessment updated</li>
           </ul>
-        )}
+        </section>
+
       </div>
 
-      {/* PERFORMANCE METRIC */}
-      <div className="card performance-card">
-        <h2>Monthly Performance</h2>
-        <div className="circular-progress">
-          <svg viewBox="0 0 36 36">
-            <path
-              className="circle-bg"
-              d="M18 2.0845
-                 a 15.9155 15.9155 0 0 1 0 31.831
-                 a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-            <path
-              className="circle"
-              strokeDasharray={`${trainer.monthlyScore}, 100`}
-              d="M18 2.0845
-                 a 15.9155 15.9155 0 0 1 0 31.831
-                 a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-            <text x="18" y="20.35" className="percentage">{trainer.monthlyScore}%</text>
-          </svg>
-        </div>
-      </div>
-
-      {/* PUBLIC REVIEWS */}
-      <div className="card">
-        <h2>Public Reviews</h2>
-        {trainer.publicReviews.map((r, idx) => (
-          <div key={idx} className="review">
-            <strong>{r.user}</strong>
-            <span className="review-stars">
-              {[1,2,3,4,5].map(s => (
-                <span key={s} className={s <= r.rating ? "filled" : ""}>★</span>
-              ))}
-            </span>
-            <p>{r.comment}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ASSESSMENT MODAL */}
+      {/* MODAL */}
       {showTrainerModal && (
-        <div className="modal-overlay" onClick={() => setShowTrainerModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3>Assess {selectedTrainer}</h3>
-            {trainer.assessmentCriteria.map(c => (
-              <div key={c} className="criteria-row">
-                <span>{c}:</span>
+        <div className="modal">
+          <div className="modal-content">
+            <h3>Assessing {selectedTrainer}</h3>
+
+            {trainer.assessmentCriteria.map((c) => (
+              <div key={c} className="slider">
+                <label>{c}</label>
                 <input
-                  type="number"
+                  type="range"
                   min="0"
                   max="10"
-                  value={trainerAssessments[selectedTrainer][c]}
-                  onChange={(e) => handleAssessmentChange(c, parseInt(e.target.value))}
+                  value={trainerAssessments[selectedTrainer]?.[c] || 0}
+                  onChange={(e) =>
+                    handleAssessmentChange(c, e.target.value)
+                  }
                 />
+                <span>
+                  {trainerAssessments[selectedTrainer]?.[c] || 0}
+                </span>
               </div>
             ))}
-            <div className="remarks">
-              <label>Remarks:</label>
-              <textarea placeholder="Write remarks..."></textarea>
-            </div>
-            <button onClick={() => setShowTrainerModal(false)}>Save & Close</button>
+
+            <textarea
+              placeholder="Add remarks..."
+              className="remarks"
+            />
+
+            <button
+              className="btn"
+              onClick={() => setShowTrainerModal(false)}
+            >
+              Submit Assessment
+            </button>
           </div>
         </div>
       )}
-
     </div>
   );
-}
+};

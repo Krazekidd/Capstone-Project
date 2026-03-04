@@ -87,8 +87,9 @@ const Account = () => {
           </label>
 
           <h3 id="displayName">John Doe</h3>
+          <p>Status: Active</p>
           <div className="account-profile-info">
-            Status: Active
+            Membership: Single/Group
             <br />
             Gym Start: Jan 2024
             <br />

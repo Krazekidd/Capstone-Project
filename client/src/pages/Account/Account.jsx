@@ -73,7 +73,13 @@ const Account = () => {
       glutes: "",
     });
   };
+  const [activeChartTab, setActiveChartTab] = useState("compare");
+  
 
+
+
+
+  
 const [aiQuery, setAiQuery] = useState("");
 const [chatMessages, setChatMessages] = useState([]);
 const [isLoading, setIsLoading] = useState(false);
@@ -133,10 +139,9 @@ const handleKeyPress = (e) => {
       {/* Banner */}
       <div className="banner">
         <div className="banner-bg"></div>
-        <div className="banner-text">IRONFORGE</div>
         <div className="banner-badge">
           <div className="logo-dot"></div>
-          <div className="logo-text">IRONFORGE</div>
+          <div className="logo-text">GYMPRO</div>
         </div>
         <div className="profile-avatar-wrap">
           <div className="avatar-ring">
@@ -386,6 +391,64 @@ const handleKeyPress = (e) => {
             </div>
           </div>
         </div>
+        {/* ─── PROGRESS CHARTS ─── */}
+
+<div className="card" style={{ marginBottom: "20px" }}>
+  <div className="card-label">Analytics</div>
+  <div className="section-title">📊 Progress Dashboard</div>
+  <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "20px" }}>
+    Live comparison of your current stats vs goals, plus monthly trend lines.
+  </p>
+
+  <div className="chart-tabs">
+    <button
+      className={`chart-tab ${activeChartTab === "compare" ? "active" : ""}`}
+      onClick={() => setActiveChartTab("compare")}
+    >
+      Goal vs Current
+    </button>
+    <button
+      className={`chart-tab ${activeChartTab === "weight" ? "active" : ""}`}
+      onClick={() => setActiveChartTab("weight")}
+    >
+      Weight Trend
+    </button>
+    <button
+      className={`chart-tab ${activeChartTab === "body" ? "active" : ""}`}
+      onClick={() => setActiveChartTab("body")}
+    >
+      Body Measurements
+    </button>
+    <button
+      className={`chart-tab ${activeChartTab === "strength" ? "active" : ""}`}
+      onClick={() => setActiveChartTab("strength")}
+    >
+      Strength
+    </button>
+  </div>
+
+  <div className={`chart-panel ${activeChartTab === "compare" ? "show" : ""}`} id="tab-compare">
+    <div className="compare-grid" id="compareGrid"></div>
+  </div>
+  <div className={`chart-panel ${activeChartTab === "weight" ? "show" : ""}`} id="tab-weight">
+    <div className="chart-canvas-wrap">
+      <canvas id="weightChart"></canvas>
+    </div>
+  </div>
+  <div className={`chart-panel ${activeChartTab === "body" ? "show" : ""}`} id="tab-body">
+    <div className="chart-canvas-wrap">
+      <canvas id="bodyChart"></canvas>
+    </div>
+  </div>
+  <div className={`chart-panel ${activeChartTab === "strength" ? "show" : ""}`} id="tab-strength">
+    <div className="chart-canvas-wrap">
+      <canvas id="strengthChart"></canvas>
+    </div>
+  </div>
+</div>
+
+
+
               <div className="grid">
         <div className="card ai-area grid-full">
           <div className="card-label">AI Powered</div>

@@ -128,7 +128,7 @@ const Account = () => {
       {/* AI Chat Button */}
       <div className="chat-fab">
         <button className="chat-btn">💬</button>
-        <div className="chat-label">AI Coach</div>
+        <div className="chat-label">lIVE CHAT</div>
       </div>
 
     </div>

@@ -1,0 +1,188 @@
+.admin-page {
+    max-width: 1000px;
+    margin: auto;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    font-family: Manrope;
+    color: #E2E8F4;
+}
+
+/* HERO */
+
+.admin-hero {
+    text-align: center;
+    padding: 40px;
+    background: linear-gradient(135deg, #0D1220, #131928);
+    border-radius: 16px;
+    border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+.admin-avatar {
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    border: 3px solid #00D4FF;
+    margin-bottom: 12px;
+}
+
+.admin-name {
+    font-size: 26px;
+    font-weight: 700;
+}
+
+.admin-role {
+    color: #00D4FF;
+    margin-bottom: 8px;
+}
+
+.admin-stars {
+    color: #FFD700;
+    font-size: 18px;
+}
+
+
+/* CARDS */
+
+.card {
+    background: #0D1220;
+    padding: 25px;
+    border-radius: 14px;
+    border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+.card-title {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #00D4FF;
+    margin-bottom: 20px;
+}
+
+
+/* PROFILE */
+
+.profile-grid {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 15px;
+}
+
+.profile-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-number {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: #5A6A8A;
+}
+
+.certifications {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    font-size: 11px;
+}
+
+
+/* STATS */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+}
+
+.stat-card {
+    padding: 20px;
+    border-radius: 12px;
+    background: #131928;
+    text-align: center;
+}
+
+.stat-card h2 {
+    font-size: 32px;
+}
+
+.stat-card.cyan {
+    border-bottom: 3px solid #00D4FF;
+}
+
+.stat-card.orange {
+    border-bottom: 3px solid #FF8C00;
+}
+
+.stat-card.green {
+    border-bottom: 3px solid #00FF88;
+}
+
+.stat-card.red {
+    border-bottom: 3px solid #FF3355;
+}
+
+
+/* ALERT */
+
+.alert {
+    background: rgba(255, 140, 0, 0.1);
+    border: 1px solid rgba(255, 140, 0, 0.3);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+
+/* TRAINERS */
+
+.trainer-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.trainer-item img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.btn {
+    margin-left: auto;
+    background: #00D4FF;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+
+/* REVIEWS */
+
+.review {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 10px 0;
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.stars {
+    color: #FFD700;
+}

@@ -1,235 +1,138 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { sendNutriMessage } from "../../api/nutriAI";
 import { SendHorizontal } from 'lucide-react';
 import "./Account.css";
 
 const Account = () => {
-  const [chatMessages, setChatMessages] = useState([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const chatBoxRef = useRef(null);
-
-  useEffect(() => {
-    if (chatBoxRef.current) {
-      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
-    }
-  }, [chatMessages]);
-
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
-
-    const userMessage = inputMessage.trim();
-    setInputMessage('');
-    
-    // Add user message to chat
-    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setIsLoading(true);
-
-    try {
-      let aiResponse = '';
-      
-      // Add empty AI message that will be updated with streaming content
-      setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-      await sendNutriMessage(userMessage, (chunk) => {
-        aiResponse += chunk;
-        // Update the last message (AI response) with new content
-        setChatMessages(prev => {
-          const updated = [...prev];
-          updated[updated.length - 1] = { role: 'assistant', content: aiResponse };
-          return updated;
-        });
-      });
-    } catch (error) {
-      console.error('Error:', error);
-      setChatMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
-      }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
 
   return (
-    <div className="account-container-wrapper">
-      <div className="account-header-banner">
-        <div className="account-settings-dropdown">
-          <button className="account-settings-btn">⋮</button>
-          <div className="account-settings-menu">
-            <div className="account-settings-item" onClick={() => toggleTheme()}>
-              Toggle Light/Dark
-            </div>
-            <div className="account-settings-item">Profile Settings</div>
-            <div className="account-settings-item">Log Out</div>
+    <div className="member-profile">
+
+      {/* Banner */}
+      <div className="banner">
+        <div className="banner-bg"></div>
+
+
+        <div className="banner-badge">
+          <div className="logo-text">GYM PRO</div>
+          <div className="logo-dot"></div>
+        </div>
+
+        <div className="profile-avatar-wrap">
+          <div className="avatar-ring">
+            <img src="/avatar.jpg" alt="Profile Avatar" />
           </div>
+          <div className="avatar-status"></div>
         </div>
       </div>
 
-      <div className="account-container">
-        {/* LEFT PANEL */}
-        <div className="account-profile-panel">
-          <label className="account-profile-pic">
-            <img
-              id="profileImage"
-              src="https://via.placeholder.com/150"
-              alt="Profile"
-            />
-            <input type="file" id="imageUpload" />
-          </label>
+      {/* Main Content */}
+      <div className="main">
 
-          <h3 id="displayName">John Doe</h3>
-          <p>Status: Active</p>
-          <div className="account-profile-info">
-            Membership: Single/Group
-            <br />
-            Gym Start: Jan 2024
-            <br />
-            Birthday: May 15, 1998
+        {/* Profile Header */}
+        <div className="profile-header">
+
+          <div className="profile-info">
+            <h1>John Carter</h1>
+            <div className="handle">@ironmember</div>
+
+            <div className="profile-tags">
+              <span className="tag tag-red">Athlete</span>
+              <span className="tag tag-orange">Strength</span>
+              <span className="tag tag-green">Active</span>
+            </div>
           </div>
+
+          <div className="profile-stats">
+            <div className="stat">
+              <div className="stat-num">128</div>
+              <div className="stat-label">Workouts</div>
+            </div>
+
+            <div className="stat">
+              <div className="stat-num">52</div>
+              <div className="stat-label">Weeks</div>
+            </div>
+
+            <div className="stat">
+              <div className="stat-num">9</div>
+              <div className="stat-label">Goals</div>
+            </div>
+          </div>
+
         </div>
 
-        {/* RIGHT CONTENT */}
-        <div className="account-content">
-          {/* PERSONAL INFO */}
-          <div className="account-section">
-            <h2>Personal Information</h2>
-            <div className="account-grid-2">
-              <input type="text" placeholder="Full Name" />
-              <input type="date" />
-              <input type="email" placeholder="Email" />
-              <input type="tel" placeholder="Phone Number" />
-              <select>
-                <option>Gender</option>
-                <option>Male</option>
-                <option>Female</option>
-                <option>Other</option>
-              </select>
-            </div>
-          </div>
+        {/* Dashboard Grid */}
+        <div className="grid">
 
-          {/* TRACK PROGRESS */}
-          <div className="account-section">
-            <h2>Track Your Progress</h2>
-            <div className="account-progress-container">
-              <div className="account-progress-left">
-                <div className="account-grid-2">
-                  <input
-                    type="number"
-                    id="weight"
-                    placeholder="Weight (kg)"
-                  />
-                  <input
-                    type="number"
-                    id="height"
-                    placeholder="Height (cm)"
-                  />
-                  <input type="number" placeholder="Bust (cm)" />
-                  <input type="number" placeholder="Shoulder (cm)" />
-                  <input type="number" placeholder="Waist (cm)" />
-                  <input type="number" placeholder="Hip (cm)" />
-                  <input type="number" placeholder="Thigh (cm)" />
-                </div>
+          {/* Progress Card */}
+          <div className="card">
+            <div className="card-label">Progress</div>
 
-                <button onClick={() => calculateBMI()}>Calculate BMI</button>
-                <div className="account-bmi-display" id="bmiResult">
-                  BMI: --
-                </div>
+            <div className="mini-stats">
+              <div className="mini-stat">
+                <div className="ms-val">72kg</div>
+                <div className="ms-label">Weight</div>
               </div>
 
-              <div className="account-body-visual" id="bodyVisual"></div>
-            </div>
-          </div>
-
-          {/* MONTHLY REPORT */}
-          <div className="account-section">
-            <h2>Monthly Report</h2>
-            <canvas id="progressChart"></canvas>
-          </div>
-
-          {/* NUTRI-AI */}
-          <div className="account-section nutri-ai-section">
-
-            {/* AI HEADER */}
-            <div className="nutri-ai-header">
-              <div className="nutri-ai-header-content">
-                <img 
-                  src="images/nutri.png"
-                  alt="AI"
-                  className="nutri-ai-avatar"
-                />
-                <div>
-                  <h2>Nutri-AI</h2>
-                  <p>Your Smart Nutrition Assistant</p>
-                </div>
+              <div className="mini-stat">
+                <div className="ms-val">18%</div>
+                <div className="ms-label">Body Fat</div>
               </div>
 
-              {/* SVG WAVE */}
-              <svg className="nutri-ai-wave" viewBox="0 0 1440 120">
-                <path
-                  fill="#ffffff"
-                  d="M0,64L80,80C160,96,320,128,480,128C640,128,800,96,960,85.3C1120,75,1280,85,1360,90.7L1440,96L1440,160L0,160Z"
-                ></path>
-              </svg>
+              <div className="mini-stat">
+                <div className="ms-val">44cm</div>
+                <div className="ms-label">Arms</div>
+              </div>
+
+              <div className="mini-stat">
+                <div className="ms-val">110cm</div>
+                <div className="ms-label">Chest</div>
+              </div>
             </div>
 
-            {/* CHAT BOX */}
-            <div className="account-chat-box" ref={chatBoxRef}>
-              {chatMessages.length === 0 ? (
-                <div className="chat-placeholder">
-                  Ask me anything about nutrition, meal planning, or dietary advice!
-                </div>
-              ) : (
-                chatMessages.map((msg, index) => (
-                  <div key={index} className={`chat-message ${msg.role}`}>
-                    {msg.role === 'user' ? (
-                      msg.content
-                    ) : (
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+          </div>
 
-            <div className="account-chat-input">
-              <input
-                type="text"
-                placeholder="Ask for nutrition advice..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                disabled={isLoading}
-              />
-              <button onClick={handleSendMessage} disabled={isLoading}>
-                {isLoading ? 'Sending...' : <SendHorizontal />}
+          {/* Workout Target */}
+          <div className="card">
+            <div className="card-label">Target Workout</div>
+
+            <div className="target-grid">
+
+              <button className="target-btn">
+                <div className="icon">🏋️</div>
+                <div className="name">Strength</div>
+                <div className="desc">Muscle growth</div>
               </button>
+
+              <button className="target-btn">
+                <div className="icon">🔥</div>
+                <div className="name">Fat Burn</div>
+                <div className="desc">Weight loss</div>
+              </button>
+
+              <button className="target-btn">
+                <div className="icon">⚡</div>
+                <div className="name">Endurance</div>
+                <div className="desc">Stamina</div>
+              </button>
+
             </div>
 
           </div>
 
-          {/* BADGES */}
-          <div className="account-section">
-            <h2>Achievements</h2>
-            <div className="account-badges">
-              <div className="account-badge">🔥 7 Day Streak</div>
-              <div className="account-badge">💪 30 Workouts</div>
-              <div className="account-badge">🏆 3 Month Consistency</div>
-              <div className="account-badge">🥗 Clean Eating Week</div>
-            </div>
-          </div>
         </div>
+
       </div>
+
+      {/* AI Chat Button */}
+      <div className="chat-fab">
+        <button className="chat-btn">💬</button>
+        <div className="chat-label">AI Coach</div>
+      </div>
+
     </div>
   );
-};
+}
 
 export default Account;

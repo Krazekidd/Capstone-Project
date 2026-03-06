@@ -72,6 +72,16 @@ const Account = () => {
     });
   };
 
+const [aiQuery, setAiQuery] = useState("");
+const [aiResponse, setAiResponse] = useState("");
+
+  const handleAskAI = () => {
+    if (!aiQuery.trim()) return;
+    // Fake AI response for now — you can replace this with real API call
+    setAiResponse(`AI Coach Response: Based on your input "${aiQuery}"`);
+    setAiQuery(""); // optional: clear input
+  }
+
   return (
     <div className="member-profile">
       {/* Banner */}
@@ -330,9 +340,33 @@ const Account = () => {
             </div>
           </div>
         </div>
+              <div className="grid">
+        <div className="card ai-area grid-full">
+          <div className="card-label">AI Powered</div>
+          <div className="section-title">🤖 AI Coach — Ask Anything</div>
+          <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "4px" }}>
+            Get personalized advice based on your measurements, goals, and training history.
+          </p>
 
+          <div className="ai-input-row">
+            <input
+              className="ai-input"
+              type="text"
+              placeholder="e.g. Based on my measurements, what should I focus on this month?"
+              value={aiQuery}
+              onChange={(e) => setAiQuery(e.target.value)}
+            />
+            <button className="btn-primary" onClick={handleAskAI}>
+              Ask Coach
+            </button>
+          </div>
+
+          <div className="ai-response">{aiResponse}</div>
+        </div>
+      </div>
       </div>
     </div>
+    
   );
 };
 

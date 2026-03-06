@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import { sendNutriMessage } from "../../api/nutriAI";
 import "./Account.css";
 
 const Account = () => {
@@ -73,14 +75,58 @@ const Account = () => {
   };
 
 const [aiQuery, setAiQuery] = useState("");
-const [aiResponse, setAiResponse] = useState("");
+const [chatMessages, setChatMessages] = useState([]);
+const [isLoading, setIsLoading] = useState(false);
+const chatBoxRef = useRef(null);
 
-  const handleAskAI = () => {
-    if (!aiQuery.trim()) return;
-    // Fake AI response for now — you can replace this with real API call
-    setAiResponse(`AI Coach Response: Based on your input "${aiQuery}"`);
-    setAiQuery(""); // optional: clear input
+useEffect(() => {
+  if (chatBoxRef.current) {
+    chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
   }
+}, [chatMessages]);
+
+const handleAskAI = async () => {
+  if (!aiQuery.trim() || isLoading) return;
+
+  const userMessage = aiQuery.trim();
+  setAiQuery('');
+  
+  // Add user message to chat
+  setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+  setIsLoading(true);
+
+  try {
+    let aiResponse = '';
+    
+    // Add empty AI message that will be updated with streaming content
+    setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+    await sendNutriMessage(userMessage, (chunk) => {
+      aiResponse += chunk;
+      // Update the last message (AI response) with new content
+      setChatMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'assistant', content: aiResponse };
+        return updated;
+      });
+    });
+  } catch (error) {
+    console.error('Error:', error);
+    setChatMessages(prev => [...prev, { 
+      role: 'assistant', 
+      content: 'Sorry, I encountered an error. Please try again.' 
+    }]);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+const handleKeyPress = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleAskAI();
+  }
+};
 
   return (
     <div className="member-profile">
@@ -344,9 +390,30 @@ const [aiResponse, setAiResponse] = useState("");
         <div className="card ai-area grid-full">
           <div className="card-label">AI Powered</div>
           <div className="section-title">🤖 AI Coach — Ask Anything</div>
-          <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "4px" }}>
+          <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "14px" }}>
             Get personalized advice based on your measurements, goals, and training history.
           </p>
+
+          <div className="ai-chat-box" ref={chatBoxRef}>
+            {chatMessages.length === 0 ? (
+              <div style={{ color: '#999', textAlign: 'center', padding: '20px', fontSize: '13px' }}>
+                Ask me anything about fitness, nutrition, or training advice!
+              </div>
+            ) : (
+              chatMessages.map((msg, index) => (
+                <div 
+                  key={index} 
+                  className={`ai-chat-message ${msg.role}`}
+                >
+                  {msg.role === 'user' ? (
+                    msg.content
+                  ) : (
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
 
           <div className="ai-input-row">
             <input
@@ -355,13 +422,13 @@ const [aiResponse, setAiResponse] = useState("");
               placeholder="e.g. Based on my measurements, what should I focus on this month?"
               value={aiQuery}
               onChange={(e) => setAiQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
             />
-            <button className="btn-primary" onClick={handleAskAI}>
-              Ask Coach
+            <button className="btn-primary" onClick={handleAskAI} disabled={isLoading}>
+              {isLoading ? 'Asking...' : 'Ask Coach'}
             </button>
           </div>
-
-          <div className="ai-response">{aiResponse}</div>
         </div>
       </div>
       </div>

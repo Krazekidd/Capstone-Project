@@ -1,28 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import {
-  Chart,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Filler,
-  Tooltip,
-  Legend,
-} from "chart.js";
+import { Chart, registerables } from "chart.js";
+Chart.register(...registerables);
 import "./Account.css";
-
-Chart.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Filler,
-  Tooltip,
-  Legend,
-);
 
 // ─── DATA ─────────────────────────────────────────────
 const WORKOUTS = {
@@ -262,43 +242,44 @@ function WeightChart({ history, goalWeight }) {
 
   useEffect(() => {
     if (!ref.current) return;
-    const timer = setTimeout(() => {
-      chart.current?.destroy();
-      const labels = history.map((h) => h.month);
-      chart.current = new Chart(ref.current, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [
-            {
-              label: "Weight (kg)",
-              data: history.map((h) => h.weight),
-              borderColor: "#ff6b1a",
-              backgroundColor: "rgba(255,107,26,0.1)",
-              borderWidth: 2.5,
-              tension: 0.4,
-              fill: true,
-              pointBackgroundColor: "#ff6b1a",
-              pointRadius: 5,
-            },
-            {
-              label: "Goal",
-              data: history.map(() => goalWeight),
-              borderColor: "rgba(240,238,234,0.45)",
-              borderWidth: 2,
-              borderDash: [6, 4],
-              tension: 0,
-              fill: false,
-              pointRadius: 0,
-            },
-          ],
-        },
-        options: { ...CO },
-      });
-    }, 0);
+    chart.current?.destroy();
+    chart.current = null;
+
+    const labels = history.map((h) => h.month);
+    chart.current = new Chart(ref.current, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Weight (kg)",
+            data: history.map((h) => h.weight),
+            borderColor: "#ff6b1a",
+            backgroundColor: "rgba(255,107,26,0.1)",
+            borderWidth: 2.5,
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: "#ff6b1a",
+            pointRadius: 5,
+          },
+          {
+            label: "Goal",
+            data: history.map(() => goalWeight),
+            borderColor: "rgba(240,238,234,0.45)",
+            borderWidth: 2,
+            borderDash: [6, 4],
+            tension: 0,
+            fill: false,
+            pointRadius: 0,
+          },
+        ],
+      },
+      options: { ...CO },
+    });
+
     return () => {
-      clearTimeout(timer);
       chart.current?.destroy();
+      chart.current = null;
     };
   }, [history, goalWeight]);
 
@@ -311,67 +292,68 @@ function BodyChart({ history }) {
 
   useEffect(() => {
     if (!ref.current) return;
-    const timer = setTimeout(() => {
-      chart.current?.destroy();
-      const labels = history.map((h) => h.month);
-      chart.current = new Chart(ref.current, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [
-            {
-              label: "Chest/Bust",
-              data: history.map((h) => h.chest),
-              borderColor: "#ff6b1a",
-              tension: 0.4,
-              borderWidth: 2,
-              fill: false,
-              pointRadius: 4,
-            },
-            {
-              label: "Waist",
-              data: history.map((h) => h.waist),
-              borderColor: "#ffa040",
-              tension: 0.4,
-              borderWidth: 2,
-              fill: false,
-              pointRadius: 4,
-            },
-            {
-              label: "Hips",
-              data: history.map((h) => h.hips),
-              borderColor: "#f0eeea",
-              tension: 0.4,
-              borderWidth: 2,
-              fill: false,
-              pointRadius: 4,
-            },
-            {
-              label: "Thigh",
-              data: history.map((h) => h.thigh),
-              borderColor: "#6b6b7a",
-              tension: 0.4,
-              borderWidth: 2,
-              fill: false,
-              pointRadius: 4,
-            },
-            {
-              label: "Arm",
-              data: history.map((h) => h.arm),
-              borderColor: "#d4a050",
-              tension: 0.4,
-              borderWidth: 2,
-              fill: false,
-              pointRadius: 4,
-            },
-          ],
-        },
-        options: { ...CO },
-      });
-    }, 0);
+    chart.current?.destroy();
+    chart.current = null;
+
+    const labels = history.map((h) => h.month);
+    chart.current = new Chart(ref.current, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Chest/Bust",
+            data: history.map((h) => h.chest),
+            borderColor: "#ff6b1a",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+          },
+          {
+            label: "Waist",
+            data: history.map((h) => h.waist),
+            borderColor: "#ffa040",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+          },
+          {
+            label: "Hips",
+            data: history.map((h) => h.hips),
+            borderColor: "#f0eeea",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+          },
+          {
+            label: "Thigh",
+            data: history.map((h) => h.thigh),
+            borderColor: "#6b6b7a",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+          },
+          {
+            label: "Arm",
+            data: history.map((h) => h.arm),
+            borderColor: "#d4a050",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+          },
+        ],
+      },
+      options: { ...CO },
+    });
+
     return () => {
-      clearTimeout(timer);
       chart.current?.destroy();
+      chart.current = null;
     };
   }, [history]);
 
@@ -384,35 +366,36 @@ function StrengthChart() {
 
   useEffect(() => {
     if (!ref.current) return;
-    const timer = setTimeout(() => {
-      chart.current?.destroy();
-      chart.current = new Chart(ref.current, {
-        type: "bar",
-        data: {
-          labels: ["Bench Press", "Squat", "Deadlift", "OHP", "Pull-ups"],
-          datasets: [
-            {
-              label: "Current (kg)",
-              data: [100, 130, 160, 65, 18],
-              backgroundColor: "rgba(255,107,26,0.75)",
-              borderRadius: 6,
-            },
-            {
-              label: "Goal (kg)",
-              data: [120, 150, 180, 80, 25],
-              backgroundColor: "rgba(240,238,234,0.14)",
-              borderRadius: 6,
-              borderWidth: 1,
-              borderColor: "rgba(240,238,234,0.38)",
-            },
-          ],
-        },
-        options: { ...CO, barPercentage: 0.6 },
-      });
-    }, 0);
+    chart.current?.destroy();
+    chart.current = null;
+
+    chart.current = new Chart(ref.current, {
+      type: "bar",
+      data: {
+        labels: ["Bench Press", "Squat", "Deadlift", "OHP", "Pull-ups"],
+        datasets: [
+          {
+            label: "Current (kg)",
+            data: [100, 130, 160, 65, 18],
+            backgroundColor: "rgba(255,107,26,0.75)",
+            borderRadius: 6,
+          },
+          {
+            label: "Goal (kg)",
+            data: [120, 150, 180, 80, 25],
+            backgroundColor: "rgba(240,238,234,0.14)",
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: "rgba(240,238,234,0.38)",
+          },
+        ],
+      },
+      options: { ...CO, barPercentage: 0.6 },
+    });
+
     return () => {
-      clearTimeout(timer);
       chart.current?.destroy();
+      chart.current = null;
     };
   }, []);
 

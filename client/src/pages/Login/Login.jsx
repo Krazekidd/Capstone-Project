@@ -86,9 +86,6 @@ const Login = () => {
               <button className="social-circle google">
                 <i className="fab fa-google"></i>
               </button>
-              <button className="social-circle apple">
-                <i className="fab fa-apple"></i>
-              </button>
             </div>
           </div>
         </div>

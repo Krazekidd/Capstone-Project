@@ -270,11 +270,6 @@
     color: white;
 }
 
-/* Apple Circle */
-.social-circle.apple {
-    border-color: #000;
-    color: #000;
-}
 
 .social-circle.apple:hover {
     background: #000;

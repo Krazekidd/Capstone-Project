@@ -1017,7 +1017,7 @@ function OrdersPage({ showToast }) {
             ⚠ Ready for Pickup
           </div>
           {pendingOrders.length === 0 ? (
-            <div className="card" style={{ textAlign: "center", padding: 40, color: "#6b6560" }}>
+            <div className="second-card" style={{ textAlign: "center", padding: 40, color: "#6b6560" }}>
               <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
               <div style={{ fontFamily: "'DM Mono',monospace", fontSize: 11, letterSpacing: 2 }}>ALL ORDERS CLEARED</div>
             </div>

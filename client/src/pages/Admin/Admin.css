@@ -223,7 +223,15 @@ body::before {
     color: #ff6b00;
 }
 
+.second-card {
+    text-align: center;
+    padding: 40px;
+    color: #6b6560;
+}
+
+
 /* ═══════════════════════════════════════════
+
    CARDS
 ═══════════════════════════════════════════ */
 .card {

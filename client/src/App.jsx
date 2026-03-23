@@ -9,6 +9,7 @@ import Account from './pages/Account/Account'
 import NotFound from './pages/NotFound/NotFound'
 import Excursions from './pages/Excursions/Excursions';
 import TrainerPage from './pages/Trainer/Traineracc'
+import Admin from './pages/Admin/Admin'
 // import Admin from './pages/Admin/Admin'
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/excursions" element={<Excursions />} />
         <Route path="/trainer" element={<TrainerPage />} />
+        <Route path="/admin" element={<Admin />} />
         {/* <Route path="/Admin" element={<Admin />} /> */}
         <Route path="*" element={<NotFound />} />
       </Routes>

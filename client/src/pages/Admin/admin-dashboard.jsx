@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import './GymProAdmin.css'; 
+import '.Admin.css'; 
 
-const GymProAdmin = () => {
+const Admin = () => {
   // ═══════════════════════════════════════════
   // DATA
   // ═══════════════════════════════════════════
@@ -1137,4 +1137,4 @@ const GymProAdmin = () => {
   );
 };
 
-export default GymProAdmin;
+export default Admin;

@@ -4,6 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from router import router
 from conversations_router import router as conversations_router
 from database import init_db
+from auth_router import router as auth_router
+from account_router import router as account_router
 import logging
 
 # Configure logging to print to terminal
@@ -52,6 +54,8 @@ app.add_middleware(
 # Include all routes
 app.include_router(router, tags=["api"])
 app.include_router(conversations_router)
+app.include_router(auth_router)
+app.include_router(account_router)
 
 if __name__ == "__main__":
     import uvicorn

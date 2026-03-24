@@ -80,3 +80,62 @@ class ConversationDetailOut(BaseModel):
     messages: List[ConversationMessageOut]
 
     model_config = {"from_attributes": True}
+
+# ---------------------------------------------------------------------------
+# Authentication & Account Schemas
+# ---------------------------------------------------------------------------
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    phone_number: str
+    # Optional client-specific fields
+    height: Optional[float] = None
+    weight: Optional[float] = None
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str                     # "client", "trainer", "admin"
+    user_id: uuid.UUID
+
+# Account data for each role
+class ClientAccount(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: str
+    phone_number: str
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class TrainerAccount(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: str
+    certification: Optional[str] = None
+    rating: Optional[float] = None
+    level: Optional[str] = None
+    is_senior: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class AdminAccount(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: str
+    phone_number: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

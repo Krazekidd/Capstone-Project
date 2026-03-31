@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from router import router
 from conversations_router import router as conversations_router
 from database import init_db
+from database import engine, Base
 from auth_router import router as auth_router
 from account_router import router as account_router
 import logging
@@ -19,6 +20,11 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Create tables (for development only - use Alembic for production)
+async def init_db():
+    async with engine.begin() as conn:
+        # await conn.run_sync(Base.metadata.drop_all)  # Uncomment to drop tables
+        await conn.run_sync(Base.metadata.create_all)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,6 +62,18 @@ app.include_router(router, tags=["api"])
 app.include_router(conversations_router)
 app.include_router(auth_router)
 app.include_router(account_router)
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+@app.get("/")
+async def root():
+    return {"message": "B.A.D People Fitness API", "status": "running"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn

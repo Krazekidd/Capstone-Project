@@ -17,9 +17,77 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+// ─── Calendar Picker Component ───────────────────────────────────────────────
+const CalendarPicker = ({ availableDates, onSelectDate, selectedDate }) => {
+  const today = new Date();
+  const [month, setMonth] = useState(today.getMonth());
+  const [year, setYear] = useState(today.getFullYear());
+
+  const monthNames = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+  const dayLabels = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const prevMonth = () => {
+    if (month === 0) { setMonth(11); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 11) { setMonth(0); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+
+  return (
+    <div className="cal-wrap">
+      <div className="cal-header">
+        <button className="cal-nav" onClick={prevMonth}>&#8592;</button>
+        <span className="cal-title">{monthNames[month]} {year}</span>
+        <button className="cal-nav" onClick={nextMonth}>&#8594;</button>
+      </div>
+
+      <div className="cal-grid">
+        {dayLabels.map(d => (
+          <div key={d} className="cal-day-label">{d}</div>
+        ))}
+        {Array(firstDay).fill(null).map((_, i) => (
+          <div key={`empty-${i}`} className="cal-day empty" />
+        ))}
+        {Array.from({ length: daysInMonth }, (_, i) => {
+          const d = i + 1;
+          const mm = String(month + 1).padStart(2, "0");
+          const dd = String(d).padStart(2, "0");
+          const dateStr = `${year}-${mm}-${dd}`;
+          const isAvail = availableDates.includes(dateStr);
+          const isSel = dateStr === selectedDate;
+          return (
+            <div
+              key={dateStr}
+              className={`cal-day ${isSel ? "selected" : isAvail ? "available" : "unavailable"}`}
+              onClick={() => isAvail && onSelectDate(dateStr)}
+            >
+              {d}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="cal-legend">
+        <span><span className="dot dot-avail" /> Available</span>
+        <span><span className="dot dot-unavail" /> Unavailable</span>
+        <span><span className="dot dot-sel" /> Selected</span>
+      </div>
+    </div>
+  );
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 const Excursions = () => {
   const [selectedExcursion, setSelectedExcursion] = useState(null);
   const [step, setStep] = useState(1);
+  const [selectedDate, setSelectedDate] = useState("");
   const [userInfo, setUserInfo] = useState({
     name: "",
     phone: "",
@@ -35,12 +103,12 @@ const Excursions = () => {
     }
   }, [step]);
 
-  // frontend sample for pretty 
+  // frontend sample for pretty
   const excursions = [
     {
       id: 1,
       name: "Blue Mountain Peak Hike",
-      description: "Summit Jamaica’s highest peak. 7‑mile round trip, challenging AND rewarding.",
+      description: "Summit Jamaica's highest peak. 7‑mile round trip, challenging AND rewarding.",
       date: "2026-04-15",
       time: "6:00 AM",
       spots: 12,
@@ -79,8 +147,14 @@ const Excursions = () => {
   const kingstonCenter = [18.0179, -76.8099];
 
   const handleSelectExcursion = (excursion) => {
-    setSelectedExcursion(excursion);
-    setStep(2);
+    if (selectedExcursion?.id === excursion.id) {
+      // Toggle closed
+      setSelectedExcursion(null);
+      setSelectedDate("");
+    } else {
+      setSelectedExcursion(excursion);
+      setSelectedDate("");
+    }
   };
 
   const handleInputChange = (e) => {
@@ -94,13 +168,14 @@ const Excursions = () => {
       alert("Please fill in all fields.");
       return;
     }
-    // send ts to backend one day
+    // send to backend one day
     setStep(3);
   };
 
   const resetBooking = () => {
     setSelectedExcursion(null);
     setStep(1);
+    setSelectedDate("");
     setUserInfo({ name: "", phone: "", email: "" });
   };
 
@@ -111,7 +186,7 @@ const Excursions = () => {
 
       <section className="excursions-hero">
         <div className="excursions-overlay">
-          {/* back to front page*/}
+          {/* back to front page */}
           <div className="excursions-home-link-container">
             <Link to="/" className="excursions-home-link">← Return to Home page</Link>
           </div>
@@ -137,7 +212,7 @@ const Excursions = () => {
           <div className="excursions-card">
             <h2>Available Excursions in Kingston</h2>
 
-            {/* kool map of kingston :> */}
+            {/* map of kingston */}
             <div className="excursions-main-map">
               <MapContainer
                 center={kingstonCenter}
@@ -161,7 +236,7 @@ const Excursions = () => {
               </MapContainer>
             </div>
 
-            {/* sxcursion cards */}
+            {/* excursion cards */}
             <div className="excursions-grid">
               {excursions.map((exc) => (
                 <div key={exc.id} className="excursions-card-item">
@@ -174,12 +249,27 @@ const Excursions = () => {
                       <span>👥 {exc.spots} left</span>
                       <span className="excursions-price">{exc.price}</span>
                     </div>
+
                     <button
-                      className="excursions-select-btn"
+                      className={`excursions-select-btn ${selectedExcursion?.id === exc.id ? "active" : ""}`}
                       onClick={() => handleSelectExcursion(exc)}
                     >
-                      Select
+                      {selectedExcursion?.id === exc.id ? "Close" : "Select"}
                     </button>
+
+                    {/* Calendar drops in when this card is selected */}
+                    {selectedExcursion?.id === exc.id && (
+                      <div className="excursions-calendar-inline">
+                        <CalendarPicker
+                          availableDates={[exc.date]}
+                          selectedDate={selectedDate}
+                          onSelectDate={(d) => {
+                            setSelectedDate(d);
+                            setStep(2);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -206,7 +296,7 @@ const Excursions = () => {
 
             <div className="excursions-selected-summary">
               <p><strong>Excursion:</strong> {selectedExcursion.name}</p>
-              <p><strong>Date:</strong> {selectedExcursion.date} at {selectedExcursion.time}</p>
+              <p><strong>Date:</strong> {selectedDate} at {selectedExcursion.time}</p>
               <p><strong>Price:</strong> {selectedExcursion.price}</p>
             </div>
 
@@ -275,14 +365,14 @@ const Excursions = () => {
 
               <h2>Booking Confirmed!</h2>
 
-              {/* Summary card with image inside on left */}
+              {/* Summary card with image */}
               <div className="excursions-summary with-image">
                 <div className="summary-image">
                   <img src={selectedExcursion.image} alt={selectedExcursion.name} />
                 </div>
                 <div className="summary-details">
                   <p><strong>Excursion:</strong> {selectedExcursion.name}</p>
-                  <p><strong>Date:</strong> {selectedExcursion.date} at {selectedExcursion.time}</p>
+                  <p><strong>Date:</strong> {selectedDate} at {selectedExcursion.time}</p>
                   <p><strong>Name:</strong> {userInfo.name}</p>
                   <p><strong>Phone:</strong> {userInfo.phone}</p>
                   <p><strong>Email:</strong> {userInfo.email}</p>

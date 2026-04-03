@@ -279,10 +279,10 @@ export default function Login() {
 
           <div className="left-content">
             <div className="logo-wrap">
-              <div className="logo-hex-wrap">
-                <div className="logo-hex-bg"/>
+              <div className="logo-hex-wrap"> 
+                <div className="logo-hex-bg"/> 
                 <div className="logo-hex-inner"/>
-                <span className="logo-letter">G</span>
+                <span className="logo-letter"><span><img src="images/triallogo.png" alt="GymPRO Logo" style={{ width: "150px", height: "200px" }} /></span></span>
               </div>
               <div className="brand-name">GYMPRO</div>
               <div className="brand-tagline">Forge Your Legacy</div>

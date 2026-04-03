@@ -149,7 +149,7 @@
 
 .leaflet-container {
     border-radius: 12px;
-    height: 400px; 
+    height: 400px;
     width: 100%;
 }
 
@@ -233,6 +233,16 @@
 .excursions-select-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(255, 69, 0, 0.25);
+}
+
+.excursions-select-btn.active {
+    background: transparent;
+    border: 2px solid #ff4500;
+    color: #ff4500;
+}
+
+.excursions-select-btn.active:hover {
+    background: rgba(255, 69, 0, 0.05);
 }
 
 .excursions-selected-summary {
@@ -381,7 +391,7 @@
 .excursion-receipt {
     background: #f0f7ff;
     border-left: 4px solid #ff4500;
-    border-radius: 8px;
+    border-radius: 0 8px 8px 0;
     padding: 15px 20px;
     margin-bottom: 20px;
     font-size: 14px;
@@ -442,6 +452,133 @@
     color: #ff4500;
 }
 
+/* ─── Calendar Picker ──────────────────────────────────────────────────────── */
+
+.excursions-calendar-inline {
+    margin-top: 14px;
+}
+
+.cal-wrap {
+    background: #111;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.cal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.cal-title {
+    color: #ff6a00;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.cal-nav {
+    background: none;
+    border: 1px solid #ff6a00;
+    color: #ff6a00;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s ease;
+}
+
+.cal-nav:hover {
+    background: rgba(255, 106, 0, 0.12);
+}
+
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+}
+
+.cal-day-label {
+    color: #666;
+    font-size: 11px;
+    text-align: center;
+    padding-bottom: 4px;
+}
+
+.cal-day {
+    height: 36px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    cursor: default;
+}
+
+.cal-day.empty {
+    background: none;
+}
+
+.cal-day.available {
+    background: #1a1a1a;
+    border: 1px solid #444;
+    color: #fff;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.cal-day.available:hover {
+    border-color: #ff6a00;
+    color: #ff6a00;
+}
+
+.cal-day.unavailable {
+    background: #1a1a1a;
+    color: #333;
+    cursor: not-allowed;
+}
+
+.cal-day.selected {
+    background: #ff6a00;
+    color: #fff;
+    border: 1px solid #ff6a00;
+    font-weight: 600;
+}
+
+.cal-legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 14px;
+    font-size: 11px;
+    color: #777;
+    align-items: center;
+}
+
+.dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+.dot-avail {
+    background: #fff;
+    border: 1px solid #555;
+}
+
+.dot-unavail {
+    background: #2a2a2a;
+    border: 1px solid #333;
+}
+
+.dot-sel {
+    background: #ff6a00;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+
 @media (max-width: 768px) {
     .excursions-hero h1 {
         font-size: 32px;
@@ -469,12 +606,19 @@
         padding: 0.3rem 0.8rem;
     }
     .excursions-summary.with-image {
-        flex-direction: column; /* stack on mobile */
+        flex-direction: column;
         text-align: center;
     }
     .summary-image {
         width: 100%;
         max-width: 280px;
         margin: 0 auto;
+    }
+    .cal-wrap {
+        padding: 14px;
+    }
+    .cal-day {
+        height: 30px;
+        font-size: 12px;
     }
 }

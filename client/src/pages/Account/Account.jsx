@@ -581,11 +581,14 @@ export default function Account() {
           </div>
         </div>
 
-        {/* Progress Dashboard */}
-        <div className="card" style={{ marginBottom:20 }}>
+        {/* PROGRESS CHARTS */}
+        <div className="card" style={{ marginBottom: 20 }}>
           <div className="card-label">Analytics</div>
           <div className="section-title">📊 Progress Dashboard</div>
-          <p style={{ fontSize:13, color:"#6b6b7a", marginBottom:20 }}>Live comparison of your current stats vs goals, plus monthly trend lines.</p>
+          <p style={{ fontSize: 13, color: "#6b6b7a", marginBottom: 20 }}>
+            Live comparison of your current stats vs goals, plus monthly trend
+            lines.
+          </p>
           <div className="chart-tabs">
             {[["compare","Goal vs Current"],["weight","Weight Trend"],["body","Body Measurements"],["strength","Strength"]].map(([id,lbl]) => (
               <button key={id} className={`chart-tab${chartTab===id?" active":""}`} onClick={() => setChartTab(id)}>{lbl}</button>
@@ -655,12 +658,48 @@ export default function Account() {
           </div>
         </div>
 
-        {/* Awarded Badges Card */}
-        <div className="card">
-          <div className="card-label">Achievements</div>
-          <div className="section-title">🏅 Awarded Badges</div>
-          <div className="badges-grid"><div className="badge-item">💪 100 Workouts</div><div className="badge-item">🔥 12‑Week Streak</div><div className="badge-item">🏆 Elite Member</div><div className="badge-item">🥗 Nutrition Master</div></div>
-        </div>
+        <div className="grid">
+          {/* AI COACH */}
+          <div className="card ai-area grid-full">
+            <div className="card-label">AI Powered</div>
+            <div className="section-title">🤖 AI Coach — Ask Anything</div>
+            <p style={{ fontSize: 13, color: "#6b6b7a", marginBottom: 4 }}>
+              Get personalized advice based on your measurements, goals, and
+              training history.
+            </p>
+            <div className="ai-input-row">
+              <input
+                className="ai-input"
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && askAI()}
+                placeholder="e.g. Based on my measurements, what should I focus on this month?"
+              />
+              <button
+                className="btn-primary"
+                onClick={askAI}
+                disabled={aiLoading}
+              >
+                Ask Coach
+              </button>
+            </div>
+            {aiResponse && (
+              <div className="ai-response">
+                {aiResponse === "thinking" ? (
+                  <>
+                    <span className="ai-typing">
+                      <span />
+                      <span />
+                      <span />
+                    </span>{" "}
+                    Thinking...
+                  </>
+                ) : (
+                  aiResponse
+                )}
+              </div>
+            )}
+          </div>
 
         {/* Grid for remaining cards */}
         <div className="grid">

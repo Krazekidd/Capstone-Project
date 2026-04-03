@@ -1221,13 +1221,13 @@ export default function Account() {
         </div>
 
         {/* PROGRESS CHARTS */}
-        <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card">
           <div className="card-label">Analytics</div>
           <div className="section-title">📊 Progress Dashboard</div>
-          <p style={{ fontSize: 13, color: "#6b6b7a", marginBottom: 20 }}>
-            Live comparison of your current stats vs goals, plus monthly trend
+          <p>Live comparison of your current stats vs goals, plus monthly trend
             lines.
           </p>
+          <br></br>
           <div className="chart-tabs">
             {[
               ["compare", "Goal vs Current"],
@@ -1317,13 +1317,12 @@ export default function Account() {
 
         <div className="grid">
           {/* AI COACH */}
-          <div className="card ai-area grid-full">
+          <div className="card ai-area grid-full" style={{ marginBottom: 20 }}>
             <div className="card-label">AI Powered</div>
-            <div className="section-title">🤖 AI Coach — Ask Anything</div>
-            <p style={{ fontSize: 13, color: "#6b6b7a", marginBottom: 4 }}>
-              Get personalized advice based on your measurements, goals, and
-              training history.
-            </p>
+            <div className="section-title">🤖 NUTRI AI COACH </div>
+            <center><p>Ask me anything about your nutrition and fitness goals and get personalized advice based on your measurements, goals, and
+              training history!</p></center>
+
             <div className="ai-input-row">
               <input
                 className="ai-input"

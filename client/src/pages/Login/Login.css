@@ -41,7 +41,6 @@ body {
     color: var(--white);
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
-    /* overflow: hidden; */
 }
 
 /* ────────────────────────────────

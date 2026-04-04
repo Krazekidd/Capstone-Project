@@ -105,7 +105,7 @@ const ArrowRight = () => (
 const NAV_ITEMS = [
   {
     label: "Services", children: [
-      { label: "Membership", desc: "Build raw power and functional fitness" },
+      { label: "Excursion", desc: "Build raw power and functional fitness" },
       { label: "HIIT & Cardio",           desc: "High-intensity fat-burning workouts" },
       { label: "Yoga & Flexibility",       desc: "Restore balance and mobility" },
       { label: "Boxing & Combat",          desc: "Train like a fighter, perform like a champion" },
@@ -113,7 +113,7 @@ const NAV_ITEMS = [
     ],
   },
   {
-    label: "Membership", children: [
+    label: "Membership", href: "/membership", children: [
       { label: "Starter Plan",   desc: "Access to all main floor equipment" },
       { label: "Pro Plan",       desc: "Unlimited classes + guest passes" },
       { label: "Elite Plan",     desc: "Full access + personal trainer sessions" },
@@ -121,14 +121,14 @@ const NAV_ITEMS = [
     ],
   },
   {
-    label: "About Us", href: "/about" ,children: [
+    label: "Consultation", href: "/consultation" ,children: [
       { label: "Our Story",    desc: "15 years of forging champions" },
       { label: "Our Trainers", desc: "Meet the world-class coaching team" },
       { label: "Locations",    desc: "200+ gyms worldwide" },
       { label: "Press",        desc: "News, features and media coverage" },
     ],
   },
-  { label: "Consultation", href: "/consultation" },
+  { label: "About Us", href: "/about" },
  { label: "Account", href: "/Account" }
 ];
 

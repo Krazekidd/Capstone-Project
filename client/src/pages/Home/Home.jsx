@@ -137,10 +137,10 @@ const NAV_ITEMS = [
 ───────────────────────────────────────── */
 const PROGRAMS = [
   {
-    title: "Strength & Power",
+    title: "Monthly excursions or challenges",
     tag: "Foundation",
     img: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=600&q=80&fit=crop",
-    desc: "Progressive overload programs designed by elite powerlifters. Build a physique that performs.",
+    desc: "Structured strength programs focused on progressive overload to build muscle, increase power, and improve overall physical performance.",
   },
   {
     title: "HIIT & Burn",
@@ -155,10 +155,10 @@ const PROGRAMS = [
     desc: "Boxing, Muay Thai and MMA conditioning classes. Develop discipline, power and agility.",
   },
   {
-    title: "Mind & Body",
+    title: "AEROBICS :Mind & Body",
     tag: "Recovery",
     img: "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=600&q=80&fit=crop",
-    desc: "Yoga, mobility and breathwork sessions to restore, recover and perform at your peak.",
+    desc: "High-energy aerobic sessions designed to improve cardiovascular health, boost endurance, and keep your body active and energized.",
   },
 ];
 
@@ -197,25 +197,25 @@ const TRAINERS = [
 ───────────────────────────────────────── */
 const PLANS = [
   {
-    name: "Starter",
-    price: "49",
+    name: "GROUP TRAINING",
+    price: "5000",
     period: "/mo",
     highlight: false,
-    perks: ["Full equipment access", "Locker room & showers", "2 group classes/week", "Mobile app access"],
+    perks: ["Full equipment access", "2-4 indiviuals in group", "Up to 4 group classes/week"],
   },
   {
-    name: "Pro",
-    price: "89",
+    name: "SINGLE TRAINING",
+    price: "12,000",
     period: "/mo",
     highlight: true,
-    perks: ["Everything in Starter", "Unlimited group classes", "2 guest passes/month", "Nutrition tracking", "Priority booking"],
+    perks: ["Personalized training plan", "Dedicated trainer", "Unlimited group classes and training sessions", "One-on-one sessions", "Nutrition tracking", "Priority booking"],
   },
   {
-    name: "Elite",
-    price: "149",
+    name: "KIDS PROGRAMME",
+    price: "3000",
     period: "/mo",
     highlight: false,
-    perks: ["Everything in Pro", "4 PT sessions/month", "Body composition scans", "Recovery suite access", "Dedicated coach"],
+    perks: ["Personalized training plan", "Up to 4 weekly kid sessions", "Body composition scans", "Recovery suite access", "Dedicated coach"],
   },
 ];
 
@@ -491,7 +491,7 @@ function Footer() {
         <div className="footer-card">
           <div className="footer-card-icon">🏋️</div>
           <h4>World-Class Equipment</h4>
-          <p>Over $2M invested in premium machines, free weights, and recovery tech at every location.</p>
+          <p>Over $2M invested in premium machines, free weights, and recovery tech at our location.</p>
         </div>
         <div className="footer-card">
           <div className="footer-card-icon">🥇</div>
@@ -501,12 +501,12 @@ function Footer() {
         <div className="footer-card">
           <div className="footer-card-icon">🌍</div>
           <h4>Global Community</h4>
-          <p>1 million+ members across 30 countries. One membership, unlimited access worldwide.</p>
+          <p>1000+ members on the national level. One membership, unlimited access.</p>
         </div>
         <div className="footer-card">
           <div className="footer-card-icon">📱</div>
-          <h4>GymPro App</h4>
-          <p>Book classes, track workouts, scan in at any location and connect with coaches — all in one app.</p>
+          <h4>GymPro Website</h4>
+          <p>Recommended workouts, track progress, book consulation at any available times and connect with us — all in one website.</p>
         </div>
       </div>
 
@@ -524,7 +524,7 @@ function Footer() {
           </div>
           <p className="footer-tagline">Forge Your Legacy.</p>
           <p className="footer-brand-desc">
-            GymPro has been the training ground for champions, everyday athletes and anyone who refuses to settle — since 2010.
+            B.a.d people fitness has been the training ground for champions, everyday athletes and anyone who refuses to settle since 1976.
           </p>
           <div className="footer-socials">
            <a href="https://www.instagram.com/b.a.dpplfitness/" className="footer-social" aria-label="Instagram" target="_blank" rel="noopener noreferrer">
@@ -540,7 +540,7 @@ function Footer() {
         <div className="footer-col">
           <h5 className="footer-col-title">Programs</h5>
           <ul className="footer-links">
-            {["Strength & Conditioning", "HIIT & Cardio", "Yoga & Flexibility", "Boxing & Combat", "Personal Training"].map(l => (
+            {["Monthly Excursion & Challenges", "Kids Programme", "Personalized Single Training", "Group Training"].map(l => (
               <li key={l}><a href="#" onClick={e => e.preventDefault()}>{l}</a></li>
             ))}
           </ul>
@@ -655,7 +655,7 @@ export default function HomePage() {
         <div className="hero-content">
           <div className="hero-eyebrow">
             <span className="hero-eyebrow-line" />
-            <span>Est. 2010 · 100+ Programmes · 300+ Members</span>
+            <span>Est. 1976 · 100+ Programmes · 300+ Members</span>
           </div>
           <h1 className="hero-title">
             FORGE YOUR<br />
@@ -663,7 +663,7 @@ export default function HomePage() {
           </h1>
           <p className="hero-subtitle">
             World-class training. Elite coaching. A global community.<br />
-            Your strongest self starts at GymPro.
+            Your strongest self starts at B.A.D People Fitness.
           </p>
           <div className="hero-actions">
             <a href="/login" className="hero-btn-primary">Join Now <ArrowRight /></a>
@@ -680,10 +680,10 @@ export default function HomePage() {
       {/* ── STATS STRIP ── */}
       <section className="stats-strip" ref={statsRef}>
         {[
-          { val: "200+", label: "Locations Worldwide" },
-          { val: "1M+",  label: "Active Members" },
-          { val: "50+",  label: "Weekly Classes" },
-          { val: "15",   label: "Years of Excellence" },
+          { val: "100+", label: "Gym Programmes" },
+          { val: "200+",  label: "Active Members" },
+          { val: "5+",  label: "Weekly Sessions" },
+          { val: "55",   label: "Years of Excellence" },
           { val: "98%",  label: "Member Satisfaction" },
         ].map((s, i) => (
           <div key={i} className={`stat-item${statsCounted ? " stat-item--visible" : ""}`} style={{ animationDelay: `${i * 0.1}s` }}>
@@ -727,8 +727,8 @@ export default function HomePage() {
         <div className="cta-banner-overlay" />
         <div className="cta-banner-content">
           <h2 className="cta-banner-title">READY TO START?</h2>
-          <p className="cta-banner-sub">Join over 1 million members. First 7 days free — no commitment.</p>
-          <a href="/login" className="hero-btn-primary">Claim Your Free Trial <ArrowRight /></a>
+          <p className="cta-banner-sub">Join over 500+ members.</p>
+          <a href="/login" className="hero-btn-primary">Claim Your Fitness Journey <ArrowRight /></a>
         </div>
       </section>
 

@@ -179,8 +179,8 @@ const TRAINERS = [
   { name: "Kenneth 'Robin' Daley",    role: "Head of Facility & Operating Manager", certs: "NSCA-CSCS · Olympic Lifting Coach", exp: "18 yrs", img: "https://images.unsplash.com/photo-1567013127542-490d757e51fc?w=500&q=80&fit=crop", athletes: "4 Olympians" },
   { name: "Sasha Volkov",   role: "Senior Trainer", certs: "WBC Certified · Muay Thai Level 3", exp: "14 yrs", img: "https://images.unsplash.com/photo-1570655652364-2e0a67455ac6?w=500&q=80&fit=crop", athletes: "12 Pro Fighters" },
   { name: "Deandre",     role: "Senior Trainer",       certs: "RYT-500 · FRC Specialist · SFMA", exp: "11 yrs", img: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=500&q=80&fit=crop", athletes: "Pro Dance Teams" },
-  { name: "Jordan Wells",   role: "Trainer",    certs: "ACSM-CPT · Precision Nutrition L2",exp: "9 yrs",  img: "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=500&q=80&fit=crop", athletes: "3 NCAA Teams" },
-  { name: "Arthur",  role: "Trainer",     certs: "IRONMAN Coach · USA Triathlon",   exp: "13 yrs", img: "https://images.unsplash.com/photo-1594381898411-846e7d193883?w=500&q=80&fit=crop", athletes: "6 IRONMAN Finishers" },
+  { name: "Arturo Gordon",   role: "Trainer",    certs: "ACSM-CPT · Precision Nutrition L2",exp: "9 yrs",  img: "https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=500&q=80&fit=crop", athletes: "3 NCAA Teams" },
+  { name: "Keemo",  role: "Trainer",     certs: "IRONMAN Coach · USA Triathlon",   exp: "13 yrs", img: "https://images.unsplash.com/photo-1594381898411-846e7d193883?w=500&q=80&fit=crop", athletes: "6 IRONMAN Finishers" },
   { name: "Darius Okafor",  role: "Strength & Sports Performance",  certs: "NASM-CPT · FMS Level 2",         exp: "10 yrs", img: "https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=500&q=80&fit=crop", athletes: "NFL Draft Prospects" },
 ];
 

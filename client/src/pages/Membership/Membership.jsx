@@ -134,7 +134,6 @@ const PLANS = [
       "Before/after assessment tracking",
       "Certificate of completion",
     ],
-    schedule: "Varies by programme — check availability via our contact channels",
     includes: ["Programme-specific gym access", "All specialist coaching", "Custom plan"],
     note: "Availability is seasonal and limited. Contact us to check current openings.",
     inquiryOnly: true,
@@ -539,10 +538,10 @@ export default function Membership() {
       <section className="why-section">
         <div className="why-inner">
           {[
-            { icon: <ZapIcon/>,    title: "Results Guaranteed",   desc: "Every programme is results-driven. If you show up, we guarantee progress — tracked every step of the way." },
+            { icon: <ZapIcon/>,    title: "Results Guaranteed",   desc: "Every programme is results-driven. If you show up, we guarantee progress tracked every step of the way." },
             { icon: <UsersIcon/>,  title: "Real Community",       desc: "More than a gym, a family. Our members push each other, celebrate each other, and grow together." },
             { icon: <ShieldIcon/>, title: "No Contracts Ever",    desc: "Month-to-month flexibility. No penalties, no fine print. Your fitness journey, your terms." },
-            { icon: <TrophyIcon/>, title: "Championship Coaches", desc: "Our trainers hold elite international certifications and have coached athletes to podiums across Jamaica and beyond." },
+            { icon: <TrophyIcon/>, title: "Championship Coaches", desc: "Our trainers hold elite national and international certifications and have coached athletes to podiums across Jamaica and beyond." },
           ].map((w, i) => (
             <div key={i} className="why-card">
               <div className="why-card-icon">{w.icon}</div>
@@ -622,10 +621,8 @@ export default function Membership() {
                   ["Group classes",            "Youth only",   "✓ Unlimited",  "✓ Included",   "—"],
                   ["Nutrition guidance",       "Basic",        "—",            "✓ Full",       "✓ Included"],
                   ["Progress tracking",        "Monthly",      "Check-ins",    "Weekly",       "Assessment"],
-                  ["App booking access",       "—",            "✓",            "✓ Priority",   "Programme"],
-                  ["Guest passes",             "—",            "—",            "1/month",      "—"],
-                  ["Towel service",            "—",            "—",            "✓",            "—"],
-                  ["Certificate of completion","—",            "—",            "—",            "✓"],
+                  ["Website consultationbooking access",       "✓",            "✓",            "✓",   "Programme"],
+                  ["Website Bages Awards",              "✓",            "✓",            "✓",            "✓"],
                 ].map(([feat, ...vals]) => (
                   <tr key={feat}>
                     <td className="compare-feat">{feat}</td>
@@ -710,8 +707,8 @@ export default function Membership() {
           {/* Overall rating */}
           <div className="overall-rating">
             <div className="or-stars">{[...Array(5)].map((_,i)=><StarIcon key={i}/>)}</div>
-            <p className="or-score">4.9 / 5.0</p>
-            <p className="or-label">Based on 200+ member reviews</p>
+            <p className="or-score">4.8 / 5.0</p>
+            <p className="or-label">Based on 500+ member reviews</p>
           </div>
         </div>
       </section>

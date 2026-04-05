@@ -137,22 +137,22 @@ const NAV_ITEMS = [
 ───────────────────────────────────────── */
 const PROGRAMS = [
   {
-    title: "Monthly excursions or challenges",
+    title: "Strength & Power Training",
     tag: "Foundation",
     img: "https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=600&q=80&fit=crop",
     desc: "Structured strength programs focused on progressive overload to build muscle, increase power, and improve overall physical performance.",
   },
   {
-    title: "HIIT & Burn",
+    title: "HIT & Burn",
     tag: "Fat Loss",
     img: "https://images.unsplash.com/photo-1601422407692-ec4eeec1d9b3?w=600&q=80&fit=crop",
     desc: "Torch calories and shred body fat with our science-backed high-intensity interval protocols.",
   },
   {
-    title: "Combat Training",
+    title: "Boot Camp",
     tag: "Fight Ready",
     img: "https://images.unsplash.com/photo-1547153760-18fc86324498?w=600&q=80&fit=crop",
-    desc: "Boxing, Muay Thai and MMA conditioning classes. Develop discipline, power and agility.",
+    desc: "High-intensity boot camp sessions combining strength drills, cardio bursts, and endurance challenges. Push your limits, build resilience, and train like a team.",
   },
   {
     title: "AEROBICS :Mind & Body",
@@ -495,13 +495,13 @@ function Footer() {
         </div>
         <div className="footer-card">
           <div className="footer-card-icon">🥇</div>
-          <h4>Award-Winning Coaches</h4>
+          <h4>Expert Coaches</h4>
           <p>Our trainers hold elite certifications from NSCA, ACSM, WBC and international bodies.</p>
         </div>
         <div className="footer-card">
           <div className="footer-card-icon">🌍</div>
           <h4>Global Community</h4>
-          <p>1000+ members on the national level. One membership, unlimited access.</p>
+          <p>1000+ members on the national level and more on an international level. One membership, unlimited access.</p>
         </div>
         <div className="footer-card">
           <div className="footer-card-icon">📱</div>

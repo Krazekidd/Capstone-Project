@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr, validator
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 import uuid
 
@@ -108,7 +108,8 @@ class RegisterRequest(BaseModel):
     # Optional client-specific fields
     height: Optional[float] = Field(None, ge=0, le=300)
     weight: Optional[float] = Field(None, ge=0, le=500)
-    
+    birthday: Optional[date] = None
+    gender: Optional[str] = None
     @validator('phone_number')
     def validate_phone(cls, v):
         # Remove any non-digit characters for validation
@@ -128,9 +129,12 @@ class ClientAccount(BaseModel):
     id: uuid.UUID
     name: str
     email: EmailStr
-    phone_number: str
+    phone_number: Optional[str] = None
+    gender: Optional[str] = None  # Add this
+    birthday: Optional[date] = None
     height: Optional[float] = None
     weight: Optional[float] = None
+    profile_image: Optional[str] = None  # Add this
     created_at: datetime
     updated_at: datetime
     
@@ -138,7 +142,8 @@ class ClientAccount(BaseModel):
         from_attributes = True
         json_encoders = {
             uuid.UUID: lambda v: str(v),
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat(),
+            date: lambda v: v.isoformat()
         }
 
 class TrainerAccount(BaseModel):
@@ -147,7 +152,7 @@ class TrainerAccount(BaseModel):
     email: EmailStr
     certification: Optional[str] = None
     rating: Optional[float] = Field(None, ge=0, le=5)
-    trainer_level: Optional[float] = Field(None, ge=1, le=10)  # Changed from 'level' to match DB
+    trainer_level: Optional[float] = Field(None, ge=1, le=10)
     is_senior: bool = False
     created_at: datetime
     updated_at: datetime
@@ -156,14 +161,15 @@ class TrainerAccount(BaseModel):
         from_attributes = True
         json_encoders = {
             uuid.UUID: lambda v: str(v),
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat(),
+            date: lambda v: v.isoformat()
         }
 
 class AdminAccount(BaseModel):
     id: uuid.UUID
     name: str
     email: EmailStr
-    phone_number: str
+    phone_number: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     
@@ -171,8 +177,34 @@ class AdminAccount(BaseModel):
         from_attributes = True
         json_encoders = {
             uuid.UUID: lambda v: str(v),
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat(),
+            date: lambda v: v.isoformat()
         }
+
+class UpdateClientProfileRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    email: Optional[EmailStr] = None  # Add email update
+    phone_number: Optional[str] = Field(None, pattern=r'^\+?1?\d{9,15}$')
+    birthday: Optional[date] = None
+    gender: Optional[str] = None
+    height: Optional[float] = Field(None, ge=0, le=300)
+    weight: Optional[float] = Field(None, ge=0, le=500)
+    profile_image: Optional[str] = None
+
+class UpdateTrainerProfileRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    email: Optional[EmailStr] = None  # Add email update
+    birthday: Optional[date] = None  # Add birthday
+    certification: Optional[str] = None
+    rating: Optional[float] = Field(None, ge=0, le=5)
+    trainer_level: Optional[float] = Field(None, ge=1, le=10)
+    is_senior: Optional[bool] = None
+
+class UpdateAdminProfileRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    email: Optional[EmailStr] = None  # Add email update
+    phone_number: Optional[str] = Field(None, pattern=r'^\+?1?\d{9,15}$')
+    birthday: Optional[date] = None  # Add birthday
 
 # Extended schemas for progress tracking
 class ProgressUpdateRequest(BaseModel):
@@ -186,23 +218,7 @@ class UserProgressResponse(BaseModel):
     bmi_history: list[dict]
     measurements_history: list[dict]
 
-# Additional schemas for profile updates
-class UpdateClientProfileRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    phone_number: Optional[str] = Field(None, pattern=r'^\+?1?\d{9,15}$')
-    height: Optional[float] = Field(None, ge=0, le=300)
-    weight: Optional[float] = Field(None, ge=0, le=500)
 
-class UpdateTrainerProfileRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    certification: Optional[str] = None
-    rating: Optional[float] = Field(None, ge=0, le=5)
-    trainer_level: Optional[float] = Field(None, ge=1, le=10)
-    is_senior: Optional[bool] = None
-
-class UpdateAdminProfileRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    phone_number: Optional[str] = Field(None, pattern=r'^\+?1?\d{9,15}$')
 
 # Response wrapper for API consistency
 class APIResponse(BaseModel):

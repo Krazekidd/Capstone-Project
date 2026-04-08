@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from database import Base
-from sqlalchemy import Enum, Text, CheckConstraint, Integer, Index, Column, String, Float, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import Enum,Date, Text, CheckConstraint, Integer, Index, Column, String, Float, Boolean, DateTime, ForeignKey, Enum
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.mysql import BINARY
 
@@ -99,9 +99,8 @@ class Client(Base):
     phone_number = Column(String(20))
     height = Column(Float)
     weight = Column(Float)
-    birthday = Column(String(20), nullable=True)
+    birthday = Column(Date, nullable=True)
     gender = Column(String(10), nullable=True)
-    profile_image = Column(String(500), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
     

@@ -65,7 +65,6 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_user_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or passwod" 
         )
-    
     # Convert binary ID to UUID string for token
     user_uuid = uuid.UUID(bytes=user.id)
     token = create_access_token(data={"sub": str(user_uuid), "role": user.role})
@@ -98,6 +97,8 @@ async def register_client(request: RegisterRequest, db: AsyncSession = Depends(g
     new_client = Client(
         id=new_user.id,
         name=request.name,
+        gender = request.gender,
+        birthday = request.birthday,
         phone_number=request.phone_number,
         height=request.height,
         weight=request.weight

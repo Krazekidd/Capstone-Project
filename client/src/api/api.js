@@ -49,7 +49,52 @@ export const authAPI = {
       return false;
     }
   },
-  
+
+
+  googleLogin: async (credential) => {
+    try {
+      const response = await axiosInstance.post('/auth/google', { credential });
+      const data = response.data;
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('user_role', data.role);
+      localStorage.setItem('user_id', data.user_id);
+      return data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Google login failed' };
+    }
+  },
+
+  googleLoginWithToken: async (accessToken) => {
+    try {
+      const response = await axiosInstance.post('/auth/google/token', { access_token: accessToken });
+      const data = response.data;
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('user_role', data.role);
+      localStorage.setItem('user_id', data.user_id);
+      return data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Google login failed' };
+    }
+  },
+
+  forgotPassword: async (email) => {
+    try {
+      const response = await axiosInstance.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to send reset email' };
+    }
+  },
+
+  resetPassword: async (token, newPassword) => {
+    try {
+      const response = await axiosInstance.post('/auth/reset-password', { token, new_password: newPassword });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to reset password' };
+    }
+  },
+
   getToken: () => localStorage.getItem('access_token'),
   getUserRole: () => localStorage.getItem('user_role'),
   getUserId: () => localStorage.getItem('user_id'),

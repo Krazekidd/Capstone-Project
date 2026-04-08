@@ -79,3 +79,4 @@ if __name__ == "__main__":
     import uvicorn
     from config import HOST, PORT
     uvicorn.run("main:app", host=HOST, port=PORT, reload=True)
+

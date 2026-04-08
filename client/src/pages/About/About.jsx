@@ -153,7 +153,7 @@ const NAV_ITEMS = [
     label: "About", children: [
       { label: "Our Story",    desc: "15 years of forging champions" },
       { label: "Our Trainers", desc: "Meet the world-class coaching team" },
-      { label: "Locations",    desc: "200+ gyms worldwide" },
+      { label: "Programme",    desc: "200+ programmes " },
       { label: "Press",        desc: "News, features and media coverage" },
     ],
   },
@@ -463,9 +463,9 @@ function ContactSection() {
             </div>
           </div>
           <div className="map-locations-strip">
-            <p className="map-locations-title">Other Key Locations</p>
+            <p className="map-locations-title">Key Excursion Locations</p>
             <div className="map-locations-list">
-              {["London, UK", "Dubai, UAE", "Toronto, CA", "Sydney, AU", "Tokyo, JP", "Paris, FR"].map(loc => (
+              {["Blue Mountain, Mountain Spring", "Long Mountain", "Toronto, CA", "Sydney, AU", "Tokyo, JP", "Paris, FR"].map(loc => (
                 <span key={loc} className="map-location-tag">{loc}</span>
               ))}
             </div>

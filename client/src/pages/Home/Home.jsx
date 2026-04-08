@@ -549,7 +549,7 @@ function Footer() {
         <div className="footer-col">
           <h5 className="footer-col-title">Company</h5>
           <ul className="footer-links">
-            {["About Us", "Our Trainers", "Careers", "Press & Media", "Partnerships", "Blog"].map(l => (
+            {["About Us", "Our Trainers", "Membership", "Gallery", "Partnerships", "Support"].map(l => (
               <li key={l}><a href="#" onClick={e => e.preventDefault()}>{l}</a></li>
             ))}
           </ul>

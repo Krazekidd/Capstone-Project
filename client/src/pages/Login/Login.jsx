@@ -1,19 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../../Context/AuthContext";   // import auth context
 import "./Login.css";
 
 /* ─────────────────────────────────────────────────────────────
    IMPORTANT — GOOGLE OAUTH SETUP
-   ─────────────────────────────────────────────────────────────
-   1. Go to https://console.cloud.google.com/
-   2. Create a project → APIs & Services → Credentials
-   3. Create an "OAuth 2.0 Client ID" (Web application)
-   4. Add your domain to "Authorised JavaScript origins"
-      e.g.  http://localhost:3000  (dev)
-            https://yourdomain.com  (prod)
-   5. Replace the string below with your real Client ID:
 ─────────────────────────────────────────────────────────────── */
-
 const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
 
 /* ─────────────────────────────────────────────────────────────
@@ -85,7 +77,6 @@ function LoginNavbar() {
   return (
     <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>
       <div className="navbar-inner">
-        {/* Logo links to home */}
         <NavLink to="/" className="nav-logo">
           <div className="nav-logo-hex">
             <div className="nlh-bg" />
@@ -95,7 +86,6 @@ function LoginNavbar() {
           <span className="nav-logo-name">GYMVAULT</span>
         </NavLink>
 
-        {/* Desktop links */}
         <ul className="nav-links">
           {NAV_ITEMS.map((item) => (
             <li
@@ -135,9 +125,6 @@ function LoginNavbar() {
           ))}
         </ul>
 
-        {/* No user pill, no Account link, no action buttons (sign in/join now) because this is the login page */}
-
-        {/* Hamburger (mobile) */}
         <button className="nav-hamburger" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
           <span className={mobileOpen ? "ham-open" : ""} />
           <span className={mobileOpen ? "ham-open" : ""} />
@@ -145,7 +132,6 @@ function LoginNavbar() {
         </button>
       </div>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="nav-mobile">
           {NAV_ITEMS.map((item) => (
@@ -224,6 +210,8 @@ function pwStr(p) {
    MAIN COMPONENT
 ════════════════════════════════ */
 export default function Login() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   /* Sign-in state */
   const [email, setEmail]   = useState("");
@@ -231,10 +219,10 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false);
 
   /* Google OAuth state */
-  const [gReady, setGReady]   = useState(false);   // SDK loaded
-  const [gLoading, setGLoading] = useState(false);  // button clicked, popup opening
-  const [gUser, setGUser]     = useState(null);     // signed-in Google user info
-  const gInitRef              = useRef(false);      // prevent double-init in dev
+  const [gReady, setGReady]   = useState(false);
+  const [gLoading, setGLoading] = useState(false);
+  const [gUser, setGUser]     = useState(null);
+  const gInitRef              = useRef(false);
 
   /* Create-account modal state */
   const [modal, setModal] = useState(false);
@@ -260,7 +248,6 @@ export default function Login() {
     if (gInitRef.current) return;
     gInitRef.current = true;
 
-    // Load the Google Identity Services script dynamically
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
@@ -269,8 +256,7 @@ export default function Login() {
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: handleGoogleCredential,
-        // auto_select: true   ← uncomment to auto-sign-in returning users
-        ux_mode: "popup",      // opens the account-chooser popup
+        ux_mode: "popup",
       });
       setGReady(true);
     };
@@ -280,68 +266,64 @@ export default function Login() {
     document.body.appendChild(script);
 
     return () => {
-      // Cleanup: cancel any pending One Tap prompt on unmount
       if (window.google?.accounts?.id) {
         window.google.accounts.id.cancel();
       }
     };
   }, []);
 
-  /* Called by Google SDK after user picks an account */
   const handleGoogleCredential = (response) => {
     setGLoading(false);
     if (!response?.credential) return;
 
-    // Decode the JWT payload to get user info (name, email, picture)
-    // NOTE: In production, send response.credential to your backend
-    //       for server-side verification instead of decoding client-side.
     try {
       const payload = JSON.parse(atob(response.credential.split(".")[1]));
-      setGUser({
-        name:    payload.name,
-        email:   payload.email,
-        picture: payload.picture,
-        given_name: payload.given_name,
-      });
+      const userData = {
+        firstName: payload.given_name,
+        lastName: payload.family_name,
+        email: payload.email,
+        avatar: payload.given_name?.charAt(0).toUpperCase(),
+        membership: "Pro Member", // fetch real membership from backend later
+      };
+      setGUser(userData);
+      login(userData);
+      navigate("/account");
     } catch {
       console.error("Could not decode Google credential.");
     }
   };
 
-  /* Trigger the Google account-chooser popup */
   const handleGoogleClick = () => {
     if (!gReady || gLoading) return;
     setGLoading(true);
 
-    // prompt() opens the One Tap / account-chooser UI
     window.google.accounts.id.prompt((notification) => {
-      // If the user dismisses or there's no saved account,
-      // fall back to the standard OAuth redirect/popup flow
       if (
         notification.isNotDisplayed() ||
         notification.isSkippedMoment() ||
         notification.isDismissedMoment()
       ) {
-        // Fallback: open a standard OAuth popup using google.accounts.oauth2
-        // This ensures users can still pick accounts even if One Tap is suppressed
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: "openid email profile",
           callback: (tokenResponse) => {
             setGLoading(false);
             if (tokenResponse?.access_token) {
-              // Fetch user profile from Google's userinfo endpoint
               fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
                 headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
               })
                 .then(r => r.json())
                 .then(info => {
-                  setGUser({
-                    name:       info.name,
-                    email:      info.email,
-                    picture:    info.picture,
-                    given_name: info.given_name,
-                  });
+                  const userData = {
+                    firstName: info.given_name,
+                    lastName: info.family_name,
+                    email: info.email,
+                    avatar: info.given_name?.charAt(0).toUpperCase(),
+                    membership: "Pro Member",
+                  };
+                  setGUser(userData);
+                  login(userData);
+                  navigate("/account");
                 })
                 .catch(() => setGLoading(false));
             } else {
@@ -354,12 +336,29 @@ export default function Login() {
     });
   };
 
-  /* Sign out of Google session */
   const handleGoogleSignOut = () => {
     if (window.google?.accounts?.id) {
       window.google.accounts.id.disableAutoSelect();
     }
     setGUser(null);
+  };
+
+  /* ── Email sign-in handler ── */
+  const handleEmailSignIn = () => {
+    // Replace this with your real authentication logic
+    if (!email || !pw) {
+      alert("Please enter email and password");
+      return;
+    }
+    // For demo, we create a user object from the email
+    const userData = {
+      firstName: email.split('@')[0],
+      email: email,
+      avatar: email.charAt(0).toUpperCase(),
+      membership: "Pro Member",
+    };
+    login(userData);
+    navigate("/account");
   };
 
   /* ── Create-account helpers ── */
@@ -394,8 +393,18 @@ export default function Login() {
   const next        = () => { if (v1()) setStep(2); };
   const submitCreate = () => {
     if (v2()) {
+      // In a real app, send registration data to your backend
+      // Then automatically log in the user
+      const userData = {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        avatar: form.firstName.charAt(0).toUpperCase(),
+        membership: "Pro Member",
+      };
+      login(userData);
+      navigate("/account");
       closeCreate();
-      setForm({ firstName:"",lastName:"",email:"",gender:"",dob:"",phone:"",password:"",confirm:"",agree:false });
     }
   };
 
@@ -415,6 +424,7 @@ export default function Login() {
       return;
     }
     setFpSent(true);
+    // In a real app, call backend to send reset email
   };
 
   const str    = pwStr(form.password);
@@ -426,7 +436,7 @@ export default function Login() {
       <div className="app-shell">
         <LoginNavbar />
 
-        {/* ══ LEFT PANEL ══ */}
+        {/* LEFT PANEL (unchanged) */}
         <div className="left-panel">
           <div className="left-bg-img"/>
           <div className="left-overlay"/>
@@ -455,11 +465,10 @@ export default function Login() {
           <div className="left-footer">© 2026 GymPRO Global Inc.</div>
         </div>
 
-        {/* ══ RIGHT PANEL ══ */}
+        {/* RIGHT PANEL */}
         <div className="right-panel">
           <div className="form-wrap">
 
-            {/* ── Google signed-in banner ── */}
             {gUser && (
               <div className="g-signed-banner">
                 <img src={gUser.picture} alt={gUser.name} className="g-avatar"/>
@@ -467,9 +476,7 @@ export default function Login() {
                   <p className="g-signed-name">Welcome, {gUser.given_name}!</p>
                   <p className="g-signed-email">{gUser.email}</p>
                 </div>
-                <button className="g-signout-btn" onClick={handleGoogleSignOut} type="button">
-                  Sign out
-                </button>
+                <button className="g-signout-btn" onClick={handleGoogleSignOut} type="button">Sign out</button>
               </div>
             )}
 
@@ -506,11 +513,10 @@ export default function Login() {
               </div>
             </div>
 
-            <button className="btn-main" type="button">Sign In</button>
+            <button className="btn-main" type="button" onClick={handleEmailSignIn}>Sign In</button>
 
             <div className="divider"><span>or continue with</span></div>
 
-            {/* ── Google Button ── */}
             <button
               className={`btn-google${gLoading ? " btn-google--loading" : ""}${!gReady ? " btn-google--disabled" : ""}`}
               type="button"
@@ -524,10 +530,7 @@ export default function Login() {
               }
             </button>
 
-            {/* SDK not yet loaded hint */}
-            {!gReady && (
-              <p className="g-loading-hint">Loading Google Sign-In…</p>
-            )}
+            {!gReady && <p className="g-loading-hint">Loading Google Sign-In…</p>}
 
             <div className="form-foot">
               <span>Not a member yet?</span>
@@ -537,14 +540,11 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ══════════════════════════
-          FORGOT PASSWORD MODAL
-      ══════════════════════════ */}
+      {/* Forgot Password Modal (unchanged) */}
       {fpModal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) closeFp(); }}>
           <div className="modal-box fp-box">
             <button className="modal-close" onClick={closeFp} type="button">✕</button>
-
             {!fpSent ? (
               <>
                 <div className="modal-head">
@@ -552,7 +552,6 @@ export default function Login() {
                   <h2>FORGOT PASSWORD?</h2>
                   <p>Enter the email address linked to your GymPRO account and we'll send you a reset link.</p>
                 </div>
-
                 <div className="fgrp">
                   <label>Email Address</label>
                   <input
@@ -564,13 +563,9 @@ export default function Login() {
                   />
                   {fpEmailErr && <span className="err">{fpEmailErr}</span>}
                 </div>
-
                 <button className="btn-main" type="button" onClick={submitFp}>Reset Password</button>
-
                 <div className="fp-back-row">
-                  <a href="#" className="link-aux" onClick={e => { e.preventDefault(); closeFp(); }}>
-                    ← Back to Sign In
-                  </a>
+                  <a href="#" className="link-aux" onClick={e => { e.preventDefault(); closeFp(); }}>← Back to Sign In</a>
                 </div>
               </>
             ) : (
@@ -581,9 +576,7 @@ export default function Login() {
                 <p className="fp-sent-email">{fpEmail}</p>
                 <p className="fp-success-note">
                   Didn't receive it? Check your spam folder or{" "}
-                  <a href="#" className="link-cta" onClick={e => { e.preventDefault(); setFpSent(false); }}>
-                    try again
-                  </a>.
+                  <a href="#" className="link-cta" onClick={e => { e.preventDefault(); setFpSent(false); }}>try again</a>.
                 </p>
                 <button className="btn-main fp-done-btn" type="button" onClick={closeFp}>Done</button>
               </div>
@@ -592,9 +585,7 @@ export default function Login() {
         </div>
       )}
 
-      {/* ══════════════════════════
-          CREATE ACCOUNT MODAL
-      ══════════════════════════ */}
+      {/* Create Account Modal (unchanged, but login added on submit) */}
       {modal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) closeCreate(); }}>
           <div className="modal-box">
@@ -621,44 +612,15 @@ export default function Login() {
             {step === 1 && (
               <div className="mfields">
                 <div className="f2col">
-                  <div className="fgrp">
-                    <label>First Name</label>
-                    <input name="firstName" placeholder="John" value={form.firstName} onChange={fc}/>
-                    {errs.firstName && <span className="err">{errs.firstName}</span>}
-                  </div>
-                  <div className="fgrp">
-                    <label>Last Name</label>
-                    <input name="lastName" placeholder="Doe" value={form.lastName} onChange={fc}/>
-                    {errs.lastName && <span className="err">{errs.lastName}</span>}
-                  </div>
+                  <div className="fgrp"><label>First Name</label><input name="firstName" placeholder="John" value={form.firstName} onChange={fc}/>{errs.firstName && <span className="err">{errs.firstName}</span>}</div>
+                  <div className="fgrp"><label>Last Name</label><input name="lastName" placeholder="Doe" value={form.lastName} onChange={fc}/>{errs.lastName && <span className="err">{errs.lastName}</span>}</div>
                 </div>
-                <div className="fgrp">
-                  <label>Email Address</label>
-                  <input name="email" type="email" placeholder="you@example.com" value={form.email} onChange={fc}/>
-                  {errs.email && <span className="err">{errs.email}</span>}
-                </div>
+                <div className="fgrp"><label>Email Address</label><input name="email" type="email" placeholder="you@example.com" value={form.email} onChange={fc}/>{errs.email && <span className="err">{errs.email}</span>}</div>
                 <div className="f2col">
-                  <div className="fgrp">
-                    <label>Gender</label>
-                    <select name="gender" value={form.gender} onChange={fc}>
-                      <option value="">Select</option>
-                      <option>Male</option>
-                      <option>Female</option>
-                      <option>Non-binary</option>
-                      <option value="prefer-not">Prefer not to say</option>
-                    </select>
-                    {errs.gender && <span className="err">{errs.gender}</span>}
-                  </div>
-                  <div className="fgrp">
-                    <label>Date of Birth</label>
-                    <input name="dob" type="date" value={form.dob} onChange={fc}/>
-                    {errs.dob && <span className="err">{errs.dob}</span>}
-                  </div>
+                  <div className="fgrp"><label>Gender</label><select name="gender" value={form.gender} onChange={fc}><option value="">Select</option><option>Male</option><option>Female</option><option>Non-binary</option><option value="prefer-not">Prefer not to say</option></select>{errs.gender && <span className="err">{errs.gender}</span>}</div>
+                  <div className="fgrp"><label>Date of Birth</label><input name="dob" type="date" value={form.dob} onChange={fc}/>{errs.dob && <span className="err">{errs.dob}</span>}</div>
                 </div>
-                <div className="fgrp">
-                  <label>Phone <span className="opt">(optional)</span></label>
-                  <input name="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={fc}/>
-                </div>
+                <div className="fgrp"><label>Phone <span className="opt">(optional)</span></label><input name="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={fc}/></div>
                 <button className="btn-main" type="button" onClick={next}>Continue →</button>
               </div>
             )}
@@ -689,13 +651,7 @@ export default function Login() {
                 </div>
                 <label className={`chk-label ${errs.agree ? "eb" : ""}`}>
                   <input name="agree" type="checkbox" checked={form.agree} onChange={fc}/>
-                  <span>
-                    I agree to GymPRO's{" "}
-                    <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Terms & Conditions</a>{" "}
-                    and{" "}
-                    <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Privacy Policy</a>.
-                    I understand that my membership is subject to GymPRO's code of conduct.
-                  </span>
+                  <span>I agree to GymPRO's <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Terms & Conditions</a> and <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Privacy Policy</a>. I understand that my membership is subject to GymPRO's code of conduct.</span>
                 </label>
                 {errs.agree && <span className="err">{errs.agree}</span>}
                 <div className="mactions">

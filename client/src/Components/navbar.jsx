@@ -1,6 +1,7 @@
 // src/components/Navbar.jsx
 import { useState, useEffect, useRef } from "react";
 import { NavLink, Link } from "react-router-dom";
+import { useAuth } from "../Context/AuthContext";
 
 /* ─────────────────────────────────────────
    ICONS
@@ -11,8 +12,16 @@ const ChevDown = () => (
   </svg>
 );
 
+const CartIcon = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="9" cy="21" r="1" />
+    <circle cx="20" cy="21" r="1" />
+    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+  </svg>
+);
+
 /* ─────────────────────────────────────────
-   NAVIGATION DATA (no Account item)
+   NAVIGATION DATA (no Account link)
 ───────────────────────────────────────── */
 const NAV_ITEMS = [
   {
@@ -37,7 +46,7 @@ const NAV_ITEMS = [
     ],
   },
   {
-    label: "About Us",
+    label: "About",
     path: "/about",
     children: [
       { label: "Our Story", desc: "15 years of champions", path: "/about#story" },
@@ -47,23 +56,19 @@ const NAV_ITEMS = [
     ],
   },
   { label: "Schedule", path: "/schedule", children: null },
-  { label: "Contact Us", path: "/contact", children: null },
-  // "Account" removed – now handled by the user pill
+  { label: "Contact", path: "/contact", children: null },
 ];
 
-// Mock user data – replace with real auth context later
-const MOCK_USER = {
-  firstName: "Jordan",
-  lastName: "Wells",
-  avatar: "JW",
-  membership: "Pro Member",
-};
-
 export default function Navbar() {
+  const { user } = useAuth();
+  const isLoggedIn = !!user;
   const [scrolled, setScrolled] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const closeTimer = useRef(null);
+
+  // Mock cart item count – replace with actual cart context later
+  const [cartItemCount, setCartItemCount] = useState(2);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -80,17 +85,22 @@ export default function Navbar() {
     closeTimer.current = setTimeout(() => setActiveMenu(null), 180);
   };
 
+  // Get user display data
+  const displayName = user?.firstName || user?.name || (user?.email ? user.email.split('@')[0] : 'User');
+  const userAvatar = user?.avatar || displayName.charAt(0).toUpperCase();
+  const membershipType = user?.membership || "Member";
+
   return (
     <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>
       <div className="navbar-inner">
-        {/* Logo – clickable link to home */}
+        {/* Logo links to home */}
         <NavLink to="/" className="nav-logo">
           <div className="nav-logo-hex">
             <div className="nlh-bg" />
             <div className="nlh-inner" />
             <span className="nlh-letter">G</span>
           </div>
-          <span className="nav-logo-name">GYMPRO</span>
+          <span className="nav-logo-name">GYMVAULT</span>
         </NavLink>
 
         {/* Desktop navigation links */}
@@ -137,19 +147,30 @@ export default function Navbar() {
           ))}
         </ul>
 
-        {/* User pill – clickable button to account page */}
-        <Link to="/account" className="nav-user-pill">
-          <div className="nav-user-avatar">{MOCK_USER.avatar}</div>
-          <div className="nav-user-info">
-            <span className="nav-user-name">{MOCK_USER.firstName}</span>
-            <span className="nav-user-badge">{MOCK_USER.membership}</span>
-          </div>
-        </Link>
+        {/* Right side: conditional user pill OR sign-in buttons, plus cart icon */}
+        <div className="nav-right-group">
+          {isLoggedIn ? (
+            <Link to="/account" className="nav-user-pill">
+              <div className="nav-user-avatar">{userAvatar}</div>
+              <div className="nav-user-info">
+                <span className="nav-user-name">{displayName}</span>
+                <span className="nav-user-badge">{membershipType}</span>
+              </div>
+            </Link>
+          ) : (
+            <div className="nav-actions">
+              <NavLink to="/login" className="nav-btn-ghost">Sign In</NavLink>
+              <NavLink to="/login" className="nav-btn-solid">Join Now</NavLink>
+            </div>
+          )}
 
-        {/* Action buttons */}
-        <div className="nav-actions">
-          <NavLink to="/login" className="nav-btn-ghost">Sign In</NavLink>
-          <NavLink to="/login" className="nav-btn-solid">Join Now</NavLink>
+          {/* Shopping cart icon with badge */}
+          <Link to="/shop" className="nav-cart-icon">
+            <CartIcon />
+            {cartItemCount > 0 && (
+              <span className="nav-cart-badge">{cartItemCount}</span>
+            )}
+          </Link>
         </div>
 
         {/* Hamburger (mobile) */}
@@ -180,8 +201,18 @@ export default function Navbar() {
             </div>
           ))}
           <div className="nav-mobile-actions">
-            <NavLink to="/login" className="nav-btn-ghost">Sign In</NavLink>
-            <NavLink to="/login" className="nav-btn-solid">Join Now</NavLink>
+            {!isLoggedIn && (
+              <>
+                <NavLink to="/login" className="nav-btn-ghost">Sign In</NavLink>
+                <NavLink to="/login" className="nav-btn-solid">Join Now</NavLink>
+              </>
+            )}
+            {isLoggedIn && (
+              <Link to="/account" className="nav-btn-solid">My Account</Link>
+            )}
+            <Link to="/shop" className="nav-btn-solid nav-cart-mobile">
+              Cart {cartItemCount > 0 && `(${cartItemCount})`}
+            </Link>
           </div>
         </div>
       )}

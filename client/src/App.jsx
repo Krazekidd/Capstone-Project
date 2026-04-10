@@ -12,7 +12,6 @@ import Excursions from './pages/Excursions/Excursions';
 import TrainerPage from './pages/Trainer/Traineracc'
 import Admin from './pages/Admin/Admin'
 
-// import Admin from './pages/Admin/Admin'
 
 function App() {
   return (

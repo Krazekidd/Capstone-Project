@@ -207,7 +207,7 @@ class UpdateAdminProfileRequest(BaseModel):
     birthday: Optional[date] = None  # Add birthday
 
 # Extended schemas for progress tracking
-class ProgressUpdateRequest(BaseModel):
+class ProgressRequest(BaseModel):
     weight: Optional[float] = None
     height: Optional[float] = None
     measurements: Optional[dict] = None
@@ -218,7 +218,126 @@ class UserProgressResponse(BaseModel):
     bmi_history: list[dict]
     measurements_history: list[dict]
 
+class BodyMeasurements(BaseModel):
+    # Body basics
+    weight: Optional[float] = None
+    height: Optional[float] = None
+    body_fat: Optional[float] = None
+    
+    # Upper body
+    chest: Optional[float] = None
+    waist: Optional[float] = None
+    shoulders: Optional[float] = None
+    arm_left: Optional[float] = None
+    arm_right: Optional[float] = None
+    neck: Optional[float] = None
+    
+    # Lower body
+    hips: Optional[float] = None
+    thigh_left: Optional[float] = None
+    thigh_right: Optional[float] = None
+    calf_left: Optional[float] = None
+    calf_right: Optional[float] = None
+    glutes: Optional[float] = None
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "weight": 84,
+                "height": 178,
+                "body_fat": 18,
+                "chest": 96,
+                "waist": 84,
+                "shoulders": 118,
+                "arm_left": 36,
+                "arm_right": 36,
+                "neck": 38,
+                "hips": 96,
+                "thigh_left": 56,
+                "thigh_right": 56,
+                "calf_left": 36,
+                "calf_right": 36,
+                "glutes": 100
+            }
+        }
 
+class ProgressTrackingResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    weight: Optional[float] = None
+    height: Optional[float] = None
+    measurements: Optional[BodyMeasurements] = None
+    recorded_at: datetime
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class GoalTrackingResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    weight: Optional[float] = None
+    chest: Optional[float] = None
+    waist: Optional[float] = None
+    hips: Optional[float] = None
+    thigh: Optional[float] = None
+    arm: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Password Reset Schemas
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=6)
+    
+    @validator('new_password')
+    def validate_password(cls, v):
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        return v
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=6)
+
+# Google OAuth Schemas
+class GoogleLoginRequest(BaseModel):
+    credential: str
+
+class GoogleTokenRequest(BaseModel):
+    access_token: str
+
+# Registration Request (updated)
+class RegisterRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    email: EmailStr
+    password: str = Field(..., min_length=6)
+    phone_number: Optional[str] = Field(None, pattern=r'^\+?1?\d{9,15}$')
+    height: Optional[float] = Field(None, ge=0, le=300)
+    weight: Optional[float] = Field(None, ge=0, le=500)
+    birthday: Optional[date] = None
+    gender: Optional[str] = Field(None, pattern='^(Male|Female|Non-binary|prefer-not)$')
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 6:
+            raise ValueError('Password must be at least 6 characters')
+        return v
+
+# Response schemas
+class APIResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+class PasswordResetResponse(BaseModel):
+    message: str
+    reset_token: Optional[str] = None  # Only for development
 
 # Response wrapper for API consistency
 class APIResponse(BaseModel):

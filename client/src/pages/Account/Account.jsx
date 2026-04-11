@@ -64,57 +64,169 @@ const chartOptions = {
     x: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#6b6b7a", font: { family: "DM Sans" } } },
     y: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#6b6b7a", font: { family: "DM Sans" } } },
   },
+  
 };
 
 function WeightChart({ history, goalWeight }) {
   const ref = useRef(null);
   const chart = useRef(null);
+  
   useEffect(() => {
     if (!ref.current) return;
-    chart.current?.destroy();
-    const labels = history.map(h => h.month);
+    
+    // Destroy existing chart
+    if (chart.current) {
+      chart.current.destroy();
+      chart.current = null;
+    }
+    
+    // Only create chart if we have data
+    if (!history || history.length === 0) return;
+    
+    const labels = history.map(h => `${h.month}${h.year ? ` ${h.year}` : ''}`);
+    const weightData = history.map(h => h.weight);
+    
     chart.current = new Chart(ref.current, {
       type: "line",
       data: {
-        labels,
+        labels: labels,
         datasets: [
-          { label: "Weight (kg)", data: history.map(h => h.weight), borderColor: "#ff6b1a", backgroundColor: "rgba(255,107,26,0.1)", borderWidth: 2.5, tension: 0.4, fill: true, pointBackgroundColor: "#ff6b1a", pointRadius: 5 },
-          { label: "Goal", data: history.map(() => goalWeight), borderColor: "rgba(240,238,234,0.45)", borderWidth: 2, borderDash: [6,4], tension: 0, fill: false, pointRadius: 0 },
+          {
+            label: "Weight (kg)",
+            data: weightData,
+            borderColor: "#ff6b1a",
+            backgroundColor: "rgba(255,107,26,0.1)",
+            borderWidth: 2.5,
+            tension: 0.4,
+            fill: true,
+            pointBackgroundColor: "#ff6b1a",
+            pointRadius: 5,
+            pointHoverRadius: 7,
+          },
+          {
+            label: "Goal",
+            data: history.map(() => goalWeight),
+            borderColor: "rgba(240,238,234,0.45)",
+            borderWidth: 2,
+            borderDash: [6, 4],
+            tension: 0,
+            fill: false,
+            pointRadius: 0,
+          },
         ],
       },
-      options: chartOptions,
+      options: {
+        ...chartOptions,
+        plugins: {
+          ...chartOptions.plugins,
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.raw} kg`;
+              }
+            }
+          }
+        }
+      },
     });
-    return () => chart.current?.destroy();
-  }, [history, goalWeight]);
+    
+    return () => {
+      if (chart.current) {
+        chart.current.destroy();
+        chart.current = null;
+      }
+    };
+  }, [history, goalWeight]); // Re-run when history or goalWeight changes
+  
   return <canvas ref={ref} />;
 }
 
 function BodyChart({ history }) {
   const ref = useRef(null);
   const chart = useRef(null);
+  
   useEffect(() => {
     if (!ref.current) return;
-    chart.current?.destroy();
-    const labels = history.map(h => h.month);
+    
+    if (chart.current) {
+      chart.current.destroy();
+      chart.current = null;
+    }
+    
+    if (!history || history.length === 0) return;
+    
+    const labels = history.map(h => `${h.month}${h.year ? ` ${h.year}` : ''}`);
+    
     chart.current = new Chart(ref.current, {
       type: "line",
       data: {
-        labels,
+        labels: labels,
         datasets: [
-          { label: "Chest/Bust", data: history.map(h => h.chest), borderColor: "#ff6b1a", tension: 0.4, borderWidth: 2, fill: false, pointRadius: 4 },
-          { label: "Waist", data: history.map(h => h.waist), borderColor: "#ffa040", tension: 0.4, borderWidth: 2, fill: false, pointRadius: 4 },
-          { label: "Hips", data: history.map(h => h.hips), borderColor: "#f0eeea", tension: 0.4, borderWidth: 2, fill: false, pointRadius: 4 },
-          { label: "Thigh", data: history.map(h => h.thigh), borderColor: "#6b6b7a", tension: 0.4, borderWidth: 2, fill: false, pointRadius: 4 },
-          { label: "Arm", data: history.map(h => h.arm), borderColor: "#d4a050", tension: 0.4, borderWidth: 2, fill: false, pointRadius: 4 },
+          {
+            label: "Chest/Bust",
+            data: history.map(h => h.chest),
+            borderColor: "#ff6b1a",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          },
+          {
+            label: "Waist",
+            data: history.map(h => h.waist),
+            borderColor: "#ffa040",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          },
+          {
+            label: "Hips",
+            data: history.map(h => h.hips),
+            borderColor: "#f0eeea",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          },
+          {
+            label: "Thigh",
+            data: history.map(h => h.thigh),
+            borderColor: "#6b6b7a",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          },
+          {
+            label: "Arm",
+            data: history.map(h => h.arm),
+            borderColor: "#d4a050",
+            tension: 0.4,
+            borderWidth: 2,
+            fill: false,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          },
         ],
       },
       options: chartOptions,
     });
-    return () => chart.current?.destroy();
+    
+    return () => {
+      if (chart.current) {
+        chart.current.destroy();
+        chart.current = null;
+      }
+    };
   }, [history]);
+  
   return <canvas ref={ref} />;
 }
-
 function StrengthChart() {
   const ref = useRef(null);
   const chart = useRef(null);
@@ -216,6 +328,7 @@ export default function Account() {
   const [history, setHistory] = useState([]);
   const [activeTarget, setActiveTarget] = useState(null);
   const [chartTab, setChartTab] = useState("compare");
+  const [chartKey, setChartKey] = useState(0);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([
     { role:"agent", text:"Hello! 👋 I'm your GymPro support agent. How can I help?", time:"Just now" },
@@ -269,107 +382,105 @@ export default function Account() {
     document.body.style.backgroundColor = bgColor;
   }, [bgColor]);
 
-  // Load user data on mount
-  useEffect(() => {
-    loadUserData();
-  }, []);
 
-  const loadUserData = async () => {
+
+  
+  const refreshData = async () => {
     try {
-      setLoading(true);
-      
-      // Get account info
-      const accountData = await accountAPI.getMyAccount();
-      setUserData(accountData);
-      
-      // Load user goals
-      try {
-        const goalsData = await progressAPI.getGoals();
-        if (goalsData && Object.keys(goalsData).length > 0) {
-          setGoals({
-            weight: goalsData.target_weight_kg || 80,
-            chest: goalsData.target_chest_cm || 100,
-            waist: goalsData.target_waist_cm || 80,
-            hips: goalsData.target_hips_cm || 98,
-            thigh: goalsData.target_thigh_cm || 58,
-            arm: goalsData.target_arm_cm || 38
-          });
-          setGoalInputs({
-            weight: goalsData.target_weight_kg || 80,
-            chest: goalsData.target_chest_cm || 100,
-            waist: goalsData.target_waist_cm || 80,
-            hips: goalsData.target_hips_cm || 98,
-            thigh: goalsData.target_thigh_cm || 58,
-            arm: goalsData.target_arm_cm || 38
-          });
-          setGoalType(goalsData.goal_type || "Bulk Up");
-        }
-      } catch (err) {
-        console.log("No goals found, using defaults");
+      const historyData = await progressAPI.getProgressHistory(12);
+      if (historyData && historyData.length > 0) {
+        const formattedHistory = historyData.map(entry => {
+          const measurements = entry.measurements || {};
+          return {
+            month: new Date(entry.recorded_at).toLocaleString('default', { month: 'short' }),
+            year: new Date(entry.recorded_at).getFullYear(),
+            weight: entry.weight || measurements.weight || 84,
+            chest: measurements.chest || 96,
+            waist: measurements.waist || 84,
+            hips: measurements.hips || 96,
+            thigh: measurements.thigh_left || 56,
+            arm: measurements.arm_left || 37,
+          };
+        });
+        setHistory(formattedHistory);
+        setChartKey(prev => prev + 1);
       }
-      
-      // Load measurement history
-      try {
-        const historyData = await progressAPI.getHistory();
-        if (historyData && historyData.length > 0) {
-          const formattedHistory = historyData.map(record => ({
-            month: record.month_name,
-            weight: record.weight_kg,
-            chest: record.chest_cm,
-            waist: record.waist_cm,
-            hips: record.hips_cm,
-            thigh: record.thigh_left_cm,
-            arm: record.arm_left_cm
-          }));
-          setHistory(formattedHistory);
-          
-          // Set current measurements from latest record
-          const latest = formattedHistory[formattedHistory.length - 1];
-          if (latest) {
-            setM(prev => ({
-              ...prev,
-              weight: latest.weight || "",
-              chest: latest.chest || "",
-              waist: latest.waist || "",
-              hips: latest.hips || "",
-              thighL: latest.thigh || "",
-              armL: latest.arm || ""
-            }));
-          }
-        } else {
-          // Use default demo data if no history
-          const defaultHistory = [
-            { month: "Oct", weight: 88, chest: 100, waist: 88, hips: 100, thigh: 58, arm: 37 },
-            { month: "Nov", weight: 87, chest: 100, waist: 87, hips: 99, thigh: 58, arm: 37 },
-            { month: "Dec", weight: 86, chest: 99, waist: 86, hips: 99, thigh: 57, arm: 37 },
-            { month: "Jan", weight: 85, chest: 98, waist: 85, hips: 98, thigh: 57, arm: 37 },
-            { month: "Feb", weight: 84, chest: 97, waist: 84, hips: 97, thigh: 56, arm: 37 },
-            { month: "Mar", weight: 84, chest: 96, waist: 84, hips: 96, thigh: 56, arm: 37 },
-          ];
-          setHistory(defaultHistory);
-        }
-      } catch (err) {
-        console.log("Error loading history, using defaults");
-        const defaultHistory = [
-          { month: "Oct", weight: 88, chest: 100, waist: 88, hips: 100, thigh: 58, arm: 37 },
-          { month: "Nov", weight: 87, chest: 100, waist: 87, hips: 99, thigh: 58, arm: 37 },
-          { month: "Dec", weight: 86, chest: 99, waist: 86, hips: 99, thigh: 57, arm: 37 },
-          { month: "Jan", weight: 85, chest: 98, waist: 85, hips: 98, thigh: 57, arm: 37 },
-          { month: "Feb", weight: 84, chest: 97, waist: 84, hips: 97, thigh: 56, arm: 37 },
-          { month: "Mar", weight: 84, chest: 96, waist: 84, hips: 96, thigh: 56, arm: 37 },
-        ];
-        setHistory(defaultHistory);
-      }
-      
     } catch (err) {
-      console.error("Error loading user data:", err);
-      setError("Failed to load user data");
-      showToast("Failed to load user data");
-    } finally {
-      setLoading(false);
+      console.error("Failed to refresh data:", err);
     }
   };
 
+  // Load user data on mount
+  useEffect(() => {
+    loadUserData();
+
+  }, []);
+
+const loadUserData = async () => {
+  // Load measurement history
+try {
+  const historyData = await progressAPI.getProgressHistory();
+  console.log("Raw history data from API:", historyData);
+  
+  if (historyData && historyData.length > 0) {
+    // Transform history for charts
+    const formattedHistory = historyData.map(entry => {
+      const measurements = entry.measurements || {};
+      return {
+        month: new Date(entry.recorded_at).toLocaleString('default', { month: 'short' }),
+        year: new Date(entry.recorded_at).getFullYear(),
+        fullDate: new Date(entry.recorded_at), // Store full date for sorting
+        weight: entry.weight || measurements.weight || 84,
+        chest: measurements.chest || 96,
+        waist: measurements.waist || 84,
+        hips: measurements.hips || 96,
+        thigh: measurements.thigh_left || 56,
+        arm: measurements.arm_left || 37,
+      };
+    });
+    
+    // Sort by date (oldest first) for proper chart display
+    formattedHistory.sort((a, b) => a.fullDate - b.fullDate);
+    
+    // Remove the fullDate property after sorting (optional)
+    const sortedHistory = formattedHistory.map(({ fullDate, ...rest }) => rest);
+    
+    console.log("Formatted & sorted history:", sortedHistory);
+    setHistory(sortedHistory);
+    
+    // Set current measurements from latest record (last item after sorting)
+    const latest = sortedHistory[sortedHistory.length - 1];
+    if (latest) {
+      setM(prev => ({
+        ...prev,
+        weight: latest.weight || "",
+        chest: latest.chest || "",
+        waist: latest.waist || "",
+        hips: latest.hips || "",
+        thighL: latest.thigh || "",
+        armL: latest.arm || ""
+      }));
+    }
+  } else {
+    console.log("No history data found, using defaults");
+    const defaultHistory = [
+      { month: "Oct", year: 2025, weight: 88, chest: 100, waist: 88, hips: 100, thigh: 58, arm: 37 },
+      { month: "Nov", year: 2025, weight: 87, chest: 100, waist: 87, hips: 99, thigh: 58, arm: 37 },
+      { month: "Dec", year: 2025, weight: 86, chest: 99, waist: 86, hips: 99, thigh: 57, arm: 37 },
+      { month: "Jan", year: 2026, weight: 85, chest: 98, waist: 85, hips: 98, thigh: 57, arm: 37 },
+      { month: "Feb", year: 2026, weight: 84, chest: 97, waist: 84, hips: 97, thigh: 56, arm: 37 },
+      { month: "Mar", year: 2026, weight: 84, chest: 96, waist: 84, hips: 96, thigh: 56, arm: 37 },
+    ];
+    setHistory(defaultHistory);
+  }
+} catch (err) {
+  console.error("Error loading history:", err);
+  setError("Failed to load user data");
+    showToast("Failed to load user data");
+  } finally {
+    setLoading(false);
+  }
+};
   const logWater = () => {
     if (waterLogs < 8) {
       setWaterLogs(prev => prev + 1);
@@ -409,58 +520,93 @@ export default function Account() {
     }
   };
   
-  const saveMeasurements = async () => {
-    try {
-      const month = MONTHS[new Date().getMonth()];
-      const measurementData = {
-        measurement_date: new Date().toISOString().split('T')[0],
-        month_name: month,
-        weight_kg: parseFloat(m.weight) || 84,
-        height_cm: parseFloat(m.height) || 178,
-        body_fat_percentage: parseFloat(m.bf) || 18,
-        chest_cm: parseFloat(m.chest) || 96,
-        waist_cm: parseFloat(m.waist) || 84,
-        shoulders_cm: parseFloat(m.shoulders) || 118,
-        arm_left_cm: parseFloat(m.armL) || 37,
-        arm_right_cm: parseFloat(m.armR) || 37,
-        neck_cm: parseFloat(m.neck) || 38,
-        hips_cm: parseFloat(m.hips) || 96,
-        thigh_left_cm: parseFloat(m.thighL) || 56,
-        thigh_right_cm: parseFloat(m.thighR) || 56,
-        calf_left_cm: parseFloat(m.calfL) || 36,
-        calf_right_cm: parseFloat(m.calfR) || 36,
-        glutes_cm: parseFloat(m.glutes) || 100
+const saveMeasurements = async () => {
+  try {
+    // Prepare complete measurements object
+    const measurementsData = {
+      // Body basics
+      weight: m.weight ? parseFloat(m.weight) : null,
+      height: m.height ? parseFloat(m.height) : null,
+      body_fat: m.bf ? parseFloat(m.bf) : null,
+      
+      // Upper body
+      chest: m.chest ? parseFloat(m.chest) : null,
+      waist: m.waist ? parseFloat(m.waist) : null,
+      shoulders: m.shoulders ? parseFloat(m.shoulders) : null,
+      arm_left: m.armL ? parseFloat(m.armL) : null,
+      arm_right: m.armR ? parseFloat(m.armR) : null,
+      neck: m.neck ? parseFloat(m.neck) : null,
+      
+      // Lower body
+      hips: m.hips ? parseFloat(m.hips) : null,
+      thigh_left: m.thighL ? parseFloat(m.thighL) : null,
+      thigh_right: m.thighR ? parseFloat(m.thighR) : null,
+      calf_left: m.calfL ? parseFloat(m.calfL) : null,
+      calf_right: m.calfR ? parseFloat(m.calfR) : null,
+      glutes: m.glutes ? parseFloat(m.glutes) : null,
       };
+    
+    // Remove null values
+    Object.keys(measurementsData).forEach(key => {
+      if (measurementsData[key] === null) {
+        delete measurementsData[key];
+      }
+    });
+    
+    // Save to backend
+    await progressAPI.saveProgress(measurementsData);
+    await refreshData();
+
+    // Update local history for charts
+    const month = new Date().toLocaleString('default', { month: 'short' });
+    const currentYear = new Date().getFullYear();
+
+    const newEntry = {
+      month,
+      year: currentYear,
+      weight: measurementsData.weight || (history.length > 0 ? history[history.length - 1]?.weight : 84),
+      chest: measurementsData.chest || (history.length > 0 ? history[history.length - 1]?.chest : 96),
+      waist: measurementsData.waist || (history.length > 0 ? history[history.length - 1]?.waist : 84),
+      hips: measurementsData.hips || (history.length > 0 ? history[history.length - 1]?.hips : 96),
+      thigh: measurementsData.thigh_left || (history.length > 0 ? history[history.length - 1]?.thigh : 56),
+      arm: measurementsData.arm_left || (history.length > 0 ? history[history.length - 1]?.arm : 37),
+    };
+    
+ setHistory(prev => {
+      const existingIndex = prev.findIndex(h => h.month === currentMonth && h.year === currentYear);
+      let updatedHistory;
       
-      await progressAPI.saveMeasurements(measurementData);
-      
-      // Update local history
-      const entry = {
-        month,
-        weight: measurementData.weight_kg,
-        chest: measurementData.chest_cm,
-        waist: measurementData.waist_cm,
-        hips: measurementData.hips_cm,
-        thigh: measurementData.thigh_left_cm,
-        arm: measurementData.arm_left_cm,
-      };
-      
-      setHistory(prev => {
-        const idx = prev.findIndex(h => h.month === month);
-        if (idx >= 0) { 
-          const n = [...prev]; 
-          n[idx] = entry; 
-          return n; 
+      if (existingIndex >= 0) {
+        // Replace existing month
+        updatedHistory = [...prev];
+        updatedHistory[existingIndex] = newEntry;
+      } else {
+        // Add new entry and keep last 12 months
+        updatedHistory = [...prev, newEntry];
+        if (updatedHistory.length > 12) {
+          updatedHistory = updatedHistory.slice(-12);
         }
-        return [...prev, entry];
+      }
+      
+      // Sort by date (assuming months in order)
+      const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      updatedHistory.sort((a, b) => {
+        return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
       });
       
-      showToast("✓ Measurements saved!");
-    } catch (err) {
-      console.error("Error saving measurements:", err);
-      showToast("Failed to save measurements");
-    }
-  };
+      return updatedHistory;
+    });
+    
+    showToast("✓ All measurements saved successfully!");
+  
+    // Clear form after save (optional)
+    // clearMeasurements();
+    
+  } catch (err) {
+    console.error("Failed to save measurements:", err);
+    showToast("Failed to save measurements: " + (err.detail || err.message));
+  }
+};
   
   const clearM = () => setM({
     weight:"", height:"", bf:"", chest:"", waist:"", shoulders:"",
@@ -508,14 +654,19 @@ export default function Account() {
     navigate('/');
   };
 
-  const last = history[history.length-1] || { weight: 84, chest: 96, waist: 84, hips: 96, thigh: 56, arm: 37 };
+
+  // Calculate last entry dynamically
+  const last = history.length > 0 ? history[history.length - 1] : { 
+    weight: 84, chest: 96, waist: 84, hips: 96, thigh: 56, arm: 37 
+  };
+
   const compareItems = [
-    { label:"Weight (kg)", current:last.weight, goal:goals.weight, unit:"kg" },
-    { label:"Chest/Bust", current:last.chest, goal:goals.chest, unit:"cm" },
-    { label:"Waist", current:last.waist, goal:goals.waist, unit:"cm" },
-    { label:"Hips", current:last.hips, goal:goals.hips, unit:"cm" },
-    { label:"Thigh", current:last.thigh, goal:goals.thigh, unit:"cm" },
-    { label:"Arm", current:last.arm, goal:goals.arm, unit:"cm" },
+    { label: "Weight (kg)", current: last.weight, goal: goals.weight, unit: "kg" },
+    { label: gender === "female" ? "Bust (cm)" : "Chest (cm)", current: last.chest, goal: goals.chest, unit: "cm" },
+    { label: "Waist (cm)", current: last.waist, goal: goals.waist, unit: "cm" },
+    { label: "Hips (cm)", current: last.hips, goal: goals.hips, unit: "cm" },
+    { label: "Thigh (cm)", current: last.thigh, goal: goals.thigh, unit: "cm" },
+    { label: "Arm (cm)", current: last.arm, goal: goals.arm, unit: "cm" },
   ];
   const cMax = Math.max(...compareItems.map(i => Math.max(i.current, i.goal)), 1);
   
@@ -776,10 +927,10 @@ export default function Account() {
               );
             })}
           </div>
-          <div style={{ display:chartTab==="weight"?"block":"none" }} className="chart-canvas-wrap">
+          <div style={{ display:chartTab==="weight"?"block":"none" }} className="chart-canvas-wrap" key={`weight-${chartKey}`}>  
             <WeightChart history={history} goalWeight={goals.weight} />
           </div>
-          <div style={{ display:chartTab==="body"?"block":"none" }} className="chart-canvas-wrap">
+          <div style={{ display:chartTab==="body"?"block":"none" }} className="chart-canvas-wrap" key={`body-${chartKey}`}> 
             <BodyChart history={history} />
           </div>
           <div style={{ display:chartTab==="strength"?"block":"none" }} className="chart-canvas-wrap">

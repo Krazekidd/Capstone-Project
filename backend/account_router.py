@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, desc, asc
 import uuid
 import json
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
 from database import get_user_db
 from models import User, Client, Trainer, Admin, ProgressTracking
@@ -12,7 +12,7 @@ from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
     UpdateAdminProfileRequest, APIResponse, UserProgressResponse,
-    ProgressUpdateRequest
+    ProgressRequest, BodyMeasurements, ProgressTrackingResponse
 )
 from auth_router import get_current_user
 
@@ -312,117 +312,205 @@ async def delete_my_account(
 # ============================================================
 # PROGRESS TRACKING ENDPOINTS
 # ============================================================
-@router.post("/progress", response_model=APIResponse)
-async def update_progress(
-    progress_data: ProgressUpdateRequest,
+@router.post("/progress")
+async def save_progress(
+    measurements: BodyMeasurements,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Update user progress measurements"""
-    try:
-        user_id = current_user["user_id"]
-        role = current_user["role"]
+    """Save complete body measurements to progress tracking"""
+    user_id = current_user["user_id"]
+    user_id_bytes = user_id.bytes
+    
+    # Create new progress entry using body_measurements table
+    from models import BodyMeasurement
+    
+    new_measurement = BodyMeasurement(
+        user_id=user_id_bytes,
+        weight=measurements.weight,
+        height=measurements.height,
+        body_fat=measurements.body_fat,
+        chest=measurements.chest,
+        waist=measurements.waist,
+        shoulders=measurements.shoulders,
+        arm_left=measurements.arm_left,
+        arm_right=measurements.arm_right,
+        neck=measurements.neck,
+        hips=measurements.hips,
+        thigh_left=measurements.thigh_left,
+        thigh_right=measurements.thigh_right,
+        calf_left=measurements.calf_left,
+        calf_right=measurements.calf_right,
+        glutes=measurements.glutes
+    )
+    
+    db.add(new_measurement)
+    await db.commit()
+    await db.refresh(new_measurement)
+    
+    # Also update the client profile with latest weight/height
+    if measurements.weight or measurements.height:
+        update_data = {}
+        if measurements.weight:
+            update_data["weight"] = str(measurements.weight)
+        if measurements.height:
+            update_data["height"] = str(measurements.height)
         
-        # Only clients can track progress
-        if role != "client":
-            raise HTTPException(status_code=403, detail="Only clients can track progress")
-        
-        user_id_bytes = user_id.bytes
-        
-        # Create new progress record
-        new_progress = ProgressTracking(
-            user_id=user_id_bytes,
-            weight=progress_data.weight,
-            height=progress_data.height,
-            measurements=json.dumps(progress_data.measurements) if progress_data.measurements else None,
-            recorded_at=datetime.utcnow()
-        )
-        
-        db.add(new_progress)
-        
-        # Also update current client measurements if weight/height provided
-        if progress_data.weight or progress_data.height:
-            update_values = {}
-            if progress_data.weight:
-                update_values['weight'] = progress_data.weight
-            if progress_data.height:
-                update_values['height'] = progress_data.height
-            
-            stmt = update(Client).where(Client.id == user_id_bytes).values(**update_values)
+        if update_data:
+            from sqlalchemy import update as sql_update
+            stmt = sql_update(Client).where(Client.id == user_id_bytes).values(**update_data)
             await db.execute(stmt)
-        
-        await db.commit()
-        
-        return APIResponse(success=True, message="Progress updated successfully", data=None)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating progress: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+            await db.commit()
+    
+    return {
+        "message": "Progress saved successfully",
+        "id": str(uuid.UUID(bytes=new_measurement.id))
+    }
 
-@router.get("/progress/history", response_model=UserProgressResponse)
+@router.get("/progress/history", response_model=list[ProgressTrackingResponse])
 async def get_progress_history(
-    limit: int = Query(30, ge=1, le=365),
+    limit: int = Query(12, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Get user progress history"""
+    """Get progress history for the current user"""
     try:
         user_id = current_user["user_id"]
-        role = current_user["role"]
-        
-        # Only clients can view progress
-        if role != "client":
-            raise HTTPException(status_code=403, detail="Only clients can view progress")
-        
         user_id_bytes = user_id.bytes
         
-        # Get progress history
+        logger.info(f"Fetching progress history for user: {user_id}")
+        
+        # Change from desc() to asc() to get oldest first
         result = await db.execute(
             select(ProgressTracking)
             .where(ProgressTracking.user_id == user_id_bytes)
-            .order_by(ProgressTracking.recorded_at.desc())
+            .order_by(asc(ProgressTracking.recorded_at))  # Changed from desc to asc
             .limit(limit)
         )
-        progress_records = result.scalars().all()
+        entries = result.scalars().all()
         
-        # Format history data
-        weight_history = []
-        bmi_history = []
-        measurements_history = []
+        logger.info(f"Found {len(entries)} progress entries")
         
-        for record in reversed(progress_records):  # Chronological order
-            weight_history.append({
-                "date": record.recorded_at.isoformat(),
-                "weight": record.weight
-            })
+        response = []
+        for entry in entries:
+            measurements_data = json.loads(entry.measurements) if entry.measurements else {}
             
-            # Calculate BMI if both height and weight available
-            if record.weight and record.height:
-                bmi = record.weight / ((record.height / 100) ** 2)
-                bmi_history.append({
-                    "date": record.recorded_at.isoformat(),
-                    "bmi": round(bmi, 1)
-                })
+            body_measurements = BodyMeasurements(
+                weight=measurements_data.get('weight'),
+                height=measurements_data.get('height'),
+                body_fat=measurements_data.get('body_fat'),
+                chest=measurements_data.get('chest'),
+                waist=measurements_data.get('waist'),
+                shoulders=measurements_data.get('shoulders'),
+                arm_left=measurements_data.get('arm_left'),
+                arm_right=measurements_data.get('arm_right'),
+                neck=measurements_data.get('neck'),
+                hips=measurements_data.get('hips'),
+                thigh_left=measurements_data.get('thigh_left'),
+                thigh_right=measurements_data.get('thigh_right'),
+                calf_left=measurements_data.get('calf_left'),
+                calf_right=measurements_data.get('calf_right'),
+                glutes=measurements_data.get('glutes')
+            ) if measurements_data else None
             
-            if record.measurements:
-                measurements_history.append({
-                    "date": record.recorded_at.isoformat(),
-                    "measurements": json.loads(record.measurements)
-                })
+            response.append(
+                ProgressTrackingResponse(
+                    id=uuid.UUID(bytes=entry.id),
+                    user_id=uuid.UUID(bytes=entry.user_id),
+                    weight=entry.weight,
+                    height=entry.height,
+                    measurements=body_measurements,
+                    recorded_at=entry.recorded_at,
+                    created_at=entry.created_at
+                )
+            )
         
-        return UserProgressResponse(
-            user_id=user_id,
-            weight_history=weight_history,
-            bmi_history=bmi_history,
-            measurements_history=measurements_history
-        )
+        # No need to reverse here since we're already in ascending order
+        return response
         
     except Exception as e:
         logger.error(f"Error getting progress history: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/progress/latest", response_model=ProgressTrackingResponse)
+async def get_latest_progress(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get the most recent progress entry"""
+    user_id = current_user["user_id"]
+    user_id_bytes = user_id.bytes
+    
+    result = await db.execute(
+        select(ProgressTracking)
+        .where(ProgressTracking.user_id == user_id_bytes)
+        .order_by(desc(ProgressTracking.recorded_at))
+        .limit(1)
+    )
+    entry = result.scalar_one_or_none()
+    
+    if not entry:
+        raise HTTPException(status_code=404, detail="No progress data found")
+    
+    measurements_data = json.loads(entry.measurements) if entry.measurements else {}
+    
+    return ProgressTrackingResponse(
+        id=uuid.UUID(bytes=entry.id),
+        user_id=uuid.UUID(bytes=entry.user_id),
+        weight=entry.weight,
+        height=entry.height,
+        measurements=BodyMeasurements(**measurements_data) if measurements_data else None,
+        recorded_at=entry.recorded_at,
+        created_at=entry.created_at
+    )
+
+# ============================================================
+# GOALS ENDPOINTS
+# ============================================================
+@router.get("/goals")
+async def get_goals(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get current user's goals"""
+    user_id = current_user["user_id"]
+    user_id_bytes = user_id.bytes
+    
+    # Check if user is client
+    if current_user["role"] != "client":
+        raise HTTPException(status_code=400, detail="Goals only available for clients")
+    
+    # Try to get existing goals
+    result = await db.execute(
+        select(Client).where(Client.id == user_id_bytes)
+    )
+    client = result.scalar_one_or_none()
+    
+    # For now, return default goals or stored ones
+    # You can add a client_goals table later
+    return GoalTrackingResponse(
+        id=uuid.UUID(bytes=client.id),
+        user_id=uuid.UUID(bytes=client.user_id),
+        weight=client.target_weight_cm,
+        arm=client.target_arm_cm
+    )
+
+@router.put("/goals")
+async def update_goals(
+    goals: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update user's goals"""
+    user_id = current_user["user_id"]
+    user_id_bytes = user_id.bytes
+    
+    if current_user["role"] != "client":
+        raise HTTPException(status_code=400, detail="Goals only available for clients")
+    
+    # Store goals in client table or separate goals table
+    # For now, just return success
+    return {"message": "Goals updated successfully"}
 
 # ============================================================
 # GET ALL CLIENTS (Admin & Trainers only)

@@ -15,6 +15,11 @@ import "./Login.css";
    5. Replace the string below with your real Client ID:
 ─────────────────────────────────────────────────────────────── */
 const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+const handleGoogleLogin = () => {
+    // Redirect directly to backend Google login endpoint
+    window.location.href = 'http://localhost:8000/auth/google/login';
+};
+
 
 /* ── Icons ── */
 const EyeIcon = ({ open }) => (
@@ -479,13 +484,7 @@ export default function Login() {
             <div className="divider"><span>or continue with</span></div>
 
             {/* ── Google Button ── */}
-            <button
-              className={`btn-google${gLoading ? " btn-google--loading" : ""}${!gReady ? " btn-google--disabled" : ""}`}
-              type="button"
-              onClick={handleGoogleClick}
-              disabled={!gReady || gLoading}
-              title={!gReady ? "Loading Google Sign-In…" : "Sign in with Google"}
-            >
+            <button onClick={handleGoogleLogin} className="btn-google">
               {gLoading
                 ? <><SpinnerIcon/><span>Opening Google…</span></>
                 : <><GoogleIcon/><span>Continue with Google</span></>

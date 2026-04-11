@@ -62,9 +62,10 @@ CREATE INDEX idx_admins_name ON admins(name);
 -- Clients (password: 'password123' hashed with bcrypt)
 INSERT INTO Accounts (id, email, password_hash, role, created_at, updated_at) 
 VALUES 
-    (UUID_TO_BIN(UUID()), 'johandson@outlook.com', '2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'client', NOW(), NOW()),
-    (UUID_TO_BIN(UUID()),'plincoln@gmail.com', '2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'client', NOW(), NOW()),
-    (UUID_TO_BIN(UUID()), 'smirth@icloud.com', '2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'client', NOW(), NOW());
+    (UUID_TO_BIN(UUID()), 'johandson@outlook.com', '$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'client', NOW(), NOW()),
+    (UUID_TO_BIN(UUID()),'plincoln@gmail.com', '$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'client', NOW(), NOW()),
+    (UUID_TO_BIN(UUID()), 'smirth@icloud.com', '$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'client', NOW(), NOW());
+
 
 -- Insert client profiles (using the same IDs from Accounts table)
 SET @Client1ID = (SELECT id FROM Accounts WHERE email = 'johandson@outlook.com');
@@ -79,8 +80,8 @@ INSERT INTO clients (id, name, gender,phone_number, birthday, height, weight, cr
 -- Trainers
 INSERT INTO Accounts (id, email, password_hash, role, created_at, updated_at) 
 VALUES 
-    (UUID_TO_BIN(UUID()), 'smyers@gmail.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYrQYQZvHk7W', 'trainer', NOW(), NOW()),
-    (UUID_TO_BIN(UUID()), 'ashtHall@gmail.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYrQYQZvHk7W', 'trainer', NOW(), NOW());
+    (UUID_TO_BIN(UUID()), 'smyers@gmail.com', '$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'trainer', NOW(), NOW()),
+    (UUID_TO_BIN(UUID()), 'ashtHall@gmail.com', '$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6', 'trainer', NOW(), NOW());
 
 SET @Trainer1ID = (SELECT id FROM Accounts WHERE email = 'smyers@gmail.com');
 SET @Trainer2ID = (SELECT id FROM Accounts WHERE email = 'ashtHall@gmail.com');
@@ -502,3 +503,421 @@ WHERE client_id = @Client2ID AND day_of_week = DAYNAME(CURDATE());
 
 UPDATE training_schedule SET is_today = TRUE 
 WHERE client_id = @Client3ID AND day_of_week = DAYNAME(CURDATE());
+-- Add progress_tracking table for backward compatibility
+CREATE TABLE IF NOT EXISTS progress_tracking (
+    id BINARY(16) PRIMARY KEY DEFAULT (UUID_TO_BIN(UUID())),
+    user_id BINARY(16) NOT NULL,
+    weight FLOAT,
+    height FLOAT,
+    measurements TEXT,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Accounts(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_recorded_at (recorded_at)
+);
+SELECT * FROM progress_tracking;
+SHOW TABLES;
+
+USE Accounts;
+
+-- =====================================================
+-- 1. PROGRESS TRACKING TABLE (for JSON measurements storage)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS progress_tracking (
+    id BINARY(16) PRIMARY KEY DEFAULT (UUID_TO_BIN(UUID())),
+    user_id BINARY(16) NOT NULL,
+    weight FLOAT,
+    height FLOAT,
+    measurements TEXT,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Accounts(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_recorded_at (recorded_at),
+    INDEX idx_user_recorded (user_id, recorded_at)
+);
+
+-- =====================================================
+-- 2. CLIENT GOALS TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS client_goals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    goal_type VARCHAR(50) DEFAULT 'Bulk Up',
+    target_weight_kg DECIMAL(5,1),
+    target_chest_cm DECIMAL(5,1),
+    target_waist_cm DECIMAL(5,1),
+    target_hips_cm DECIMAL(5,1),
+    target_thigh_cm DECIMAL(5,1),
+    target_arm_cm DECIMAL(5,1),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_client_goals (client_id),
+    INDEX idx_client_goals (client_id)
+);
+
+-- =====================================================
+-- 3. CLIENT MEASUREMENTS TABLE (Monthly tracking)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS client_measurements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    measurement_date DATE NOT NULL,
+    month_name VARCHAR(3) NOT NULL,
+    weight_kg DECIMAL(5,1),
+    height_cm DECIMAL(5,1),
+    body_fat_percentage DECIMAL(4,1),
+    chest_cm DECIMAL(5,1),
+    waist_cm DECIMAL(5,1),
+    hips_cm DECIMAL(5,1),
+    shoulders_cm DECIMAL(5,1),
+    arm_left_cm DECIMAL(5,1),
+    arm_right_cm DECIMAL(5,1),
+    neck_cm DECIMAL(5,1),
+    thigh_left_cm DECIMAL(5,1),
+    thigh_right_cm DECIMAL(5,1),
+    calf_left_cm DECIMAL(5,1),
+    calf_right_cm DECIMAL(5,1),
+    glutes_cm DECIMAL(5,1),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    INDEX idx_client_date (client_id, measurement_date),
+    INDEX idx_month (month_name)
+);
+
+-- =====================================================
+-- 4. CLIENT HEALTH CONDITIONS TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS client_health_conditions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    condition_name VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_client_condition (client_id, condition_name),
+    INDEX idx_client_health (client_id)
+);
+
+-- =====================================================
+-- 5. CLIENT WATER INTAKE TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS client_water_intake (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    intake_date DATE NOT NULL,
+    cups_consumed INT DEFAULT 0 CHECK (cups_consumed BETWEEN 0 AND 20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_client_date (client_id, intake_date),
+    INDEX idx_date (intake_date)
+);
+
+-- =====================================================
+-- 6. CLIENT WORKOUT SESSIONS TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS client_workout_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    session_date DATE NOT NULL,
+    session_type VARCHAR(50),
+    duration_minutes INT,
+    calories_burned INT,
+    avg_heart_rate INT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    INDEX idx_client_session_date (client_id, session_date)
+);
+
+-- =====================================================
+-- 7. CLIENT STRENGTH RECORDS TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS client_strength_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    exercise_name VARCHAR(50) NOT NULL,
+    current_weight_kg DECIMAL(5,1),
+    goal_weight_kg DECIMAL(5,1),
+    current_reps INT,
+    goal_reps INT,
+    percentage_progress INT,
+    record_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    INDEX idx_client_strength (client_id),
+    INDEX idx_exercise_name (exercise_name)
+);
+
+-- =====================================================
+-- 8. TRAINER RATINGS TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS trainer_ratings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    trainer_name VARCHAR(100) NOT NULL,
+    rating INT CHECK (rating BETWEEN 1 AND 5),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_client_trainer (client_id, trainer_name),
+    INDEX idx_trainer_name (trainer_name)
+);
+
+-- =====================================================
+-- 9. CLIENT BADGES TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS client_badges (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    badge_name VARCHAR(100) NOT NULL,
+    awarded_date DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    INDEX idx_client_badges (client_id)
+);
+
+-- =====================================================
+-- 10. TRAINING SCHEDULE TABLE
+-- =====================================================
+CREATE TABLE IF NOT EXISTS training_schedule (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id BINARY(16) NOT NULL,
+    day_of_week VARCHAR(10),
+    day_number INT,
+    session_name VARCHAR(100),
+    session_time TIME,
+    has_session BOOLEAN DEFAULT FALSE,
+    is_today BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+    INDEX idx_client_schedule (client_id),
+    INDEX idx_day (day_number)
+);
+
+-- =====================================================
+-- 11. WORKOUT RECOMMENDATIONS TABLE (Static data)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS workout_recommendations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    target_area VARCHAR(50) NOT NULL,
+    exercise_name VARCHAR(100) NOT NULL,
+    icon VARCHAR(10),
+    detail VARCHAR(255),
+    sets_info JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_target_area (target_area)
+);
+
+-- =====================================================
+-- 12. BODY MEASUREMENTS TABLE (Detailed tracking)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS body_measurements (
+    id BINARY(16) PRIMARY KEY DEFAULT (UUID_TO_BIN(UUID())),
+    user_id BINARY(16) NOT NULL,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Body basics
+    weight FLOAT,
+    height FLOAT,
+    body_fat FLOAT,
+    
+    -- Upper body
+    chest FLOAT,
+    waist FLOAT,
+    shoulders FLOAT,
+    arm_left FLOAT,
+    arm_right FLOAT,
+    neck FLOAT,
+    
+    -- Lower body
+    hips FLOAT,
+    thigh_left FLOAT,
+    thigh_right FLOAT,
+    calf_left FLOAT,
+    calf_right FLOAT,
+    glutes FLOAT,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES Accounts(id) ON DELETE CASCADE,
+    INDEX idx_user_recorded (user_id, recorded_at)
+);
+
+-- =====================================================
+-- INSERT DEFAULT WORKOUT RECOMMENDATIONS
+-- =====================================================
+INSERT INTO workout_recommendations (target_area, exercise_name, icon, detail, sets_info) VALUES
+-- Chest
+('chest', 'Flat Bench Press', '🏋️', 'Compound · Chest focus', '["4×8", "80% 1RM", "Rest 90s"]'),
+('chest', 'Incline DB Press', '📐', 'Upper chest activation', '["3×10", "70% effort", "Rest 75s"]'),
+('chest', 'Cable Flys', '🔄', 'Isolation · Stretch', '["3×15", "Light-Med", "Rest 60s"]'),
+
+-- Back
+('back', 'Weighted Pull-ups', '⬆️', 'Width builder · Lats', '["4×6", "BW+10kg", "Rest 2min"]'),
+('back', 'Barbell Rows', '🚣', 'Thickness · Mid-back', '["4×8", "75% 1RM", "Rest 90s"]'),
+('back', 'Lat Pulldown', '🔽', 'Lat sweep · Volume', '["3×12", "Moderate", "Rest 60s"]'),
+
+-- Legs
+('legs', 'Back Squat', '🏆', 'King of leg exercises', '["5×5", "80% 1RM", "Rest 2min"]'),
+('legs', 'Romanian Deadlift', '🦵', 'Hamstrings & glutes', '["4×10", "65% 1RM", "Rest 90s"]'),
+('legs', 'Leg Press', '📦', 'Volume & quad pump', '["3×15", "Moderate", "Rest 60s"]'),
+
+-- Core
+('core', 'Ab Wheel Rollout', '🌊', 'Full core tension', '["4×12", "Slow tempo", "Rest 60s"]'),
+('core', 'Plank Variations', '🧱', 'Stability & endurance', '["3×60s", "Max tension", "Rest 45s"]'),
+('core', 'Hanging Leg Raise', '🔄', 'Lower abs & hip flex', '["3×15", "Controlled", "Rest 60s"]'),
+
+-- Full Body
+('fullbody', 'Power Cleans', '⚡', 'Full-body power', '["5×3", "70% 1RM", "Rest 2min"]'),
+('fullbody', 'Deadlift', '🏋️', 'Total posterior chain', '["4×5", "80% 1RM", "Rest 2min"]'),
+('fullbody', 'Dumbbell Complex', '🤸', '6-move circuit', '["3 rounds", "No rest", "Rest 90s"]'),
+
+-- Cardio
+('cardio', 'Sprint Intervals', '💥', 'HIIT · Fat burn', '["8×30s", "Max effort", "Rest 90s"]'),
+('cardio', 'Assault Bike HIIT', '🚴', 'Cardio conditioning', '["5×1min", "All-out", "Rest 2min"]'),
+('cardio', 'Rowing Machine', '🏃', 'Low-impact endurance', '["20min", "Moderate", "Steady"]');
+
+-- =====================================================
+-- INSERT SAMPLE DATA FOR EXISTING CLIENTS
+-- =====================================================
+
+-- Get client IDs
+SET @Client1ID = (SELECT id FROM Accounts WHERE email = 'johandson@outlook.com');
+SET @Client2ID = (SELECT id FROM Accounts WHERE email = 'plincoln@gmail.com');
+SET @Client3ID = (SELECT id FROM Accounts WHERE email = 'smirth@icloud.com');
+
+-- Insert goals for existing clients
+INSERT INTO client_goals (client_id, goal_type, target_weight_kg, target_chest_cm, target_waist_cm, target_hips_cm, target_thigh_cm, target_arm_cm) VALUES
+(@Client1ID, 'Cut Down', 75, 105, 78, 95, 55, 36),
+(@Client2ID, 'Bulk Up', 85, 110, 82, 100, 60, 40),
+(@Client3ID, 'Tone and Define', 70, 95, 75, 92, 52, 34)
+ON DUPLICATE KEY UPDATE
+    goal_type = VALUES(goal_type),
+    target_weight_kg = VALUES(target_weight_kg),
+    target_chest_cm = VALUES(target_chest_cm),
+    target_waist_cm = VALUES(target_waist_cm),
+    target_hips_cm = VALUES(target_hips_cm),
+    target_thigh_cm = VALUES(target_thigh_cm),
+    target_arm_cm = VALUES(target_arm_cm);
+
+-- Insert health conditions
+INSERT INTO client_health_conditions (client_id, condition_name) VALUES
+(@Client1ID, 'Back Pain'),
+(@Client1ID, 'Knee Injury'),
+(@Client2ID, 'Hypertension'),
+(@Client3ID, 'Asthma')
+ON DUPLICATE KEY UPDATE condition_name = VALUES(condition_name);
+
+-- Insert trainer ratings
+INSERT INTO trainer_ratings (client_id, trainer_name, rating) VALUES
+(@Client1ID, 'Sherice Myers', 4),
+(@Client1ID, 'Ashton Hall', 5),
+(@Client2ID, 'Sherice Myers', 5),
+(@Client2ID, 'Ashton Hall', 5),
+(@Client3ID, 'Sherice Myers', 3),
+(@Client3ID, 'Ashton Hall', 4)
+ON DUPLICATE KEY UPDATE rating = VALUES(rating);
+
+-- Insert badges
+INSERT INTO client_badges (client_id, badge_name, awarded_date) VALUES
+(@Client1ID, '100 Workouts', CURDATE()),
+(@Client1ID, '8-Week Streak', CURDATE()),
+(@Client2ID, '200 Workouts', CURDATE()),
+(@Client2ID, '12-Week Streak', CURDATE()),
+(@Client2ID, 'Elite Member', CURDATE()),
+(@Client3ID, '50 Workouts', CURDATE()),
+(@Client3ID, '4-Week Streak', CURDATE());
+
+-- Insert sample water intake for today
+INSERT INTO client_water_intake (client_id, intake_date, cups_consumed) VALUES
+(@Client1ID, CURDATE(), 4),
+(@Client2ID, CURDATE(), 6),
+(@Client3ID, CURDATE(), 3)
+ON DUPLICATE KEY UPDATE cups_consumed = VALUES(cups_consumed);
+
+-- Insert sample workout session for today
+INSERT INTO client_workout_sessions (client_id, session_date, session_type, duration_minutes, calories_burned, avg_heart_rate, notes) VALUES
+(@Client1ID, CURDATE(), 'Upper Body Hypertrophy', 65, 500, 140, 'Bench press, rows, OHP'),
+(@Client2ID, CURDATE(), 'Upper Body Power', 70, 560, 145, 'Bench, rows, accessories'),
+(@Client3ID, CURDATE(), 'Full Body Circuit', 55, 420, 140, 'Light weights, high reps');
+
+-- =====================================================
+-- VERIFY TABLES CREATED
+-- =====================================================
+SELECT '=== Tables Created ===' as '';
+SHOW TABLES;
+
+SELECT '=== Table Count ===' as '';
+SELECT COUNT(*) as total_tables FROM information_schema.tables WHERE table_schema = 'Accounts';
+SELECT * FROM body_measurements;
+-- Verify specific tables exist
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'Accounts' 
+AND table_name IN ('progress_tracking', 'client_goals', 'client_measurements', 'client_health_conditions', 
+                   'client_water_intake', 'client_workout_sessions', 'client_strength_records', 
+                   'trainer_ratings', 'client_badges', 'training_schedule', 'workout_recommendations', 
+                   'body_measurements');
+                   
+USE Accounts;
+
+-- Get client IDs
+SET @Client1ID = (SELECT id FROM Accounts WHERE email = 'johandson@outlook.com');
+SET @Client2ID = (SELECT id FROM Accounts WHERE email = 'plincoln@gmail.com');
+SET @Client3ID = (SELECT id FROM Accounts WHERE email = 'smirth@icloud.com');
+
+-- Insert sample progress data for Joe Hanson
+INSERT INTO progress_tracking (id, user_id, weight, height, measurements, recorded_at) VALUES
+(UUID_TO_BIN(UUID()), @Client1ID, 89, 158, '{"chest": 102, "waist": 90, "hips": 102, "thigh_left": 60, "arm_left": 38}', DATE_SUB(NOW(), INTERVAL 5 MONTH)),
+(UUID_TO_BIN(UUID()), @Client1ID, 88, 158, '{"chest": 101, "waist": 89, "hips": 101, "thigh_left": 59, "arm_left": 38}', DATE_SUB(NOW(), INTERVAL 4 MONTH)),
+(UUID_TO_BIN(UUID()), @Client1ID, 87, 158, '{"chest": 100, "waist": 88, "hips": 100, "thigh_left": 59, "arm_left": 37}', DATE_SUB(NOW(), INTERVAL 3 MONTH)),
+(UUID_TO_BIN(UUID()), @Client1ID, 86, 158, '{"chest": 99, "waist": 87, "hips": 99, "thigh_left": 58, "arm_left": 37}', DATE_SUB(NOW(), INTERVAL 2 MONTH)),
+(UUID_TO_BIN(UUID()), @Client1ID, 85, 158, '{"chest": 98, "waist": 86, "hips": 98, "thigh_left": 58, "arm_left": 37}', DATE_SUB(NOW(), INTERVAL 1 MONTH)),
+(UUID_TO_BIN(UUID()), @Client1ID, 84, 158, '{"chest": 97, "waist": 85, "hips": 97, "thigh_left": 57, "arm_left": 36, "body_fat": 22, "shoulders": 110, "arm_right": 36, "neck": 40, "thigh_right": 57, "calf_left": 38, "calf_right": 38, "glutes": 102}', NOW());
+
+-- Insert sample progress data for Peter Lincoln
+INSERT INTO progress_tracking (id, user_id, weight, height, measurements, recorded_at) VALUES
+(UUID_TO_BIN(UUID()), @Client2ID, 84, 193, '{"chest": 98, "waist": 86, "hips": 98, "thigh_left": 58, "arm_left": 38}', DATE_SUB(NOW(), INTERVAL 5 MONTH)),
+(UUID_TO_BIN(UUID()), @Client2ID, 83, 193, '{"chest": 98, "waist": 85, "hips": 98, "thigh_left": 58, "arm_left": 38}', DATE_SUB(NOW(), INTERVAL 4 MONTH)),
+(UUID_TO_BIN(UUID()), @Client2ID, 83, 193, '{"chest": 99, "waist": 85, "hips": 99, "thigh_left": 59, "arm_left": 39}', DATE_SUB(NOW(), INTERVAL 3 MONTH)),
+(UUID_TO_BIN(UUID()), @Client2ID, 82, 193, '{"chest": 99, "waist": 84, "hips": 99, "thigh_left": 59, "arm_left": 39}', DATE_SUB(NOW(), INTERVAL 2 MONTH)),
+(UUID_TO_BIN(UUID()), @Client2ID, 82, 193, '{"chest": 100, "waist": 84, "hips": 100, "thigh_left": 60, "arm_left": 40}', DATE_SUB(NOW(), INTERVAL 1 MONTH)),
+(UUID_TO_BIN(UUID()), @Client2ID, 81, 193, '{"chest": 100, "waist": 83, "hips": 100, "thigh_left": 60, "arm_left": 40, "body_fat": 15, "shoulders": 125, "arm_right": 40, "neck": 42, "thigh_right": 60, "calf_left": 42, "calf_right": 42, "glutes": 105}', NOW());
+
+-- Insert sample progress data for Merry Smith
+INSERT INTO progress_tracking (id, user_id, weight, height, measurements, recorded_at) VALUES
+(UUID_TO_BIN(UUID()), @Client3ID, 95, 258, '{"chest": 110, "waist": 95, "hips": 110, "thigh_left": 65, "arm_left": 40}', DATE_SUB(NOW(), INTERVAL 5 MONTH)),
+(UUID_TO_BIN(UUID()), @Client3ID, 94, 258, '{"chest": 109, "waist": 94, "hips": 109, "thigh_left": 64, "arm_left": 40}', DATE_SUB(NOW(), INTERVAL 4 MONTH)),
+(UUID_TO_BIN(UUID()), @Client3ID, 93, 258, '{"chest": 108, "waist": 93, "hips": 108, "thigh_left": 64, "arm_left": 39}', DATE_SUB(NOW(), INTERVAL 3 MONTH)),
+(UUID_TO_BIN(UUID()), @Client3ID, 92, 258, '{"chest": 107, "waist": 92, "hips": 107, "thigh_left": 63, "arm_left": 39}', DATE_SUB(NOW(), INTERVAL 2 MONTH)),
+(UUID_TO_BIN(UUID()), @Client3ID, 91, 258, '{"chest": 106, "waist": 91, "hips": 106, "thigh_left": 63, "arm_left": 38}', DATE_SUB(NOW(), INTERVAL 1 MONTH)),
+(UUID_TO_BIN(UUID()), @Client3ID, 90, 258, '{"chest": 105, "waist": 90, "hips": 105, "thigh_left": 62, "arm_left": 38, "body_fat": 28, "shoulders": 115, "arm_right": 38, "neck": 38, "thigh_right": 62, "calf_left": 40, "calf_right": 40, "glutes": 108}', NOW());
+
+SELECT 'Sample progress data added successfully!' as '';
+
+
+
+-- Create password_reset_tokens table
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id binary(16) NOT NULL,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    used_at DATETIME NULL,
+    FOREIGN KEY (user_id) REFERENCES Accounts(id) ON DELETE CASCADE,
+    INDEX idx_token (token),
+    INDEX idx_expires (expires_at),
+    INDEX idx_user_id (user_id)
+);
+
+
+CREATE INDEX idx_clients_email ON clients(name);

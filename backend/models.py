@@ -1,12 +1,11 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import (
-    String, Text, Integer, DateTime, ForeignKey, CheckConstraint
-)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from database import Base
-
+from sqlalchemy import Enum,Date, Text, CheckConstraint, Integer, Index, Column, String, Float, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy.sql import func
+from sqlalchemy.dialects.mysql import BINARY
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -74,3 +73,145 @@ class ConversationMessage(Base):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<ConversationMessage conv={self.conversation_id} pos={self.position} role={self.role!r}>"
+
+def generate_uuid():
+    return uuid.uuid4().bytes
+
+class User(Base):
+    __tablename__ = "Accounts"
+    
+    id = Column(BINARY(16), primary_key=True, default=generate_uuid)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(Enum('client', 'trainer', 'admin', name='user_roles'), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    client_profile = relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    trainer_profile = relationship("Trainer", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    admin_profile = relationship("Admin", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    progress_entries = relationship("ProgressTracking", back_populates="user", cascade="all, delete-orphan")
+    body_measurements = relationship("BodyMeasurement", back_populates="user", cascade="all, delete-orphan")
+
+class Client(Base):
+    __tablename__ = "clients"
+    
+    id = Column(BINARY(16), ForeignKey("Accounts.id"), primary_key=True)
+    name = Column(String(100), nullable=False)
+    phone_number = Column(String(20))
+    height = Column(Float)
+    weight = Column(Float)
+    birthday = Column(Date, nullable=True)
+    gender = Column(String(10), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    user = relationship("User", back_populates="client_profile")
+
+class Trainer(Base):
+    __tablename__ = "trainers"
+    
+    id = Column(BINARY(16), ForeignKey("Accounts.id"), primary_key=True)
+    name = Column(String(100), nullable=False)
+    certification = Column(String(100))
+    rating = Column(Float, default=0)
+    trainer_level = Column(Float, default=1)
+    is_senior = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    user = relationship("User", back_populates="trainer_profile")
+
+class Admin(Base):
+    __tablename__ = "admins"
+    
+    id = Column(BINARY(16), ForeignKey("Accounts.id"), primary_key=True)
+    name = Column(String(100), nullable=False)
+    phone_number = Column(String(20))
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    user = relationship("User", back_populates="admin_profile")
+
+class ProgressTracking(Base):
+    __tablename__ = "progress_tracking"
+    
+    id = Column(BINARY(16), primary_key=True, default=generate_uuid)
+    user_id = Column(BINARY(16), ForeignKey("Accounts.id"), nullable=False)
+    weight = Column(Float, nullable=True)
+    height = Column(Float, nullable=True)
+    measurements = Column(Text, nullable=True)  # JSON string with all measurements
+    recorded_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationship
+    user = relationship("User", back_populates="progress_entries")
+    
+    def set_measurements(self, data):
+        """Store measurements as JSON string"""
+        if data:
+            self.measurements = json.dumps(data)
+        else:
+            self.measurements = None
+    
+    def get_measurements(self):
+        """Retrieve measurements as dictionary"""
+        if self.measurements:
+            return json.loads(self.measurements)
+        return {}
+
+class BodyMeasurement(Base):
+    __tablename__ = "body_measurements"
+    
+    id = Column(BINARY(16), primary_key=True, default=generate_uuid)
+    user_id = Column(BINARY(16), ForeignKey("Accounts.id"), nullable=False)
+    recorded_at = Column(DateTime, server_default=func.now())
+    
+    # Body basics
+    weight = Column(Float, nullable=True)
+    height = Column(Float, nullable=True)
+    body_fat = Column(Float, nullable=True)
+    
+    # Upper body
+    chest = Column(Float, nullable=True)
+    waist = Column(Float, nullable=True)
+    shoulders = Column(Float, nullable=True)
+    arm_left = Column(Float, nullable=True)
+    arm_right = Column(Float, nullable=True)
+    neck = Column(Float, nullable=True)
+    
+    # Lower body
+    hips = Column(Float, nullable=True)
+    thigh_left = Column(Float, nullable=True)
+    thigh_right = Column(Float, nullable=True)
+    calf_left = Column(Float, nullable=True)
+    calf_right = Column(Float, nullable=True)
+    glutes = Column(Float, nullable=True)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="body_measurements")
+
+# Add to models.py after existing models
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(BINARY(16), ForeignKey("Accounts.id", ondelete="CASCADE"), nullable=False)
+    token = Column(String(255), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    used_at = Column(DateTime, nullable=True)  # Track when token was used
+    
+    user = relationship("User", backref="reset_tokens")
+
+# Create indexes
+Index('idx_users_email', User.email)
+Index('idx_users_role', User.role)
+Index('idx_progress_user_id', ProgressTracking.user_id)
+Index('idx_progress_recorded_at', ProgressTracking.recorded_at)
+

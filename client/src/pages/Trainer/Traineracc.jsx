@@ -1,8 +1,21 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { authAPI } from "../../api/api";
 import "./trainer.css";
-
+<<<<<<< Updated upstream
+  const handleLogout = () => {
+    authAPI.logout();
+    navigate('/');
+  };
 export default function TrainerPage() {
+=======
+const handleLogout = () => {
+    authAPI.logout();
+    navigate('/');
+  };
+  
+  export default function TrainerPage() {
+>>>>>>> Stashed changes
   const [showTrainerModal, setShowTrainerModal] = useState(false);
   const [selectedTrainer, setSelectedTrainer] = useState(null);
   const [trainerAssessments, setTrainerAssessments] = useState({});
@@ -135,7 +148,9 @@ export default function TrainerPage() {
     <div className="trainer-page" style={{ "--accent": bgColor }}>
       {/* Floating Home Button */}
       <Link to="/" className="floating-home">← Home</Link>
-
+          <button className="logout-btn" onClick={handleLogout}>
+            Sign Out
+          </button>
       {/* Floating Color Picker */}
       <div className="floating-color-menu">
         <button className="color-dots" onClick={() => setShowColorMenu(!showColorMenu)}>⋮</button>

@@ -593,3 +593,23 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+
+.logout-btn {
+  background: rgba(255, 107, 26, 0.15);
+  border: 1px solid #ff6b1a;
+  border-radius: 8px;
+  padding: 8px 20px;
+  color: #ff6b1a;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 107, 26, 0.3);
+  transform: scale(1.02);
+}

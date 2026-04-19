@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import "./Admin.css";
+import { authAPI } from "../../api/api";
 
+const handleLogout = () => {
+  authAPI.logout();
+  navigate('/');
+};
 // ═══════════════════════════════════════════════════════════
 // INITIAL DATA
 // ═══════════════════════════════════════════════════════════
@@ -200,6 +205,9 @@ const ProgBar = ({ pct }) => (
 // ═══════════════════════════════════════════════════════════
 const DashboardPage = ({ navigate, schedule, reviews, orders }) => (
   <div className="page-content">
+    <button className="logout-btn" onClick={handleLogout}>
+            Sign Out
+          </button>
     <div className="section-label">Command <span>Center</span></div>
     <div className="g4">
       {[
@@ -561,6 +569,7 @@ const EquipmentPage = ({ equipment, setEquipment, toast }) => {
 
   return (
     <div className="page-content">
+            
       <div className="section-label">Equipment <span>Ratings</span></div>
       <div className="g2">
         <div className="card">

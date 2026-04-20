@@ -24,9 +24,26 @@ const CartIcon = () => (
    NAVIGATION DATA (no Account link)
 ───────────────────────────────────────── */
 const NAV_ITEMS = [
+
+   
+  { label: "Home", path: "/", children: null },
+  
   {
-    label: "Programs",
-    path: "/programs",
+    label: "Membership",
+    path: "/membership",
+    children: [
+      { label: "Kids Programme", desc: "Equipment access", path: "/membership#starter" },
+      { label: "Group Training", desc: "Unlimited classes", path: "/membership#plan-card" },
+      { label: "Single Training", desc: "Full premium access", path: "/membership#elite" },
+      { label: "Specialized Training", desc: "Team memberships", path: "/membership#corporate" },
+    ],
+  },
+
+  { label: "Consultation", path: "/consultation", children: null },
+
+{
+    label: "Excursions",
+    path: "/excursions",
     children: [
       { label: "Strength & Conditioning", desc: "Build raw power", path: "/programs/strength" },
       { label: "HIIT & Cardio", desc: "Fat-burning workouts", path: "/programs/hiit" },
@@ -35,28 +52,17 @@ const NAV_ITEMS = [
       { label: "Personal Training", desc: "1-on-1 coaching", path: "/programs/personal-training" },
     ],
   },
-  {
-    label: "Membership",
-    path: "/membership",
-    children: [
-      { label: "Starter Plan", desc: "Equipment access", path: "/membership#starter" },
-      { label: "Pro Plan", desc: "Unlimited classes", path: "/membership#pro" },
-      { label: "Elite Plan", desc: "Full premium access", path: "/membership#elite" },
-      { label: "Corporate", desc: "Team memberships", path: "/membership#corporate" },
-    ],
-  },
+
+
   {
     label: "About",
     path: "/about",
     children: [
-      { label: "Our Story", desc: "15 years of champions", path: "/about#story" },
+      { label: "Our Story", desc: "55 years of champions", path: "/about#story" },
       { label: "Our Trainers", desc: "World-class coaches", path: "/trainers" },
-      { label: "Locations", desc: "200+ gyms worldwide", path: "/locations" },
       { label: "Press", desc: "News & media", path: "/press" },
     ],
-  },
-  { label: "Schedule", path: "/schedule", children: null },
-  { label: "Contact", path: "/contact", children: null },
+  }
 ];
 
 export default function Navbar() {
@@ -100,7 +106,7 @@ export default function Navbar() {
             <div className="nlh-inner" />
             <span className="nlh-letter">G</span>
           </div>
-          <span className="nav-logo-name">GYMVAULT</span>
+          <span className="nav-logo-name">GYMPRO</span>
         </NavLink>
 
         {/* Desktop navigation links */}

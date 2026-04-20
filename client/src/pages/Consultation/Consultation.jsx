@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./Consultations.css";
+import Navbar from "../../Components/navbar";
 
 /* ═══════════════════════════════════════
    MOCK LOGGED-IN USER
@@ -177,107 +178,7 @@ const LockIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="no
 const VideoIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>;
 const InfoIcon  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 
-/* ═══════════════════════════════════════
-   NAV (shared)
-═══════════════════════════════════════ */
-const NAV_ITEMS = [
-  { label:"Programs",   children:[{label:"Strength & Conditioning",desc:"Build raw power"},{label:"HIIT & Cardio",desc:"Fat-burning workouts"},{label:"Yoga & Flexibility",desc:"Restore balance"},{label:"Boxing & Combat",desc:"Fight conditioning"},{label:"Personal Training",desc:"1-on-1 coaching"}]},
-  { label:"Membership", children:[{label:"Starter Plan",desc:"Equipment access"},{label:"Pro Plan",desc:"Unlimited classes"},{label:"Elite Plan",desc:"Full premium access"},{label:"Corporate",desc:"Team memberships"}]},
-  { label:"About",      children:[{label:"Our Story",desc:"15 years of champions"},{label:"Our Trainers",desc:"World-class coaches"},{label:"Locations",desc:"200+ gyms worldwide"},{label:"Press",desc:"News & media"}]},
-  { label:"Schedule",   children:null },
-  { label:"Contact",    children:null },
-];
 
-function Navbar() {
-  const [scrolled,   setScrolled]   = useState(false);
-  const [activeMenu, setActiveMenu] = useState(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const closeTimer = useRef(null);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", fn);
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
-
-  const enter = l => { clearTimeout(closeTimer.current); setActiveMenu(l); };
-  const leave = ()  => { closeTimer.current = setTimeout(() => setActiveMenu(null), 180); };
-
-  return (
-    <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>
-      <div className="navbar-inner">
-        {/* Logo */}
-        <div className="nav-logo">
-          <div className="nav-logo-hex"><div className="nlh-bg"/><div className="nlh-inner"/><span className="nlh-letter">G</span></div>
-          <span className="nav-logo-name">GYMVAULT</span>
-        </div>
-
-        {/* Desktop links */}
-        <ul className="nav-links">
-          {NAV_ITEMS.map(item => (
-            <li key={item.label} className="nav-item"
-              onMouseEnter={() => item.children && enter(item.label)}
-              onMouseLeave={leave}>
-              <span className={`nav-link${activeMenu === item.label ? " nav-link--active" : ""}`}>
-                {item.label}{item.children && <ChevDown/>}
-              </span>
-              {item.children && activeMenu === item.label && (
-                <div className="nav-dropdown" onMouseEnter={() => clearTimeout(closeTimer.current)} onMouseLeave={leave}>
-                  <div className="nav-dropdown-inner">
-                    {item.children.map(c => (
-                      <a key={c.label} href="#" className="nav-dropdown-item" onClick={e=>e.preventDefault()}>
-                        <span className="ndi-label">{c.label}</span>
-                        <span className="ndi-desc">{c.desc}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-
-        {/* User pill */}
-        <div className="nav-user-pill">
-          <div className="nav-user-avatar">{MOCK_USER.avatar}</div>
-          <div className="nav-user-info">
-            <span className="nav-user-name">{MOCK_USER.firstName}</span>
-            <span className="nav-user-badge">{MOCK_USER.membership}</span>
-          </div>
-        </div>
-
-        <div className="nav-actions">
-          <a href="/login" className="nav-btn-ghost">Sign In</a>
-          <a href="/login" className="nav-btn-solid">Join Now</a>
-        </div>
-
-        {/* Hamburger */}
-        <button className="nav-hamburger" onClick={() => setMobileOpen(o=>!o)}>
-          <span className={mobileOpen?"ham-open":""}/><span className={mobileOpen?"ham-open":""}/><span className={mobileOpen?"ham-open":""}/>
-        </button>
-      </div>
-
-      {mobileOpen && (
-        <div className="nav-mobile">
-          {NAV_ITEMS.map(item => (
-            <div key={item.label} className="nav-mobile-item">
-              <span className="nav-mobile-label">{item.label}</span>
-              {item.children && (
-                <div className="nav-mobile-children">
-                  {item.children.map(c=><a key={c.label} href="#" className="nav-mobile-child" onClick={e=>e.preventDefault()}>{c.label}</a>)}
-                </div>
-              )}
-            </div>
-          ))}
-          <div className="nav-mobile-actions">
-            <a href="/login" className="nav-btn-ghost">Sign In</a>
-            <a href="/login" className="nav-btn-solid">Join Now</a>
-          </div>
-        </div>
-      )}
-    </nav>
-  );
-}
 
 /* ═══════════════════════════════════════
    STEP INDICATOR
@@ -881,7 +782,7 @@ export default function ConsultationPage() {
 
   return (
     <div className="consult-page">
-      <Navbar/>
+    
 
       {/* Hero */}
       <section className="consult-hero">

@@ -111,12 +111,6 @@ function ShopNav({ cartCount, wishlistCount, onCartOpen, onWishlistOpen, searchV
           )}
         </div>
 
-        {/* Nav links */}
-        <div className="shop-nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/shop" className="active">Shop</Link>
-          <Link to="/membership">Membership</Link>
-        </div>
 
         {/* Actions */}
         <div className="shop-nav-actions">
@@ -700,7 +694,7 @@ export default function Shop() {
   };
 
   return (
-    <div className="shop-wrapper">
+    <div className="shop-wrapper" style={{marginTop: "-72px"}}>
       <Toast toasts={toasts} removeToast={removeToast}/>
 
       <ShopNav
@@ -895,16 +889,6 @@ export default function Shop() {
 
       {/* Footer */}
       <footer className="shop-footer">
-        <div className="shop-footer-inner">
-          <div className="sf-logo">
-            <div className="sf-logo-hex"><div className="sfh-bg"/><div className="sfh-inner"/><span className="sfh-letter">B</span></div>
-            <div><p className="sf-logo-name">B.A.D People Fitness</p><p className="sf-logo-sub">Official Store</p></div>
-          </div>
-          <p className="sf-copy">© 2026 B.A.D People Fitness. All rights reserved.</p>
-          <div className="sf-links">
-            {["Privacy","Returns","Shipping","Terms"].map(l=><a key={l} href="#" onClick={e=>e.preventDefault()}>{l}</a>)}
-          </div>
-        </div>
       </footer>
     </div>
   );

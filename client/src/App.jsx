@@ -11,7 +11,7 @@ import NotFound from './pages/NotFound/NotFound'
 import Excursions from './pages/Excursions/Excursions';
 import TrainerPage from './pages/Trainer/Traineracc'
 import Admin from './pages/Admin/Admin'
-
+import STrainer from './pages/STrainer/STrainer'
 
 function App() {
   return (
@@ -25,12 +25,17 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/membership" element={<Membership />} />
           <Route path="/consultation" element={<Consultation />} />
-          <Route path="/shop" element={<Shop />} />
           <Route path="/account" element={<Account />} />
           <Route path="/excursions" element={<Excursions />} />
           <Route path="/trainer" element={<TrainerPage />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/STrainer" element={<STrainer />} />
           <Route path="*" element={<NotFound />} />
+        </Route>
+
+        {/* No Navbar for Shop route */}
+        <Route element={<Layout useNavbar={false} />}>
+          <Route path="/shop" element={<Shop />} />
         </Route>
       </Routes>
     </Router>

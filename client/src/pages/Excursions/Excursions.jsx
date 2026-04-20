@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import "./Excursions.css";
+import Navbar from "../../Components/navbar";
 
 /* ═══════════════════════════════════════
    MOCK LOGGED-IN USER
@@ -248,57 +249,6 @@ const ZapIcon     = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="
 const FilterIcon  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>;
 const PrintIcon   = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>;
 
-/* ═══════════════════════════════════════
-   NAVBAR
-═══════════════════════════════════════ */
-function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", fn);
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
-  return (
-    <nav className={`exc-nav${scrolled ? " exc-nav--scrolled" : ""}`}>
-      <div className="exc-nav-inner">
-        <div className="exc-nav-logo">
-          <div className="enl-hex"><div className="enl-bg"/><div className="enl-inner"/><span className="enl-letter">B</span></div>
-          <div><p className="enl-name">B.A.D People Fitness</p><p className="enl-sub">Excursions</p></div>
-        </div>
-        <div className="exc-nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/shop">Shop</Link>
-          <Link to="/membership">Membership</Link>
-          <Link to="/excursions" className="active">Excursions</Link>
-          <Link to="/consultation">Book Session</Link>
-        </div>
-        <div className="exc-nav-right">
-          <div className="exc-nav-user">
-            <div className="exc-user-avatar">{MOCK_USER.avatar}</div>
-            <div>
-              <p className="exc-user-name">{MOCK_USER.firstName} {MOCK_USER.lastName}</p>
-              <p className="exc-user-level">{MOCK_USER.fitnessLevel} · BMI {MOCK_USER.bmi}</p>
-            </div>
-          </div>
-          <a href="#excursions" className="exc-nav-btn">Browse Trips</a>
-        </div>
-        <button className="exc-hamburger" onClick={() => setMobileOpen(o=>!o)}>
-          <span className={mobileOpen?"ham":""}/><span className={mobileOpen?"ham":""}/><span className={mobileOpen?"ham":""}/>
-        </button>
-      </div>
-      {mobileOpen && (
-        <div className="exc-mobile-menu">
-          <Link to="/" onClick={()=>setMobileOpen(false)}>Home</Link>
-          <Link to="/shop" onClick={()=>setMobileOpen(false)}>Shop</Link>
-          <Link to="/membership" onClick={()=>setMobileOpen(false)}>Membership</Link>
-          <Link to="/excursions" onClick={()=>setMobileOpen(false)}>Excursions</Link>
-          <a href="#excursions" onClick={()=>setMobileOpen(false)}>Browse Trips</a>
-        </div>
-      )}
-    </nav>
-  );
-}
 
 /* ═══════════════════════════════════════
    LEVEL BADGE
@@ -812,7 +762,7 @@ export default function ExcursionPage() {
 
   return (
     <div className="exc-page">
-      <Navbar/>
+
 
       {/* ── HERO ── */}
       <section className="exc-hero">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import "./About.css";
+import Navbar from "../../Components/navbar";
 
 /* ═══════════════════════════════════════
    SHARED ICONS
@@ -128,38 +129,7 @@ const AwardIcon = () => (
   </svg>
 );
 
-/* ═══════════════════════════════════════
-   NAV DATA
-═══════════════════════════════════════ */
-const NAV_ITEMS = [
-  {
-    label: "Programs", children: [
-      { label: "Strength & Conditioning", desc: "Build raw power and functional fitness" },
-      { label: "HIIT & Cardio",           desc: "High-intensity fat-burning workouts" },
-      { label: "Yoga & Flexibility",       desc: "Restore balance and mobility" },
-      { label: "Boxing & Combat",          desc: "Train like a fighter, perform like a champion" },
-      { label: "Personal Training",        desc: "1-on-1 sessions with elite coaches" },
-    ],
-  },
-  {
-    label: "Membership", children: [
-      { label: "Starter Plan",   desc: "Access to all main floor equipment" },
-      { label: "Pro Plan",       desc: "Unlimited classes + guest passes" },
-      { label: "Elite Plan",     desc: "Full access + personal trainer sessions" },
-      { label: "Corporate",      desc: "Discounted group memberships for teams" },
-    ],
-  },
-  {
-    label: "About", children: [
-      { label: "Our Story",    desc: "15 years of forging champions" },
-      { label: "Our Trainers", desc: "Meet the world-class coaching team" },
-      { label: "Programme",    desc: "200+ programmes " },
-      { label: "Press",        desc: "News, features and media coverage" },
-    ],
-  },
-  { label: "Schedule", children: null },
-  { label: "Contact",  children: null },
-];
+
 
 /* ═══════════════════════════════════════
    PAGE DATA
@@ -232,86 +202,7 @@ function useVisible(threshold = 0.2) {
   return [ref, visible];
 }
 
-/* ═══════════════════════════════════════
-   NAVBAR (shared with site)
-═══════════════════════════════════════ */
-function Navbar() {
-  const [scrolled,   setScrolled]   = useState(false);
-  const [activeMenu, setActiveMenu] = useState(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const closeTimer = useRef(null);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const enter = (label) => { clearTimeout(closeTimer.current); setActiveMenu(label); };
-  const leave = ()       => { closeTimer.current = setTimeout(() => setActiveMenu(null), 180); };
-
-  return (
-    <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>
-      <div className="navbar-inner">
-        <Logo />
-        <ul className="nav-links">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.label} className="nav-item"
-              onMouseEnter={() => item.children && enter(item.label)}
-              onMouseLeave={leave}>
-              <span className={`nav-link${activeMenu === item.label ? " nav-link--active" : ""}`}>
-                {item.label}{item.children && <ChevronDown />}
-              </span>
-              {item.children && activeMenu === item.label && (
-                <div className="nav-dropdown"
-                  onMouseEnter={() => clearTimeout(closeTimer.current)}
-                  onMouseLeave={leave}>
-                  <div className="nav-dropdown-inner">
-                    {item.children.map((c) => (
-                      <a key={c.label} href="#" className="nav-dropdown-item" onClick={e => e.preventDefault()}>
-                        <span className="nav-dropdown-label">{c.label}</span>
-                        <span className="nav-dropdown-desc">{c.desc}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-        <div className="nav-actions">
-          <a href="/login" className="nav-btn-ghost">Sign In</a>
-          <a href="/login" className="nav-btn-solid">Join Now</a>
-        </div>
-        <button className="nav-hamburger" onClick={() => setMobileOpen(o => !o)}>
-          <span className={mobileOpen ? "ham-open" : ""} />
-          <span className={mobileOpen ? "ham-open" : ""} />
-          <span className={mobileOpen ? "ham-open" : ""} />
-        </button>
-      </div>
-      {mobileOpen && (
-        <div className="nav-mobile">
-          {NAV_ITEMS.map((item) => (
-            <div key={item.label} className="nav-mobile-item">
-              <span className="nav-mobile-label">{item.label}</span>
-              {item.children && (
-                <div className="nav-mobile-children">
-                  {item.children.map(c => (
-                    <a key={c.label} href="#" className="nav-mobile-child" onClick={e => e.preventDefault()}>{c.label}</a>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-          <div className="nav-mobile-actions">
-            <a href="/login" className="nav-btn-ghost">Sign In</a>
-            <a href="/login" className="nav-btn-solid">Join Now</a>
-          </div>
-        </div>
-      )}
-    </nav>
-  );
-}
 
 /* ═══════════════════════════════════════
    ANIMATED COUNTER
@@ -546,7 +437,7 @@ export default function AboutPage() {
 
   return (
     <div className="about-page">
-      <Navbar />
+    
 
       {/* ── HERO ── */}
       <section className="about-hero">

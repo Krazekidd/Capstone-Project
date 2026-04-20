@@ -12,39 +12,7 @@ const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
    NAVBAR (without user pill and without Account link)
 ───────────────────────────────────────────────────────────── */
 const NAV_ITEMS = [
-  {
-    label: "Programs",
-    path: "/programs",
-    children: [
-      { label: "Strength & Conditioning", desc: "Build raw power", path: "/programs/strength" },
-      { label: "HIIT & Cardio", desc: "Fat-burning workouts", path: "/programs/hiit" },
-      { label: "Yoga & Flexibility", desc: "Restore balance", path: "/programs/yoga" },
-      { label: "Boxing & Combat", desc: "Fight conditioning", path: "/programs/boxing" },
-      { label: "Personal Training", desc: "1-on-1 coaching", path: "/programs/personal-training" },
-    ],
-  },
-  {
-    label: "Membership",
-    path: "/membership",
-    children: [
-      { label: "Starter Plan", desc: "Equipment access", path: "/membership#starter" },
-      { label: "Pro Plan", desc: "Unlimited classes", path: "/membership#pro" },
-      { label: "Elite Plan", desc: "Full premium access", path: "/membership#elite" },
-      { label: "Corporate", desc: "Team memberships", path: "/membership#corporate" },
-    ],
-  },
-  {
-    label: "About",
-    path: "/about",
-    children: [
-      { label: "Our Story", desc: "15 years of champions", path: "/about#story" },
-      { label: "Our Trainers", desc: "World-class coaches", path: "/trainers" },
-      { label: "Locations", desc: "200+ gyms worldwide", path: "/locations" },
-      { label: "Press", desc: "News & media", path: "/press" },
-    ],
-  },
-  { label: "Schedule", path: "/schedule", children: null },
-  { label: "Contact", path: "/contact", children: null },
+  
 ];
 
 const ChevDown = () => (
@@ -78,12 +46,6 @@ function LoginNavbar() {
     <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>
       <div className="navbar-inner">
         <NavLink to="/" className="nav-logo">
-          <div className="nav-logo-hex">
-            <div className="nlh-bg" />
-            <div className="nlh-inner" />
-            <span className="nlh-letter">G</span>
-          </div>
-          <span className="nav-logo-name">GYMVAULT</span>
         </NavLink>
 
         <ul className="nav-links">

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import "./Trainer.css";
+import "./STrainer.css";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 

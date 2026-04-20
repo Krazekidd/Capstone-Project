@@ -3,10 +3,10 @@ import { Outlet } from "react-router-dom";
 import Navbar from "./navbar";
 import Footer from "./footer";
 
-export default function Layout() {
+export default function Layout( { useNavbar = true }) {
   return (
     <>
-      <Navbar />
+      {useNavbar && <Navbar />}
       <main className="main-content" style={{ paddingTop: "72px" }}> {/* matches navbar height */}
         <Outlet />
       </main>

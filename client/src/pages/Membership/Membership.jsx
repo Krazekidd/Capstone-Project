@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./Membership.css";
+import Navbar from "../../Components/navbar";
+
 
 /* ═══════════════════════════════════════
    ICONS
@@ -214,51 +216,6 @@ function useMembershipCart() {
   return { addToCart, added };
 }
 
-/* ═══════════════════════════════════════
-   NAVBAR
-═══════════════════════════════════════ */
-function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", fn);
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
-  return (
-    <nav className={`mem-nav${scrolled ? " mem-nav--scrolled" : ""}`}>
-      <div className="mem-nav-inner">
-        <div className="mem-nav-logo">
-          <div className="mnl-hex"><div className="mnl-bg"/><div className="mnl-inner"/><span className="mnl-letter">B</span></div>
-          <div><p className="mnl-name">B.A.D People Fitness</p><p className="mnl-sub">Membership</p></div>
-        </div>
-        <div className="mem-nav-links">
-          <Link to="/">Home</Link>
-          <Link to="/shop">Shop</Link>
-          <Link to="/membership" className="active">Membership</Link>
-          <Link to="/consultation">Book Session</Link>
-        </div>
-        <div className="mem-nav-actions">
-          <Link to="/shop" className="mem-nav-cart"><CartIcon/></Link>
-          <a href="#plans" className="mem-nav-btn">Join Now</a>
-        </div>
-        <button className="mem-hamburger" onClick={() => setMobileOpen(o=>!o)}>
-          <span className={mobileOpen?"ham":""}/>
-          <span className={mobileOpen?"ham":""}/>
-          <span className={mobileOpen?"ham":""}/>
-        </button>
-      </div>
-      {mobileOpen && (
-        <div className="mem-mobile-menu">
-          <Link to="/" onClick={() => setMobileOpen(false)}>Home</Link>
-          <Link to="/shop" onClick={() => setMobileOpen(false)}>Shop</Link>
-          <Link to="/membership" onClick={() => setMobileOpen(false)}>Membership</Link>
-          <a href="#plans" onClick={() => setMobileOpen(false)}>Join Now</a>
-        </div>
-      )}
-    </nav>
-  );
-}
 
 /* ═══════════════════════════════════════
    PLAN CARD
@@ -501,7 +458,7 @@ export default function Membership() {
 
   return (
     <div className="membership-page">
-      <Navbar/>
+     
 
       {/* ── HERO ── */}
       <section className="mem-hero">
@@ -749,29 +706,7 @@ export default function Membership() {
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
-      <footer className="mem-footer">
-        <div className="mem-footer-motive">
-          <div className="mfm-inner">
-            {["NO EXCUSES", "✦", "TRAIN HARDER", "✦", "B.A.D PEOPLE FITNESS", "✦", "BUILD YOUR BEST SELF", "✦",
-              "NO EXCUSES", "✦", "TRAIN HARDER", "✦", "B.A.D PEOPLE FITNESS", "✦", "BUILD YOUR BEST SELF", "✦"].map((t,i)=>(
-              <span key={i} className={t==="✦"?"mfm-div":"mfm-text"}>{t}</span>
-            ))}
-          </div>
-        </div>
-        <div className="mem-footer-bottom">
-          <div className="mfb-logo">
-            <div className="mfl-hex"><div className="mflh-bg"/><div className="mflh-inner"/><span className="mflh-letter">B</span></div>
-            <span className="mfl-name">B.A.D People Fitness</span>
-          </div>
-          <p className="mfb-copy">© 2026 B.A.D People Fitness. All rights reserved. Kingston, Jamaica.</p>
-          <div className="mfb-links">
-            {["Privacy Policy","Terms of Service","Refund Policy"].map(l=>(
-              <a key={l} href="#" onClick={e=>e.preventDefault()}>{l}</a>
-            ))}
-          </div>
-        </div>
-      </footer>
+
 
       {/* Inquiry Modal */}
       {inquiryPlan && <InquiryModal plan={inquiryPlan} onClose={() => setInquiryPlan(null)}/>}

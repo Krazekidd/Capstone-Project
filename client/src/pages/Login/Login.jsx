@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "../../Context/AuthContext";   // import auth context
+// import { useAuth } from "../../Context/AuthContext";   // import auth context
 import "./Login.css";
 
 /* ─────────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ function pwStr(p) {
 ════════════════════════════════ */
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  // const { login } = useAuth();
 
   /* Sign-in state */
   const [email, setEmail]   = useState("");
@@ -248,7 +248,7 @@ export default function Login() {
         membership: "Pro Member", // fetch real membership from backend later
       };
       setGUser(userData);
-      login(userData);
+      // login(userData);
       navigate("/account");
     } catch {
       console.error("Could not decode Google credential.");
@@ -284,7 +284,7 @@ export default function Login() {
                     membership: "Pro Member",
                   };
                   setGUser(userData);
-                  login(userData);
+                  // login(userData);
                   navigate("/account");
                 })
                 .catch(() => setGLoading(false));
@@ -319,7 +319,7 @@ export default function Login() {
       avatar: email.charAt(0).toUpperCase(),
       membership: "Pro Member",
     };
-    login(userData);
+    // login(userData);
     navigate("/account");
   };
 
@@ -364,7 +364,7 @@ export default function Login() {
         avatar: form.firstName.charAt(0).toUpperCase(),
         membership: "Pro Member",
       };
-      login(userData);
+      // login(userData);
       navigate("/account");
       closeCreate();
     }

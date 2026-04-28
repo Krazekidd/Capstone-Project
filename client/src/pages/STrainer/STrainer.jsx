@@ -4,10 +4,10 @@ import "./STrainer.css";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
-const TRAINER = {
+const STRAINER = {
   name: "Marcus Steele",
   age: 34,
-  rank: "Senior Trainer",
+  rank: "Senior STRAINER",
   specialisation: "Strength & Conditioning, Functional Training",
   certification: "NASM, ACE, CSCS",
   yearsExperience: 8,
@@ -28,10 +28,10 @@ const ALL_CLIENTS = [
 ];
 
 const ALL_NON_RISK_CLIENTS = [
-  { id: 8,  name: "Liam Chen",       goal: "Hypertrophy",     progress: 72, trainer: "Marcus Steele", avatar: "https://randomuser.me/api/portraits/men/41.jpg" },
-  { id: 9,  name: "Olivia Park",     goal: "Tone & shred",    progress: 65, trainer: "Leon Cruz",     avatar: "https://randomuser.me/api/portraits/women/31.jpg" },
-  { id: 10, name: "Ethan Wright",    goal: "Marathon prep",   progress: 80, trainer: "Alicia Chen",   avatar: "https://randomuser.me/api/portraits/men/22.jpg" },
-  { id: 11, name: "Maya Johnson",    goal: "Post-natal",      progress: 55, trainer: "Derek Wong",    avatar: "https://randomuser.me/api/portraits/women/55.jpg" },
+  { id: 8,  name: "Liam Chen",       goal: "Hypertrophy",     progress: 72, STRAINER: "Marcus Steele", avatar: "https://randomuser.me/api/portraits/men/41.jpg" },
+  { id: 9,  name: "Olivia Park",     goal: "Tone & shred",    progress: 65, STRAINER: "Leon Cruz",     avatar: "https://randomuser.me/api/portraits/women/31.jpg" },
+  { id: 10, name: "Ethan Wright",    goal: "Marathon prep",   progress: 80, STRAINER: "Alicia Chen",   avatar: "https://randomuser.me/api/portraits/men/22.jpg" },
+  { id: 11, name: "Maya Johnson",    goal: "Post-natal",      progress: 55, STRAINER: "Derek Wong",    avatar: "https://randomuser.me/api/portraits/women/55.jpg" },
 ];
 
 const OTHER_TRAINERS = [
@@ -66,7 +66,7 @@ const MONTHLY_CLIENT_RATINGS = [
 const PUBLIC_REVIEWS = [
   { user: "Alice M.", rating: 5, comment: "Marcus completely transformed my approach to fitness. His programming is second to none.", avatar: "https://randomuser.me/api/portraits/women/14.jpg", date: "Feb 2026" },
   { user: "Bob K.",   rating: 4, comment: "Very knowledgeable and professional. Sessions are always well-planned.", avatar: "https://randomuser.me/api/portraits/men/27.jpg", date: "Feb 2026" },
-  { user: "Sara L.",  rating: 5, comment: "Best trainer in the gym. Results speak for themselves!", avatar: "https://randomuser.me/api/portraits/women/68.jpg", date: "Jan 2026" },
+  { user: "Sara L.",  rating: 5, comment: "Best STRAINER in the gym. Results speak for themselves!", avatar: "https://randomuser.me/api/portraits/women/68.jpg", date: "Jan 2026" },
   { user: "Tom R.",   rating: 5, comment: "Incredible attention to detail and always motivating.", avatar: "https://randomuser.me/api/portraits/men/54.jpg", date: "Jan 2026" },
 ];
 
@@ -239,7 +239,7 @@ function ClientsAtRiskSection() {
 
   const handleIntervene = (clientId) => {
     setClients(prev => prev.map(c =>
-      c.id === clientId ? { ...c, interventionTrainer: TRAINER.name } : c
+      c.id === clientId ? { ...c, interventionTrainer: STRAINER.name } : c
     ));
   };
 
@@ -284,7 +284,7 @@ function ClientsAtRiskSection() {
 
       <div className="risk-grid">
         {displayed.map(c => {
-          const myIntervention = c.interventionTrainer === TRAINER.name;
+          const myIntervention = c.interventionTrainer === STRAINER.name;
           const otherIntervention = c.interventionTrainer && !myIntervention;
           const hasPendingSwitch = switchRequest?.clientId === c.id;
           const col = riskColor(c.progress);
@@ -346,18 +346,18 @@ function ClientsAtRiskSection() {
         </button>
       )}
 
-      {/* Switch Trainer Modal */}
+      {/* Switch STRAINER Modal */}
       {switchModal && (
         <div className="modal-overlay" onClick={() => setSwitchModal(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <button className="modal-x" onClick={() => setSwitchModal(false)}>✕</button>
             <h3 className="modal-title">Request Client Switch</h3>
-            <p className="modal-sub">Select a trainer to receive this client. They must accept before the switch is finalised.</p>
-            <div className="switch-trainer-list">
+            <p className="modal-sub">Select a STRAINER to receive this client. They must accept before the switch is finalised.</p>
+            <div className="switch-STRAINER-list">
               {OTHER_TRAINERS.map(t => (
                 <div
                   key={t.name}
-                  className={`switch-trainer-item ${switchTarget === t.name ? "switch-trainer-item--selected" : ""}`}
+                  className={`switch-STRAINER-item ${switchTarget === t.name ? "switch-STRAINER-item--selected" : ""}`}
                   onClick={() => setSwitchTarget(t.name)}
                 >
                   <img src={t.avatar} alt={t.name} className="switch-avatar" />
@@ -376,7 +376,7 @@ function ClientsAtRiskSection() {
   );
 }
 
-// ─── SECTION: TRAINER ASSESSMENT ─────────────────────────────────────────────
+// ─── SECTION: STRAINER ASSESSMENT ─────────────────────────────────────────────
 
 function TrainerAssessmentSection() {
   const [assessments, setAssessments] = useState({});
@@ -404,7 +404,7 @@ function TrainerAssessmentSection() {
     <section className="section" id="assessment">
       <div className="section-header">
         <span className="section-tag">Peer Review</span>
-        <h2 className="section-title">Trainer Assessment</h2>
+        <h2 className="section-title">STRAINER Assessment</h2>
         <p className="section-sub">Evaluate your fellow trainers across key performance criteria</p>
       </div>
 
@@ -596,7 +596,7 @@ export default function TrainerPage() {
   const [bgColor, setBgColor] = useState("#e63946");
   const [showColors, setShowColors] = useState(false);
   const [isEditCert, setIsEditCert] = useState(false);
-  const [cert, setCert] = useState(TRAINER.certification);
+  const [cert, setCert] = useState(STRAINER.certification);
   const [scrolled, setScrolled] = useState(false);
 
   const COLORS = ["#e63946", "#ff6b00", "#2563eb", "#16a34a", "#7c3aed"];
@@ -613,11 +613,11 @@ export default function TrainerPage() {
   const latestClient   = MONTHLY_CLIENT_RATINGS[MONTHLY_CLIENT_RATINGS.length - 1];
 
   return (
-    <div className="trainer-page" style={{ "--accent": bgColor }}>
+    <div className="STRAINER-page" style={{ "--accent": bgColor }}>
       {/* NAV */}
       <nav className={`tp-nav ${scrolled ? "tp-nav--scrolled" : ""}`}>
         <Link to="/" className="nav-back">← Back</Link>
-        <span className="nav-name">{TRAINER.name}</span>
+        <span className="nav-name">{STRAINER.name}</span>
         <div className="color-picker">
           <button className="color-trigger" onClick={() => setShowColors(!showColors)}>
             <span className="color-dot-current" style={{ background: bgColor }} />
@@ -636,26 +636,26 @@ export default function TrainerPage() {
       {/* HERO */}
       <header className="hero">
         <div className="hero-bg">
-          <img src={TRAINER.coverImg} alt="gym" className="hero-bg-img" />
+          <img src={STRAINER.coverImg} alt="gym" className="hero-bg-img" />
           <div className="hero-overlay" />
           <div className="hero-overlay-accent" style={{ background: `${bgColor}22` }} />
         </div>
         <div className="hero-body">
           <div className="hero-left">
             <div className="hero-avatar-wrap">
-              <img src={TRAINER.avatarImg} alt={TRAINER.name} className="hero-avatar" />
+              <img src={STRAINER.avatarImg} alt={STRAINER.name} className="hero-avatar" />
               <div className="hero-avatar-ring" />
             </div>
             <div className="hero-tag-row">
-              <span className="hero-tag">{TRAINER.rank}</span>
-              <span className="hero-tag hero-tag--outline">{TRAINER.yearsExperience} yrs exp.</span>
+              <span className="hero-tag">{STRAINER.rank}</span>
+              <span className="hero-tag hero-tag--outline">{STRAINER.yearsExperience} yrs exp.</span>
             </div>
-            <h1 className="hero-name">{TRAINER.name}</h1>
-            <p className="hero-bio">{TRAINER.bio}</p>
+            <h1 className="hero-name">{STRAINER.name}</h1>
+            <p className="hero-bio">{STRAINER.bio}</p>
             <div className="hero-meta">
               <div className="hero-meta-item">
                 <span className="hero-meta-label">Specialisation</span>
-                <span className="hero-meta-val">{TRAINER.specialisation}</span>
+                <span className="hero-meta-val">{STRAINER.specialisation}</span>
               </div>
               <div className="hero-meta-item">
                 <span className="hero-meta-label">Certification</span>
@@ -674,8 +674,8 @@ export default function TrainerPage() {
               </div>
             </div>
             <div className="hero-rating-row">
-              <StarRating value={TRAINER.rating} size="lg" />
-              <span className="hero-rating-val">{TRAINER.rating}</span>
+              <StarRating value={STRAINER.rating} size="lg" />
+              <span className="hero-rating-val">{STRAINER.rating}</span>
             </div>
           </div>
 
@@ -735,7 +735,7 @@ export default function TrainerPage() {
 
       {/* FOOTER STRIP */}
       <footer className="tp-footer">
-        <p>FitPro Studio · Trainer Dashboard · {TRAINER.name}</p>
+        <p>FitPro Studio · STRAINER Dashboard · {STRAINER.name}</p>
       </footer>
     </div>
   );

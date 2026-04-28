@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Account from './pages/Account';
+import Trainer from './pages/Trainer/Traineracc'
+import Admin from './pages/Admin/Admin'
 import { authAPI } from './api/api';
 
 const PrivateRoute = ({ children }) => {
@@ -16,6 +18,16 @@ function App() {
         <Route path="/account" element={
           <PrivateRoute>
             <Account />
+          </PrivateRoute>
+        } />
+        <Route path="/trainer" element={
+          <PrivateRoute>
+            <Trainer />
+          </PrivateRoute>
+        } />
+        <Route path="/admin" element={
+          <PrivateRoute>
+            <Admin />
           </PrivateRoute>
         } />
         <Route path="/" element={<Navigate to="/login" />} />

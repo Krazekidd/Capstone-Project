@@ -7,6 +7,9 @@ from database import init_db
 from database import engine, Base
 from auth_router import router as auth_router
 from account_router import router as account_router
+from excursions_router import router as excursions_router
+from consultation_router import router as consultation_router
+from shop_router import router as shop_router
 import logging
 
 # Configure logging to print to terminal
@@ -50,6 +53,8 @@ app.add_middleware(
         "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:5173",  # Vite dev server (alternative)
         "https://gym-capstone-app.vercel.app",  # Production Vercel URL
+        "http://localhost:3000", 
+        "http://localhost:8000"
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -57,11 +62,15 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+
 # Include all routes
 app.include_router(router, tags=["api"])
 app.include_router(conversations_router)
 app.include_router(auth_router)
 app.include_router(account_router)
+app.include_router(excursions_router)
+app.include_router(consultation_router)
+app.include_router(shop_router)
 
 @app.on_event("startup")
 async def startup():

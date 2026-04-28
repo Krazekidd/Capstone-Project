@@ -9,6 +9,7 @@ load_dotenv()
 # Initialize OAuth
 oauth = OAuth()
 
+
 # Register Google OAuth provider
 oauth.register(
     name='google',

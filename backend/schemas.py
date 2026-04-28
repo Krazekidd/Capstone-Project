@@ -100,23 +100,7 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
 
-class RegisterRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    email: EmailStr
-    password: str = Field(..., min_length=6)
-    phone_number: str = Field(..., pattern=r'^\+?1?\d{9,15}$')
-    # Optional client-specific fields
-    height: Optional[float] = Field(None, ge=0, le=300)
-    weight: Optional[float] = Field(None, ge=0, le=500)
-    birthday: Optional[date] = None
-    gender: Optional[str] = None
-    @validator('phone_number')
-    def validate_phone(cls, v):
-        # Remove any non-digit characters for validation
-        cleaned = ''.join(filter(str.isdigit, v))
-        if len(cleaned) < 10 or len(cleaned) > 15:
-            raise ValueError('Phone number must be between 10 and 15 digits')
-        return v
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -151,7 +135,7 @@ class TrainerAccount(BaseModel):
     name: str
     email: EmailStr
     certification: Optional[str] = None
-    rating: Optional[float] = Field(None, ge=0, le=5)
+    rating: Optional[float] = Field(None, ge=0, le=10)
     trainer_level: Optional[float] = Field(None, ge=1, le=10)
     is_senior: bool = False
     created_at: datetime
@@ -286,6 +270,141 @@ class GoalTrackingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# ============================================================
+# CLIENT GOALS SCHEMAS
+# ============================================================
+
+class ClientGoalsResponse(BaseModel):
+    client_id: uuid.UUID
+    goal_type: str = "Bulk Up"
+    primary_goal: Optional[str] = None
+    target_weight_kg: Optional[float] = None
+    target_chest_cm: Optional[float] = None
+    target_waist_cm: Optional[float] = None
+    target_hips_cm: Optional[float] = None
+    target_thigh_cm: Optional[float] = None
+    target_arm_cm: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+class UpdateClientGoalsRequest(BaseModel):
+    goal_type: Optional[str] = None
+    primary_goal: Optional[str] = None
+    target_weight_kg: Optional[float] = None
+    target_chest_cm: Optional[float] = None
+    target_waist_cm: Optional[float] = None
+    target_hips_cm: Optional[float] = None
+    target_thigh_cm: Optional[float] = None
+    target_arm_cm: Optional[float] = None
+
+# ============================================================
+# CLIENT HEALTH CONDITIONS SCHEMAS
+# ============================================================
+
+class HealthConditionResponse(BaseModel):
+    id: int
+    condition_name: str
+    created_at: datetime
+
+class UpdateHealthConditionsRequest(BaseModel):
+    conditions: List[str]
+
+# ============================================================
+# CLIENT WATER INTAKE SCHEMAS
+# ============================================================
+
+class WaterIntakeResponse(BaseModel):
+    intake_date: date
+    cups_consumed: int
+
+class UpdateWaterIntakeRequest(BaseModel):
+    cups_consumed: int
+
+# ============================================================
+# CLIENT WORKOUT SESSIONS SCHEMAS
+# ============================================================
+
+class WorkoutSessionResponse(BaseModel):
+    id: int
+    session_date: date
+    session_type: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    calories_burned: Optional[int] = None
+    avg_heart_rate: Optional[int] = None
+    notes: Optional[str] = None
+
+class CreateWorkoutSessionRequest(BaseModel):
+    session_date: date
+    session_type: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    calories_burned: Optional[int] = None
+    avg_heart_rate: Optional[int] = None
+    notes: Optional[str] = None
+
+# ============================================================
+# CLIENT STRENGTH RECORDS SCHEMAS
+# ============================================================
+
+class StrengthRecordResponse(BaseModel):
+    id: int
+    exercise_name: str
+    current_weight_kg: Optional[float] = None
+    goal_weight_kg: Optional[float] = None
+    current_reps: Optional[int] = None
+    goal_reps: Optional[int] = None
+    percentage_progress: Optional[int] = None
+    record_date: date
+
+class UpdateStrengthRecordRequest(BaseModel):
+    current_weight_kg: Optional[float] = None
+    goal_weight_kg: Optional[float] = None
+    current_reps: Optional[int] = None
+    goal_reps: Optional[int] = None
+
+# ============================================================
+# TRAINER RATINGS SCHEMAS
+# ============================================================
+
+class TrainerRatingResponse(BaseModel):
+    trainer_name: str
+    rating: int
+
+class UpdateTrainerRatingRequest(BaseModel):
+    trainer_name: str
+    rating: int
+
+class TrainerRatingsSummaryResponse(BaseModel):
+    average_rating: float
+    total_ratings: int
+    ratings: List[TrainerRatingResponse]
+
+# ============================================================
+# CLIENT BADGES SCHEMAS
+# ============================================================
+
+class BadgeResponse(BaseModel):
+    id: int
+    badge_name: str
+    awarded_date: date
+
+# ============================================================
+# TRAINING SCHEDULE SCHEMAS
+# ============================================================
+
+class TrainingScheduleResponse(BaseModel):
+    id: int
+    day_of_week: Optional[str] = None
+    day_number: Optional[int] = None
+    session_name: Optional[str] = None
+    session_time: Optional[str] = None
+    has_session: bool = False
+    is_today: bool = False
+
+class UpdateTrainingScheduleRequest(BaseModel):
+    session_name: Optional[str] = None
+    session_time: Optional[str] = None
+    has_session: Optional[bool] = None
+
 
 # Password Reset Schemas
 class ForgotPasswordRequest(BaseModel):
@@ -339,6 +458,319 @@ class PasswordResetResponse(BaseModel):
     message: str
     reset_token: Optional[str] = None  # Only for development
 
+
+# ============================================================
+# EXCURSION SCHEMAS
+# ============================================================
+
+class ExcursionBase(BaseModel):
+    id: str
+    name: str
+    location: str
+    level: str
+    level_label: str
+    date: date
+    time: str
+    duration: str
+    spots: int
+    spots_left: int
+    cost: float
+    img_url: Optional[str] = None
+    thumb_url: Optional[str] = None
+    map_url: Optional[str] = None
+    description: str
+    guide: str
+    meetup_point: str
+    min_bmi: int = 15
+    max_bmi: int = 40
+    min_level: str = "beginner"
+    required_tenure_months: int = 0
+    difficulty: int = 1
+    tags: List[str] = []
+    what_to_bring: List[str] = []
+
+class ExcursionResponse(ExcursionBase):
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ExcursionListResponse(BaseModel):
+    excursions: List[ExcursionResponse]
+    total: int
+
+class BookingRequest(BaseModel):
+    excursion_id: str
+    booked_for_name: str
+    booked_for_email: EmailStr
+    booked_for_phone: str
+    special_notes: Optional[str] = None
+    payment_method: str = "online"  # online or cash
+
+class BookingResponse(BaseModel):
+    id: uuid.UUID
+    booking_reference: str
+    excursion_id: str
+    excursion_name: str
+    excursion_date: date
+    excursion_time: str
+    booked_for_name: str
+    booked_for_email: str
+    booked_for_phone: str
+    special_notes: Optional[str] = None
+    payment_method: str
+    payment_status: str
+    booking_status: str
+    total_amount: float
+    booked_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class MyBookingsResponse(BaseModel):
+    bookings: List[BookingResponse]
+    total: int
+
+class CancelBookingResponse(BaseModel):
+    message: str
+    booking_id: uuid.UUID
+    refund_amount: Optional[float] = None
+
+class BookingResponse(BaseModel):
+    id: uuid.UUID
+    booking_reference: str
+    excursion_id: str
+    excursion_name: str
+    excursion_date: date
+    excursion_time: str
+    location: Optional[str] = None  # Add this
+    level: Optional[str] = None      # Add this
+    thumb_url: Optional[str] = None  # Add this
+    booked_for_name: str
+    booked_for_email: str
+    booked_for_phone: str
+    special_notes: Optional[str] = None
+    payment_method: str
+    payment_status: str
+    booking_status: str
+    total_amount: float
+    booked_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class MLScoreResponse(BaseModel):
+    excursion_id: str
+    score: int
+    label: str
+    color: str
+
+class MLRecommendationsResponse(BaseModel):
+    recommendations: List[MLScoreResponse]
+    user_context: dict
+
+# ============================================================
+# CONSULTATION SCHEMAS
+# ============================================================
+
+class ConsultationTypeBase(BaseModel):
+    id: str
+    icon: Optional[str] = None
+    title: str
+    subtitle: Optional[str] = None
+    duration_minutes: int
+    price: float
+    price_display: str
+    badge_text: Optional[str] = None
+    badge_color: Optional[str] = None
+    description: str
+    coach_description: str
+    img_url: Optional[str] = None
+    includes: List[str] = []
+    
+class ConsultationTypeResponse(ConsultationTypeBase):
+    is_active: bool
+    display_order: int
+    
+    class Config:
+        from_attributes = True
+
+class TimeSlotResponse(BaseModel):
+    time: str
+    booked: bool
+    available: bool
+
+class AvailableSlotsResponse(BaseModel):
+    date: str
+    slots: List[TimeSlotResponse]
+    is_holiday: bool
+    is_closed: bool
+    holiday_name: Optional[str] = None
+
+class ConsultationBookingRequest(BaseModel):
+    consultation_type_id: str
+    booking_date: date
+    booking_time: str
+    session_format: str = "in-person"
+    notes: Optional[str] = None
+
+class ConsultationBookingResponse(BaseModel):
+    id: uuid.UUID
+    booking_reference: str
+    consultation_type_id: str
+    consultation_title: str
+    booking_date: date
+    booking_time: str
+    session_format: str
+    status: str
+    notes: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class MyConsultationsResponse(BaseModel):
+    upcoming: List[ConsultationBookingResponse]
+    past: List[ConsultationBookingResponse]
+    total_upcoming: int
+    total_past: int
+
+class CancelConsultationResponse(BaseModel):
+    message: str
+    booking_id: uuid.UUID
+    refund_amount: Optional[float] = None
+
+class BusinessHoursResponse(BaseModel):
+    day_of_week: int
+    is_open: bool
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    slot_interval_minutes: int
+
+class HolidayResponse(BaseModel):
+    holiday_date: date
+    name: str
+
+# ============================================================
+# SHOP SCHEMAS
+# ============================================================
+
+class ShopCategoryResponse(BaseModel):
+    id: str
+    name: str
+    display_name: str
+    icon: Optional[str] = None
+    display_order: int
+    
+    class Config:
+        from_attributes = True
+
+class ShopProductResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    price: float
+    category_id: str
+    image_url: Optional[str] = None
+    badge_text: Optional[str] = None
+    badge_color: Optional[str] = None
+    rating: float = 4.5
+    review_count: int = 0
+    stock_quantity: int = 0
+    is_active: bool = True
+    featured: bool = False
+    
+    class Config:
+        from_attributes = True
+
+class ShopProductDetailResponse(ShopProductResponse):
+    created_at: datetime
+    updated_at: datetime
+
+class AddToCartRequest(BaseModel):
+    product_id: str
+    quantity: int = 1
+
+class UpdateCartRequest(BaseModel):
+    product_id: str
+    quantity: int
+
+class CartItemResponse(BaseModel):
+    product_id: str
+    name: str
+    price: float
+    quantity: int
+    total: float
+    image_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class CartResponse(BaseModel):
+    items: List[CartItemResponse]
+    subtotal: float
+    tax: float
+    shipping_cost: float
+    total: float
+    item_count: int
+
+class WishlistItemResponse(BaseModel):
+    product_id: str
+    name: str
+    price: float
+    image_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+class WishlistResponse(BaseModel):
+    items: List[WishlistItemResponse]
+    total: int
+
+class OrderAddress(BaseModel):
+    customer_name: str
+    email: str
+    phone: str
+    address: str
+    city: str
+    notes: Optional[str] = None
+
+class PlaceOrderRequest(OrderAddress):
+    payment_method: str = "card"
+
+class OrderItemResponse(BaseModel):
+    product_id: str
+    product_name: str
+    product_price: float
+    quantity: int
+    total: float
+
+class OrderResponse(BaseModel):
+    id: uuid.UUID
+    order_reference: str
+    order_status: str
+    payment_status: str
+    payment_method: str
+    subtotal: float
+    tax: float
+    shipping_cost: float
+    total: float
+    shipping_address: str
+    city: str
+    customer_name: str
+    email: str
+    phone: str
+    items: List[OrderItemResponse]  # This will use the updated OrderItemResponse
+    placed_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class OrdersListResponse(BaseModel):
+    orders: List[OrderResponse]
+    total: int
+
 # Response wrapper for API consistency
 class APIResponse(BaseModel):
     success: bool
@@ -348,3 +780,125 @@ class APIResponse(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     status_code: int
+
+
+# ============================================================
+# TRAINER ASSESSMENT SCHEMAS
+# ============================================================
+
+class TrainerAssessmentScores(BaseModel):
+    perf: float = Field(0, ge=0, le=10)
+    motiv: float = Field(0, ge=0, le=10)
+    interact: float = Field(0, ge=0, le=10)
+    knowledge: float = Field(0, ge=0, le=10)
+    punct: float = Field(0, ge=0, le=10)
+
+class TrainerAssessmentRequest(BaseModel):
+    trainer_id: uuid.UUID
+    trainer_name: str
+    scores: TrainerAssessmentScores
+    average: float
+    standing: str
+    notes: Optional[str] = None
+
+class TrainerAssessmentResponse(BaseModel):
+    id: int
+    trainer_id: uuid.UUID
+    trainer_name: str
+    performance_score: float
+    motivation_score: float
+    interaction_score: float
+    knowledge_score: float
+    punctuality_score: float
+    average_score: float
+    standing: str
+    assessment_date: date
+    notes: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ============================================================
+# CLIENT STATUS SCHEMAS
+# ============================================================
+
+class ClientStatusResponse(BaseModel):
+    id: int
+    client_id: uuid.UUID
+    status: str = "Active"
+    last_visit: Optional[date] = None
+    membership_plan: str = "Standard"
+    assigned_trainer_id: Optional[uuid.UUID] = None
+    fitness_goal: Optional[str] = None
+    progress_percentage: int = 0
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ClientWithStatusResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: EmailStr
+    phone_number: Optional[str] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    birthday: Optional[date] = None
+    status: str = "Active"
+    membership_plan: str = "Standard"
+    fitness_goal: Optional[str] = None
+    progress_percentage: int = 0
+    last_visit: Optional[date] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# ============================================================
+# ORDER STATUS SCHEMAS
+# ============================================================
+
+class OrderItemResponse(BaseModel):
+    product_id: str
+    product_name: str  # Use product_name instead of name
+    product_price: float  # Use product_price instead of price
+    quantity: int
+    total: float
+
+class AdminOrderResponse(BaseModel):
+    id: str
+    order_reference: str
+    client_name: str
+    client_email: str
+    client_phone: str
+    shipping_address: str
+    city: str
+    items: List[OrderItemResponse]
+    subtotal: float
+    tax: float
+    shipping_cost: float
+    total: float
+    order_status: str
+    payment_status: str
+    payment_method: str
+    placed_at: str
+    pickup_notes: Optional[str] = None
+
+class UpdateOrderStatusRequest(BaseModel):
+    order_status: Optional[str] = None
+    payment_status: Optional[str] = None
+    pickup_notes: Optional[str] = None
+
+# ============================================================
+# DASHBOARD STATS SCHEMAS
+# ============================================================
+
+class DashboardStatsResponse(BaseModel):
+    new_clients: int
+    active_clients: int
+    inactive_clients: int
+    total_clients: int
+    total_trainers: int
+    pending_orders: int
+    revenue_mtd: float

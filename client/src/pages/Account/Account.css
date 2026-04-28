@@ -486,3 +486,13 @@ body { background: #0a0a0a; color: #f0eeea; font-family: 'DM Sans', sans-serif; 
   color: white;
   cursor: pointer;
 }
+.chart-canvas-wrap {
+  position: relative;
+  height: 300px;
+  width: 100%;
+}
+
+.chart-canvas-wrap canvas {
+  max-height: 100%;
+  width: 100%;
+}

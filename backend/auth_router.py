@@ -10,6 +10,7 @@ import uuid
 import bcrypt
 import secrets
 import os
+import httpx
 from database import get_user_db
 from models import User, Client, Trainer, Admin, PasswordResetToken
 from schemas import (LoginRequest, RegisterRequest, TokenResponse,ForgotPasswordRequest, ResetPasswordRequest, ChangePasswordRequest,
@@ -60,27 +61,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-@router.post("/login", response_model=TokenResponse)
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_user_db)):
-    # Find user by email
-    result = await db.execute(select(User).where(User.email == request.email))
-    user = result.scalar_one_or_none()
-    
-    if not user or not verify_password(request.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or passwod" 
-        )
-    # Convert binary ID to UUID string for token
-    user_uuid = uuid.UUID(bytes=user.id)
-    token = create_access_token(data={"sub": str(user_uuid), "role": user.role})
-    
-    return TokenResponse(
-        access_token=token, 
-        token_type="bearer", 
-        role=user.role, 
-        user_id=user_uuid
-    )
 
 # ========== REGISTRATION ==========
 @router.post("/register/client", response_model=TokenResponse)
@@ -298,61 +278,46 @@ async def logout(current_user: dict = Depends(get_current_user)):
 
 # ========== GOOGLE OAUTH ==========
 
-@router.get("/google/login")
-async def google_login(request: Request):
-    """
-    Initiate Google OAuth login flow
-    Returns redirect URL to Google's authorization page
-    """
-    redirect_uri = request.url_for('google_callback')
-    
-    # Generate the Google OAuth authorization URL
-    authorization_url = await oauth.google.authorize_redirect(
-        request, 
-        redirect_uri
-    )
-    
-    return {"authorization_url": str(authorization_url)}
-
-@router.get("/google/callback")
-async def google_callback(
-    request: Request,
+@router.post("/google")
+async def google_login(
+    request: GoogleLoginRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_user_db)
 ):
-    """
-    Handle Google OAuth callback after user authorization
-    """
+    """Login or register with Google ID token"""
+    print(f"Received Google credential: {request.credential[:50]}...")  # Debug log
+    
     try:
-        # Get the authorization code from the request
-        code = request.query_params.get('code')
-        if not code:
-            raise HTTPException(status_code=400, detail="Authorization code missing")
+        # Verify Google token using Google's tokeninfo endpoint
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": request.credential}
+            )
+            
+            print(f"Google tokeninfo response status: {response.status_code}")  # Debug
+            
+            if response.status_code != 200:
+                print(f"Google tokeninfo error: {response.text}")
+                raise HTTPException(status_code=400, detail="Invalid Google token")
+            
+            idinfo = response.json()
+            print(f"Google user info: {idinfo.get('email')}")  # Debug
         
-        # Exchange code for access token
-        token_data = await oauth.google.authorize_access_token(request)
-        access_token = token_data.get('access_token')
-        
-        if not access_token:
-            raise HTTPException(status_code=400, detail="Failed to get access token")
-        
-        # Fetch user info from Google
-        user_info = await get_google_user_info(access_token)
-        
-        email = user_info.get('email')
-        name = user_info.get('name', '')
-        google_id = user_info.get('sub')
-        picture = user_info.get('picture', '')
+        email = idinfo.get('email')
+        name = idinfo.get('name', '')
+        given_name = idinfo.get('given_name', '')
         
         if not email:
             raise HTTPException(status_code=400, detail="Could not get email from Google")
         
-        # Check if user exists in database
+        # Check if user exists
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         
         if not user:
-            # Create new user account
+            print(f"Creating new user for {email}")  # Debug
+            # Create new user
             new_user = User(
                 email=email,
                 password_hash="",  # No password for OAuth users
@@ -364,8 +329,7 @@ async def google_callback(
             # Create client profile
             new_client = Client(
                 id=new_user.id,
-                name=name,
-                profile_image=picture
+                name=name
             )
             db.add(new_client)
             await db.commit()
@@ -373,47 +337,27 @@ async def google_callback(
             
             user_id = uuid.UUID(bytes=new_user.id)
             role = "client"
-            
-            # Send welcome email in background
-            from email_service import send_welcome_email
-            background_tasks.add_task(send_welcome_email, email, name)
         else:
+            print(f"Existing user found for {email}")  # Debug
             user_id = uuid.UUID(bytes=user.id)
             role = user.role
-            
-            # Update profile image if needed
-            if picture:
-                await db.execute(
-                    update(Client)
-                    .where(Client.id == user.id)
-                    .values(profile_image=picture)
-                )
-                await db.commit()
         
-        # Create JWT token
+        
+        # Generate JWT token
         token = create_access_token(data={"sub": str(user_id), "role": role})
         
-        # Redirect to frontend with token
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        
-        # Option 1: Redirect with token in URL (for development)
-        redirect_response = RedirectResponse(
-            url=f"{frontend_url}/oauth-callback?token={token}&role={role}"
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            role=role,
+            user_id=user_id
         )
         
-        # Option 2: Set cookie (for production)
-        # redirect_response.set_cookie(
-        #     key="access_token",
-        #     value=token,
-        #     httponly=True,
-        #     secure=True,
-        #     samesite="lax"
-        # )
-        
-        return redirect_response
-        
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Google authentication failed: {str(e)}")
+        print(f"Google login error: {str(e)}")  # Debug
+        raise HTTPException(status_code=400, detail=f"Google login failed: {str(e)}")
 
 @router.get("/userinfo")
 async def get_user_info(
@@ -463,3 +407,9 @@ async def get_user_info(
             user_info["name"] = admin.name
     
     return user_info
+
+@router.post("/google-debug")
+async def google_debug(request: dict):
+    """Debug endpoint to check if Google requests are reaching backend"""
+    print(f"Received request: {request.keys() if request else 'No data'}")
+    return {"status": "ok", "received": bool(request.get('credential'))}

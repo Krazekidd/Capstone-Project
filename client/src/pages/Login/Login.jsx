@@ -14,12 +14,7 @@ import "./Login.css";
             https://yourdomain.com  (prod)
    5. Replace the string below with your real Client ID:
 ─────────────────────────────────────────────────────────────── */
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
-const handleGoogleLogin = () => {
-    // Redirect directly to backend Google login endpoint
-    window.location.href = 'http://localhost:8000/auth/google/login';
-};
-
+const GOOGLE_CLIENT_ID = "9117439118-uasq6furpmqpt2pnshuhnhfkmh5cu7e1.apps.googleusercontent.com";
 
 /* ── Icons ── */
 const EyeIcon = ({ open }) => (
@@ -195,12 +190,16 @@ export default function Login() {
     setGLoading(true);
     setLoginError("");
 
+    // prompt() opens the One Tap / account-chooser UI
     window.google.accounts.id.prompt((notification) => {
+      // If the user dismisses or there's no saved account,
+      // fall back to the standard OAuth redirect/popup flow
       if (
         notification.isNotDisplayed() ||
         notification.isSkippedMoment() ||
         notification.isDismissedMoment()
       ) {
+        // Fallback: open a standard OAuth popup using google.accounts.oauth2
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: "openid email profile",
@@ -484,7 +483,13 @@ export default function Login() {
             <div className="divider"><span>or continue with</span></div>
 
             {/* ── Google Button ── */}
-            <button onClick={handleGoogleLogin} className="btn-google">
+            <button
+              className={`btn-google${gLoading ? " btn-google--loading" : ""}${!gReady ? " btn-google--disabled" : ""}`}
+              type="button"
+              onClick={handleGoogleClick}
+              disabled={!gReady || gLoading}
+              title={!gReady ? "Loading Google Sign-In…" : "Sign in with Google"}
+            >
               {gLoading
                 ? <><SpinnerIcon/><span>Opening Google…</span></>
                 : <><GoogleIcon/><span>Continue with Google</span></>

@@ -4,25 +4,36 @@ from fastapi.middleware.cors import CORSMiddleware
 from router import router
 from conversations_router import router as conversations_router
 from database import init_db
+from database import engine, Base
+from auth_router import router as auth_router
+from account_router import router as account_router
+from excursions_router import router as excursions_router
+from consultation_router import router as consultation_router
+from shop_router import router as shop_router
 import logging
 
 # Configure logging to print to terminal
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()  # Print to console/terminal
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],  # Print to console/terminal
 )
 
 logger = logging.getLogger(__name__)
+
+
+# Create tables (for development only - use Alembic for production)
+async def init_db1():
+    async with engine.begin() as conn:
+        # await conn.run_sync(Base.metadata.drop_all)  # Uncomment to drop tables
+        await conn.run_sync(Base.metadata.create_all)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialise database tables on startup."""
     logger.info("🚀 Starting application...")
-    #await init_db()
+    await init_db()
     logger.info("✅ Application started successfully")
     yield
     logger.info("👋 Shutting down application...")
@@ -42,6 +53,8 @@ app.add_middleware(
         "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:5173",  # Vite dev server (alternative)
         "https://gym-capstone-app.vercel.app",  # Production Vercel URL
+        "http://localhost:3000",
+        "http://localhost:8000",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -49,11 +62,34 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+
 # Include all routes
 app.include_router(router, tags=["api"])
 app.include_router(conversations_router)
+app.include_router(auth_router)
+app.include_router(account_router)
+app.include_router(excursions_router)
+app.include_router(consultation_router)
+app.include_router(shop_router)
+
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+
+@app.get("/")
+async def root():
+    return {"message": "B.A.D People Fitness API", "status": "running"}
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 
 if __name__ == "__main__":
     import uvicorn
     from config import HOST, PORT
+
     uvicorn.run("main:app", host=HOST, port=PORT, reload=True)

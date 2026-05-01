@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from config import DATABASE_URL
 import logging
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 engine = create_async_engine(
     DATABASE_URL,
-    echo=False,          # Set True to log SQL statements during development
+    echo=False,  # Set True to log SQL statements during development
     future=True,
     pool_pre_ping=True,  # Checks connections before use; handles DB restarts
     pool_size=5,
@@ -45,6 +46,31 @@ async def get_db():
             raise
 
 
+# User database
+# Create async engine
+userEngine = create_async_engine(
+    settings.DATABASE_URL, echo=True, future=True  # Set to False in production
+)
+
+# Create async session factory
+AsyncSessionLocal = async_sessionmaker(
+    userEngine, class_=AsyncSession, expire_on_commit=False
+)
+
+
+# Dependency to get DB session
+async def get_user_db():
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
 # ---------------------------------------------------------------------------
 # Startup helper – creates tables if they don't already exist
 # ---------------------------------------------------------------------------
@@ -54,4 +80,4 @@ async def init_db():
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    logger.info("✅ Database tables initialised")
+        logger.info("✅ Database tables initialised")

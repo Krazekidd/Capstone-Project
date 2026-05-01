@@ -1,122 +1,20 @@
 import { useState, useEffect, useRef } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-// import { useAuth } from "../../Context/AuthContext";   // import auth context
+import { useNavigate } from "react-router-dom";
+import { authAPI } from "../../api/api";
 import "./Login.css";
 
 /* ─────────────────────────────────────────────────────────────
    IMPORTANT — GOOGLE OAUTH SETUP
+   ─────────────────────────────────────────────────────────────
+   1. Go to https://console.cloud.google.com/
+   2. Create a project → APIs & Services → Credentials
+   3. Create an "OAuth 2.0 Client ID" (Web application)
+   4. Add your domain to "Authorised JavaScript origins"
+      e.g.  http://localhost:3000  (dev)
+            https://yourdomain.com  (prod)
+   5. Replace the string below with your real Client ID:
 ─────────────────────────────────────────────────────────────── */
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
-
-/* ─────────────────────────────────────────────────────────────
-   NAVBAR (without user pill and without Account link)
-───────────────────────────────────────────────────────────── */
-const NAV_ITEMS = [
-  
-];
-
-const ChevDown = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-);
-
-function LoginNavbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [activeMenu, setActiveMenu] = useState(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const closeTimer = useRef(null);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const handleMouseEnter = (label) => {
-    clearTimeout(closeTimer.current);
-    setActiveMenu(label);
-  };
-
-  const handleMouseLeave = () => {
-    closeTimer.current = setTimeout(() => setActiveMenu(null), 180);
-  };
-
-  return (
-    <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>
-      <div className="navbar-inner">
-        <NavLink to="/" className="nav-logo">
-        </NavLink>
-
-        <ul className="nav-links">
-          {NAV_ITEMS.map((item) => (
-            <li
-              key={item.label}
-              className="nav-item"
-              onMouseEnter={() => item.children && handleMouseEnter(item.label)}
-              onMouseLeave={handleMouseLeave}
-            >
-              <NavLink
-                to={item.path || "#"}
-                className={({ isActive }) =>
-                  `nav-link${isActive ? " nav-link--active" : ""}${activeMenu === item.label ? " nav-link--active" : ""}`
-                }
-                end
-              >
-                {item.label}
-                {item.children && <ChevDown />}
-              </NavLink>
-
-              {item.children && activeMenu === item.label && (
-                <div
-                  className="nav-dropdown"
-                  onMouseEnter={() => clearTimeout(closeTimer.current)}
-                  onMouseLeave={handleMouseLeave}
-                >
-                  <div className="nav-dropdown-inner">
-                    {item.children.map((child) => (
-                      <NavLink key={child.label} to={child.path || "#"} className="nav-dropdown-item">
-                        <span className="ndi-label">{child.label}</span>
-                        <span className="ndi-desc">{child.desc}</span>
-                      </NavLink>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-
-        <button className="nav-hamburger" onClick={() => setMobileOpen((o) => !o)} aria-label="Menu">
-          <span className={mobileOpen ? "ham-open" : ""} />
-          <span className={mobileOpen ? "ham-open" : ""} />
-          <span className={mobileOpen ? "ham-open" : ""} />
-        </button>
-      </div>
-
-      {mobileOpen && (
-        <div className="nav-mobile">
-          {NAV_ITEMS.map((item) => (
-            <div key={item.label} className="nav-mobile-item">
-              <NavLink to={item.path || "#"} className="nav-mobile-label">
-                {item.label}
-              </NavLink>
-              {item.children && (
-                <div className="nav-mobile-children">
-                  {item.children.map((child) => (
-                    <NavLink key={child.label} to={child.path || "#"} className="nav-mobile-child">
-                      {child.label}
-                    </NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </nav>
-  );
-}
+const GOOGLE_CLIENT_ID = "9117439118-uasq6furpmqpt2pnshuhnhfkmh5cu7e1.apps.googleusercontent.com";
 
 /* ── Icons ── */
 const EyeIcon = ({ open }) => (
@@ -168,17 +66,34 @@ function pwStr(p) {
   return s;
 }
 
-/* ════════════════════════════════
+/* ═══════════════════════════════════════════════════════════
+   ROLE-BASED REDIRECTION HELPER
+════════════════════════════════════════════════════════════ */
+const getRedirectPath = (role) => {
+  switch(role) {
+    case 'admin':
+      return '/admin';
+    case 'trainer':
+      return '/trainer';
+    case 'client':
+      return '/account';
+    default:
+      return '/account';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════
    MAIN COMPONENT
-════════════════════════════════ */
+════════════════════════════════════════════════════════════ */
 export default function Login() {
   const navigate = useNavigate();
-  // const { login } = useAuth();
 
   /* Sign-in state */
   const [email, setEmail]   = useState("");
   const [pw, setPw]         = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   /* Google OAuth state */
   const [gReady, setGReady]   = useState(false);
@@ -189,9 +104,11 @@ export default function Login() {
   /* Create-account modal state */
   const [modal, setModal] = useState(false);
   const [step, setStep]   = useState(1);
+  const [isCreating, setIsCreating] = useState(false);
   const [form, setForm]   = useState({
     firstName: "", lastName: "", email: "", gender: "",
-    dob: "", phone: "", password: "", confirm: "", agree: false,
+    dob: "", phone: "", height: "", weight: "",
+    password: "", confirm: "", agree: false,
   });
   const [showP1, setShowP1] = useState(false);
   const [showP2, setShowP2] = useState(false);
@@ -202,6 +119,23 @@ export default function Login() {
   const [fpEmail, setFpEmail]       = useState("");
   const [fpEmailErr, setFpEmailErr] = useState("");
   const [fpSent, setFpSent]         = useState(false);
+  const [isSendingReset, setIsSendingReset] = useState(false);
+
+  // Check if already logged in and redirect based on role
+  useEffect(() => {
+    const token = authAPI.getToken();
+    const role = authAPI.getUserRole();
+    
+    if (token && role) {
+      const redirectPath = getRedirectPath(role);
+      navigate(redirectPath);
+    }
+    
+    const rememberedEmail = localStorage.getItem('remembered_email');
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+    }
+  }, [navigate]);
 
   /* ─────────────────────────────────
      GOOGLE IDENTITY SERVICES — INIT
@@ -215,12 +149,14 @@ export default function Login() {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: handleGoogleCredential,
-        ux_mode: "popup",
-      });
-      setGReady(true);
+      if (window.google && window.google.accounts) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleCredential,
+          ux_mode: "popup",
+        });
+        setGReady(true);
+      }
     };
     script.onerror = () => {
       console.error("Failed to load Google Identity Services script.");
@@ -234,60 +170,49 @@ export default function Login() {
     };
   }, []);
 
-  const handleGoogleCredential = (response) => {
+  /* Called by Google SDK after user picks an account */
+  const handleGoogleCredential = async (response) => {
     setGLoading(false);
     if (!response?.credential) return;
 
     try {
-      const payload = JSON.parse(atob(response.credential.split(".")[1]));
-      const userData = {
-        firstName: payload.given_name,
-        lastName: payload.family_name,
-        email: payload.email,
-        avatar: payload.given_name?.charAt(0).toUpperCase(),
-        membership: "Pro Member", // fetch real membership from backend later
-      };
-      setGUser(userData);
-      // login(userData);
-      navigate("/account");
-    } catch {
-      console.error("Could not decode Google credential.");
+      const result = await authAPI.googleLogin(response.credential);
+      const redirectPath = getRedirectPath(result.role);
+      navigate(redirectPath);
+    } catch (err) {
+      setLoginError(err.detail || "Google login failed. Please try again.");
     }
   };
 
+  /* Trigger the Google account-chooser popup */
   const handleGoogleClick = () => {
     if (!gReady || gLoading) return;
     setGLoading(true);
+    setLoginError("");
 
+    // prompt() opens the One Tap / account-chooser UI
     window.google.accounts.id.prompt((notification) => {
+      // If the user dismisses or there's no saved account,
+      // fall back to the standard OAuth redirect/popup flow
       if (
         notification.isNotDisplayed() ||
         notification.isSkippedMoment() ||
         notification.isDismissedMoment()
       ) {
+        // Fallback: open a standard OAuth popup using google.accounts.oauth2
         const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CLIENT_ID,
           scope: "openid email profile",
-          callback: (tokenResponse) => {
-            setGLoading(false);
+          callback: async (tokenResponse) => {
             if (tokenResponse?.access_token) {
-              fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-              })
-                .then(r => r.json())
-                .then(info => {
-                  const userData = {
-                    firstName: info.given_name,
-                    lastName: info.family_name,
-                    email: info.email,
-                    avatar: info.given_name?.charAt(0).toUpperCase(),
-                    membership: "Pro Member",
-                  };
-                  setGUser(userData);
-                  // login(userData);
-                  navigate("/account");
-                })
-                .catch(() => setGLoading(false));
+              try {
+                const result = await authAPI.googleLoginWithToken(tokenResponse.access_token);
+                const redirectPath = getRedirectPath(result.role);
+                navigate(redirectPath);
+              } catch (err) {
+                setLoginError("Google login failed. Please try again.");
+                setGLoading(false);
+              }
             } else {
               setGLoading(false);
             }
@@ -298,6 +223,7 @@ export default function Login() {
     });
   };
 
+  /* Sign out of Google session */
   const handleGoogleSignOut = () => {
     if (window.google?.accounts?.id) {
       window.google.accounts.id.disableAutoSelect();
@@ -305,22 +231,31 @@ export default function Login() {
     setGUser(null);
   };
 
-  /* ── Email sign-in handler ── */
-  const handleEmailSignIn = () => {
-    // Replace this with your real authentication logic
-    if (!email || !pw) {
-      alert("Please enter email and password");
-      return;
+  /* ── Sign In handler with role-based redirect ── */
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setLoginError("");
+    setIsLoggingIn(true);
+
+    try {
+      const response = await authAPI.login(email, pw);
+      
+      // Store remembered email if checkbox exists
+      const rememberCheckbox = document.querySelector('input[name="remember"]');
+      if (rememberCheckbox && rememberCheckbox.checked) {
+        localStorage.setItem('remembered_email', email);
+      } else {
+        localStorage.removeItem('remembered_email');
+      }
+      
+      // Redirect based on role
+      const redirectPath = getRedirectPath(response.role);
+      navigate(redirectPath);
+    } catch (err) {
+      setLoginError(err.detail || "Login failed. Please check your credentials.");
+    } finally {
+      setIsLoggingIn(false);
     }
-    // For demo, we create a user object from the email
-    const userData = {
-      firstName: email.split('@')[0],
-      email: email,
-      avatar: email.charAt(0).toUpperCase(),
-      membership: "Pro Member",
-    };
-    // login(userData);
-    navigate("/account");
   };
 
   /* ── Create-account helpers ── */
@@ -332,11 +267,11 @@ export default function Login() {
 
   const v1 = () => {
     const e = {};
-    if (!form.firstName.trim())                           e.firstName = "First name required";
-    if (!form.lastName.trim())                            e.lastName  = "Last name required";
-    if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email     = "Valid email required";
-    if (!form.gender)                                     e.gender    = "Please select";
-    if (!form.dob)                                        e.dob       = "Required";
+    if (!form.firstName.trim()) e.firstName = "First name required";
+    if (!form.lastName.trim()) e.lastName = "Last name required";
+    if (!form.email || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.gender) e.gender = "Please select";
+    if (!form.dob) e.dob = "Required";
     setErrs(e);
     return !Object.keys(e).length;
   };
@@ -344,61 +279,105 @@ export default function Login() {
   const v2 = () => {
     const e = {};
     if (!form.password || form.password.length < 8) e.password = "Minimum 8 characters";
-    if (form.password !== form.confirm)             e.confirm  = "Passwords do not match";
-    if (!form.agree)                                e.agree    = "You must accept the terms";
+    if (form.password !== form.confirm) e.confirm = "Passwords do not match";
+    if (!form.agree) e.agree = "You must accept the terms";
     setErrs(e);
     return !Object.keys(e).length;
   };
 
-  const openCreate  = () => { setModal(true); setStep(1); setErrs({}); };
-  const closeCreate = () => { setModal(false); setStep(1); };
-  const next        = () => { if (v1()) setStep(2); };
-  const submitCreate = () => {
-    if (v2()) {
-      // In a real app, send registration data to your backend
-      // Then automatically log in the user
+  const openCreate = () => { 
+    setModal(true); 
+    setStep(1); 
+    setErrs({});
+    setForm({
+      firstName: "", lastName: "", email: "", gender: "",
+      dob: "", phone: "", height: "", weight: "",
+      password: "", confirm: "", agree: false,
+    });
+  };
+  
+  const closeCreate = () => { 
+    setModal(false); 
+    setStep(1);
+    setIsCreating(false);
+  };
+  
+  const next = () => { 
+    if (v1()) setStep(2); 
+  };
+  
+  const submitCreate = async () => {
+    if (!v2()) return;
+    
+    setIsCreating(true);
+    try {
       const userData = {
-        firstName: form.firstName,
-        lastName: form.lastName,
+        name: `${form.firstName} ${form.lastName}`,
         email: form.email,
-        avatar: form.firstName.charAt(0).toUpperCase(),
-        membership: "Pro Member",
+        password: form.password,
+        phone_number: form.phone || "",
+        height: form.height ? parseFloat(form.height) : null,
+        weight: form.weight ? parseFloat(form.weight) : null,
+        birthday: form.dob || null,
+        gender: form.gender !== "prefer-not" ? form.gender : "prefer_not_to_say"
       };
-      // login(userData);
-      navigate("/account");
+      
+      const response = await authAPI.register(userData);
       closeCreate();
+      
+      // Redirect based on role (new clients always get client role)
+      const redirectPath = getRedirectPath(response.role);
+      navigate(redirectPath);
+    } catch (err) {
+      setErrs({ general: err.detail || "Registration failed. Please try again." });
+    } finally {
+      setIsCreating(false);
     }
   };
 
   /* ── Forgot-password helpers ── */
   const openFp = e => {
     e.preventDefault();
-    setFpEmail(""); setFpEmailErr(""); setFpSent(false);
+    setFpEmail("");
+    setFpEmailErr("");
+    setFpSent(false);
     setFpModal(true);
   };
+  
   const closeFp = () => {
     setFpModal(false);
-    setFpEmail(""); setFpEmailErr(""); setFpSent(false);
+    setFpEmail("");
+    setFpEmailErr("");
+    setFpSent(false);
+    setIsSendingReset(false);
   };
-  const submitFp = () => {
+  
+  const submitFp = async () => {
     if (!fpEmail || !/\S+@\S+\.\S+/.test(fpEmail)) {
       setFpEmailErr("Please enter a valid email address");
       return;
     }
-    setFpSent(true);
-    // In a real app, call backend to send reset email
+    
+    setIsSendingReset(true);
+    try {
+      await authAPI.forgotPassword(fpEmail);
+      setFpSent(true);
+    } catch (err) {
+      setFpEmailErr(err.detail || "Failed to send reset email. Please try again.");
+    } finally {
+      setIsSendingReset(false);
+    }
   };
 
-  const str    = pwStr(form.password);
-  const strLbl = ["","Weak","Fair","Good","Strong"][str];
-  const strCls = ["","weak","fair","good","strong"][str];
+  const str = pwStr(form.password);
+  const strLbl = ["", "Weak", "Fair", "Good", "Strong"][str];
+  const strCls = ["", "weak", "fair", "good", "strong"][str];
 
   return (
     <>
       <div className="app-shell">
-        <LoginNavbar />
 
-        {/* LEFT PANEL (unchanged) */}
+        {/* ══ LEFT PANEL ══ */}
         <div className="left-panel">
           <div className="left-bg-img"/>
           <div className="left-overlay"/>
@@ -411,7 +390,11 @@ export default function Login() {
               <div className="logo-hex-wrap"> 
                 <div className="logo-hex-bg"/> 
                 <div className="logo-hex-inner"/>
-                <span className="logo-letter"><span><img src="images/triallogo.png" alt="GymPRO Logo" style={{ width: "150px", height: "200px" }} /></span></span>
+                <span className="logo-letter">
+                  <span>
+                    <img src="/images/triallogo.png" alt="GymPRO Logo" style={{ width: "150px", height: "200px" }} />
+                  </span>
+                </span>
               </div>
               <div className="brand-name">GYMPRO</div>
               <div className="brand-tagline">Forge Your Legacy</div>
@@ -427,10 +410,11 @@ export default function Login() {
           <div className="left-footer">© 2026 GymPRO Global Inc.</div>
         </div>
 
-        {/* RIGHT PANEL */}
+        {/* ══ RIGHT PANEL ══ */}
         <div className="right-panel">
           <div className="form-wrap">
 
+            {/* ── Google signed-in banner ── */}
             {gUser && (
               <div className="g-signed-banner">
                 <img src={gUser.picture} alt={gUser.name} className="g-avatar"/>
@@ -438,7 +422,9 @@ export default function Login() {
                   <p className="g-signed-name">Welcome, {gUser.given_name}!</p>
                   <p className="g-signed-email">{gUser.email}</p>
                 </div>
-                <button className="g-signout-btn" onClick={handleGoogleSignOut} type="button">Sign out</button>
+                <button className="g-signout-btn" onClick={handleGoogleSignOut} type="button">
+                  Sign out
+                </button>
               </div>
             )}
 
@@ -448,37 +434,55 @@ export default function Login() {
               <p>Access your training dashboard, track progress, and manage your membership.</p>
             </div>
 
-            <div className="fgrp">
-              <label>Email Address</label>
-              <input
-                type="email" placeholder="you@example.com"
-                value={email} onChange={e => setEmail(e.target.value)}
-                autoComplete="email"
-              />
-            </div>
+            {loginError && <div className="error-message">{loginError}</div>}
 
-            <div className="fgrp">
-              <label>Password</label>
-              <div className="inp-wrap">
+            <form onSubmit={handleSignIn}>
+              <div className="fgrp">
+                <label>Email Address</label>
                 <input
-                  type={showPw ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={pw} onChange={e => setPw(e.target.value)}
-                  autoComplete="current-password"
+                  type="email" 
+                  placeholder="you@example.com"
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)}
+                  autoComplete="email"
+                  required
                 />
-                <button className="eye-btn" onClick={() => setShowPw(s => !s)} type="button" tabIndex={-1}>
-                  <EyeIcon open={showPw}/>
-                </button>
               </div>
-              <div className="aux-row">
-                <a href="#" className="link-aux" onClick={openFp}>Forgot Password?</a>
-              </div>
-            </div>
 
-            <button className="btn-main" type="button" onClick={handleEmailSignIn}>Sign In</button>
+              <div className="fgrp">
+                <label>Password</label>
+                <div className="inp-wrap">
+                  <input
+                    type={showPw ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={pw} 
+                    onChange={e => setPw(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button className="eye-btn" onClick={() => setShowPw(s => !s)} type="button" tabIndex={-1}>
+                    <EyeIcon open={showPw}/>
+                  </button>
+                </div>
+                <div className="aux-row">
+                  <a href="#" className="link-aux" onClick={openFp}>Forgot Password?</a>
+                </div>
+              </div>
+
+              <div className="options-row">
+                <label className="remember-checkbox">
+                  <input type="checkbox" name="remember" /> Remember Me
+                </label>
+              </div>
+
+              <button className="btn-main" type="submit" disabled={isLoggingIn}>
+                {isLoggingIn ? "Signing in..." : "Sign In"}
+              </button>
+            </form>
 
             <div className="divider"><span>or continue with</span></div>
 
+            {/* ── Google Button ── */}
             <button
               className={`btn-google${gLoading ? " btn-google--loading" : ""}${!gReady ? " btn-google--disabled" : ""}`}
               type="button"
@@ -492,7 +496,10 @@ export default function Login() {
               }
             </button>
 
-            {!gReady && <p className="g-loading-hint">Loading Google Sign-In…</p>}
+            {/* SDK not yet loaded hint */}
+            {!gReady && (
+              <p className="g-loading-hint">Loading Google Sign-In…</p>
+            )}
 
             <div className="form-foot">
               <span>Not a member yet?</span>
@@ -502,11 +509,14 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Forgot Password Modal (unchanged) */}
+      {/* ══════════════════════════
+          FORGOT PASSWORD MODAL
+      ══════════════════════════ */}
       {fpModal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) closeFp(); }}>
           <div className="modal-box fp-box">
             <button className="modal-close" onClick={closeFp} type="button">✕</button>
+
             {!fpSent ? (
               <>
                 <div className="modal-head">
@@ -514,6 +524,7 @@ export default function Login() {
                   <h2>FORGOT PASSWORD?</h2>
                   <p>Enter the email address linked to your GymPRO account and we'll send you a reset link.</p>
                 </div>
+
                 <div className="fgrp">
                   <label>Email Address</label>
                   <input
@@ -525,9 +536,15 @@ export default function Login() {
                   />
                   {fpEmailErr && <span className="err">{fpEmailErr}</span>}
                 </div>
-                <button className="btn-main" type="button" onClick={submitFp}>Reset Password</button>
+
+                <button className="btn-main" type="button" onClick={submitFp} disabled={isSendingReset}>
+                  {isSendingReset ? "Sending..." : "Reset Password"}
+                </button>
+
                 <div className="fp-back-row">
-                  <a href="#" className="link-aux" onClick={e => { e.preventDefault(); closeFp(); }}>← Back to Sign In</a>
+                  <a href="#" className="link-aux" onClick={e => { e.preventDefault(); closeFp(); }}>
+                    ← Back to Sign In
+                  </a>
                 </div>
               </>
             ) : (
@@ -538,7 +555,9 @@ export default function Login() {
                 <p className="fp-sent-email">{fpEmail}</p>
                 <p className="fp-success-note">
                   Didn't receive it? Check your spam folder or{" "}
-                  <a href="#" className="link-cta" onClick={e => { e.preventDefault(); setFpSent(false); }}>try again</a>.
+                  <a href="#" className="link-cta" onClick={e => { e.preventDefault(); setFpSent(false); }}>
+                    try again
+                  </a>.
                 </p>
                 <button className="btn-main fp-done-btn" type="button" onClick={closeFp}>Done</button>
               </div>
@@ -547,7 +566,9 @@ export default function Login() {
         </div>
       )}
 
-      {/* Create Account Modal (unchanged, but login added on submit) */}
+      {/* ══════════════════════════
+          CREATE ACCOUNT MODAL
+      ══════════════════════════ */}
       {modal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) closeCreate(); }}>
           <div className="modal-box">
@@ -558,6 +579,8 @@ export default function Login() {
               <h2>CREATE ACCOUNT</h2>
               <p>Join over a million members worldwide. Step {step} of 2.</p>
             </div>
+
+            {errs.general && <div className="error-message">{errs.general}</div>}
 
             <div className="steps">
               <div className={`s-node ${step >= 1 ? "active":""} ${step > 1 ? "done":""}`}>
@@ -574,15 +597,54 @@ export default function Login() {
             {step === 1 && (
               <div className="mfields">
                 <div className="f2col">
-                  <div className="fgrp"><label>First Name</label><input name="firstName" placeholder="John" value={form.firstName} onChange={fc}/>{errs.firstName && <span className="err">{errs.firstName}</span>}</div>
-                  <div className="fgrp"><label>Last Name</label><input name="lastName" placeholder="Doe" value={form.lastName} onChange={fc}/>{errs.lastName && <span className="err">{errs.lastName}</span>}</div>
+                  <div className="fgrp">
+                    <label>First Name</label>
+                    <input name="firstName" placeholder="John" value={form.firstName} onChange={fc}/>
+                    {errs.firstName && <span className="err">{errs.firstName}</span>}
+                  </div>
+                  <div className="fgrp">
+                    <label>Last Name</label>
+                    <input name="lastName" placeholder="Doe" value={form.lastName} onChange={fc}/>
+                    {errs.lastName && <span className="err">{errs.lastName}</span>}
+                  </div>
                 </div>
-                <div className="fgrp"><label>Email Address</label><input name="email" type="email" placeholder="you@example.com" value={form.email} onChange={fc}/>{errs.email && <span className="err">{errs.email}</span>}</div>
+                <div className="fgrp">
+                  <label>Email Address</label>
+                  <input name="email" type="email" placeholder="you@example.com" value={form.email} onChange={fc}/>
+                  {errs.email && <span className="err">{errs.email}</span>}
+                </div>
                 <div className="f2col">
-                  <div className="fgrp"><label>Gender</label><select name="gender" value={form.gender} onChange={fc}><option value="">Select</option><option>Male</option><option>Female</option><option>Non-binary</option><option value="prefer-not">Prefer not to say</option></select>{errs.gender && <span className="err">{errs.gender}</span>}</div>
-                  <div className="fgrp"><label>Date of Birth</label><input name="dob" type="date" value={form.dob} onChange={fc}/>{errs.dob && <span className="err">{errs.dob}</span>}</div>
+                  <div className="fgrp">
+                    <label>Gender</label>
+                    <select name="gender" value={form.gender} onChange={fc}>
+                      <option value="">Select</option>
+                      <option>Male</option>
+                      <option>Female</option>
+                      <option>Non-binary</option>
+                      <option value="prefer-not">Prefer not to say</option>
+                    </select>
+                    {errs.gender && <span className="err">{errs.gender}</span>}
+                  </div>
+                  <div className="fgrp">
+                    <label>Date of Birth</label>
+                    <input name="dob" type="date" value={form.dob} onChange={fc}/>
+                    {errs.dob && <span className="err">{errs.dob}</span>}
+                  </div>
                 </div>
-                <div className="fgrp"><label>Phone <span className="opt">(optional)</span></label><input name="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={fc}/></div>
+                <div className="f2col">
+                  <div className="fgrp">
+                    <label>Height (cm) <span className="opt">(optional)</span></label>
+                    <input name="height" type="number" step="0.1" placeholder="e.g., 175" value={form.height} onChange={fc}/>
+                  </div>
+                  <div className="fgrp">
+                    <label>Weight (kg) <span className="opt">(optional)</span></label>
+                    <input name="weight" type="number" step="0.1" placeholder="e.g., 70.5" value={form.weight} onChange={fc}/>
+                  </div>
+                </div>
+                <div className="fgrp">
+                  <label>Phone <span className="opt">(optional)</span></label>
+                  <input name="phone" type="tel" placeholder="+1 (555) 000-0000" value={form.phone} onChange={fc}/>
+                </div>
                 <button className="btn-main" type="button" onClick={next}>Continue →</button>
               </div>
             )}
@@ -613,12 +675,20 @@ export default function Login() {
                 </div>
                 <label className={`chk-label ${errs.agree ? "eb" : ""}`}>
                   <input name="agree" type="checkbox" checked={form.agree} onChange={fc}/>
-                  <span>I agree to GymPRO's <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Terms & Conditions</a> and <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Privacy Policy</a>. I understand that my membership is subject to GymPRO's code of conduct.</span>
+                  <span>
+                    I agree to GymPRO's{" "}
+                    <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Terms & Conditions</a>{" "}
+                    and{" "}
+                    <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Privacy Policy</a>.
+                    I understand that my membership is subject to GymPRO's code of conduct.
+                  </span>
                 </label>
                 {errs.agree && <span className="err">{errs.agree}</span>}
                 <div className="mactions">
                   <button className="btn-out" type="button" onClick={() => { setStep(1); setErrs({}); }}>← Back</button>
-                  <button className="btn-main" type="button" onClick={submitCreate}>Create Account</button>
+                  <button className="btn-main" type="button" onClick={submitCreate} disabled={isCreating}>
+                    {isCreating ? "Creating Account..." : "Create Account"}
+                  </button>
                 </div>
               </div>
             )}

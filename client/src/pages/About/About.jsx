@@ -698,32 +698,6 @@ export default function AboutPage() {
         <ContactSection />
       </div>
 
-      {/* ── FOOTER ── */}
-      <footer className="about-footer">
-        <div className="about-footer-motive">
-          <div className="about-footer-motive-inner">
-            {["FORGE YOUR LEGACY", "✦", "200+ LOCATIONS", "✦", "1M+ MEMBERS", "✦", "WORLD-CLASS COACHING", "✦", "FORGE YOUR LEGACY", "✦", "200+ LOCATIONS", "✦", "1M+ MEMBERS", "✦", "WORLD-CLASS COACHING", "✦"].map((t, i) => (
-              <span key={i} className={t === "✦" ? "footer-div" : "footer-motive-text"}>{t}</span>
-            ))}
-          </div>
-        </div>
-        <div className="about-footer-bottom">
-          <div className="about-footer-logo">
-            <div className="footer-logo-hex">
-              <div className="footer-logo-hex-bg" />
-              <div className="footer-logo-hex-inner" />
-              <span className="footer-logo-letter">G</span>
-            </div>
-            <span className="footer-logo-name">GYMPRO</span>
-          </div>
-          <p className="footer-copy">© 2026 GymVault Global Inc. All rights reserved.</p>
-          <div className="footer-bottom-links">
-            {["Privacy Policy", "Terms of Service", "Cookie Policy"].map(l => (
-              <a key={l} href="#" onClick={e => e.preventDefault()}>{l}</a>
-            ))}
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

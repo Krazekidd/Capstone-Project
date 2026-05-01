@@ -1,742 +1,692 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Chart, registerables } from "chart.js";
+Chart.register(...registerables);
 import "./Trainer.css";
 
-// ─── DATA ────────────────────────────────────────────────────────────────────
-
+/* ─────────────────────────────────────────────
+   TRAINER DATA  (the logged-in trainer)
+───────────────────────────────────────────── */
 const TRAINER = {
-  name: "Marcus Steele",
-  age: 34,
-  rank: "Senior Trainer",
-  specialisation: "Strength & Conditioning, Functional Training",
-  certification: "NASM, ACE, CSCS",
-  yearsExperience: 8,
-  rating: 4.7,
-  bio: "Elite performance coach specialising in athletic conditioning and functional movement. Known for transformative results and evidence-based programming.",
-  coverImg: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1600&q=80",
-  avatarImg: "https://randomuser.me/api/portraits/men/32.jpg",
+  name:     "Sasha Volkov",
+  title:    "Combat & Conditioning Director",
+  certs:    "WBC Certified · Muay Thai Level 3 · ACE-CPT",
+  exp:      "14 yrs",
+  since:    "January 2018",
+  clients:  19,
+  active:   15,
+  img:      "https://images.unsplash.com/photo-1570655652364-2e0a67455ac6?w=800&q=80&fit=crop",
+  coverImg: "https://images.unsplash.com/photo-1547153760-18fc86324498?w=1600&q=80&fit=crop",
+  quote:    "Every punch thrown in training is a punch saved in battle.",
+  bio:      "Elite combat and conditioning specialist with 14 years of experience transforming athletes and everyday people alike. Combining martial arts precision with cutting-edge sports science.",
+  specs:    ["Boxing","Muay Thai","HIIT","Conditioning"],
+  myInternal: [75,78,80,82,79,83,85,84,86,88,87],
+  myClient:   [3.9,4.0,4.1,4.3,4.2,4.4,4.5,4.3,4.6,4.5,4.7],
 };
 
-const ALL_CLIENTS = [
-  { id: 1, name: "Robert Johnson",   goal: "Lose 15kg",       progress: 32, risk: true,  avatar: "https://randomuser.me/api/portraits/men/11.jpg",  interventionTrainer: null },
-  { id: 2, name: "Emily Davis",      goal: "Run 5k",          progress: 28, risk: true,  avatar: "https://randomuser.me/api/portraits/women/44.jpg", interventionTrainer: null },
-  { id: 3, name: "Michael Brown",    goal: "Gain 5kg muscle", progress: 45, risk: true,  avatar: "https://randomuser.me/api/portraits/men/56.jpg",  interventionTrainer: "Jessica Hale" },
-  { id: 4, name: "Sophia Turner",    goal: "Flexibility",     progress: 20, risk: true,  avatar: "https://randomuser.me/api/portraits/women/65.jpg", interventionTrainer: null },
-  { id: 5, name: "Chris Martin",     goal: "Core strength",   progress: 15, risk: true,  avatar: "https://randomuser.me/api/portraits/men/78.jpg",  interventionTrainer: null },
-  { id: 6, name: "Natalie Brooks",   goal: "Endurance",       progress: 38, risk: true,  avatar: "https://randomuser.me/api/portraits/women/22.jpg", interventionTrainer: null },
-  { id: 7, name: "Jake Torres",      goal: "Weight loss",     progress: 10, risk: true,  avatar: "https://randomuser.me/api/portraits/men/33.jpg",  interventionTrainer: null },
+/* My personal clients (subset of AT_RISK who belong to this trainer) */
+const MY_CLIENTS = [
+  { id:1,  name:"Kwame Asante",    risk:"high",   reason:"Missed 4 consecutive sessions",        attendance:38, progress:-12, lastSeen:"8 days ago",  goal:"Weight Loss",    img:"https://images.unsplash.com/photo-1534367610401-9f5ed68180aa?w=80&q=80",  interventionBy:null  },
+  { id:2,  name:"Nia Williams",    risk:"medium", reason:"Strength plateau for 3 weeks",          attendance:80, progress:6,   lastSeen:"2 days ago",  goal:"Build Muscle",   img:"https://images.unsplash.com/photo-1607962837359-5e7e89f86776?w=80&q=80",  interventionBy:null  },
+  { id:3,  name:"Tariq Mensah",    risk:"high",   reason:"BMI increased 2.8 points this month",   attendance:44, progress:-9,  lastSeen:"4 days ago",  goal:"Weight Loss",    img:"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=80&q=80",  interventionBy:"Marcus Reid" },
+  { id:4,  name:"Serena Blake",    risk:"low",    reason:"Hydration logs below daily target",      attendance:88, progress:10,  lastSeen:"Today",       goal:"Endurance",      img:"https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=80&q=80",  interventionBy:null  },
+  { id:5,  name:"Dante Powell",    risk:"medium", reason:"No nutrition check-in for 10 days",     attendance:65, progress:3,   lastSeen:"3 days ago",  goal:"Build Muscle",   img:"https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=80&q=80",  interventionBy:null  },
+  { id:6,  name:"Camille Forrest", risk:"low",    reason:"Sleep average dropped to 5.5 hours",    attendance:85, progress:8,   lastSeen:"Yesterday",   goal:"Tone & Define",  img:"https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=80&q=80",  interventionBy:null  },
+  { id:7,  name:"Marcus Webb",     risk:"medium", reason:"Skipped last scheduled PT session",     attendance:70, progress:2,   lastSeen:"5 days ago",  goal:"Lose Weight",    img:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=80&q=80",  interventionBy:null  },
 ];
 
-const ALL_NON_RISK_CLIENTS = [
-  { id: 8,  name: "Liam Chen",       goal: "Hypertrophy",     progress: 72, trainer: "Marcus Steele", avatar: "https://randomuser.me/api/portraits/men/41.jpg" },
-  { id: 9,  name: "Olivia Park",     goal: "Tone & shred",    progress: 65, trainer: "Leon Cruz",     avatar: "https://randomuser.me/api/portraits/women/31.jpg" },
-  { id: 10, name: "Ethan Wright",    goal: "Marathon prep",   progress: 80, trainer: "Alicia Chen",   avatar: "https://randomuser.me/api/portraits/men/22.jpg" },
-  { id: 11, name: "Maya Johnson",    goal: "Post-natal",      progress: 55, trainer: "Derek Wong",    avatar: "https://randomuser.me/api/portraits/women/55.jpg" },
+/* Public reviews for this trainer */
+const MY_REVIEWS = [
+  { id:1, client:"Bob Kamara",       rating:5, date:"Apr 27, 2026", time:"2:30 PM",  comment:"Sasha's boxing sessions are incredible. Lost 12kg in 3 months and I genuinely love going to the gym now. Life-changing.", avatar:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=60&q=80" },
+  { id:2, client:"Yemi Adebayo",     rating:5, date:"Apr 24, 2026", time:"10:15 AM", comment:"Best HIIT coach I've ever trained with. Sasha knows exactly how to push you without breaking you. Results speak for themselves.", avatar:"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&q=80" },
+  { id:3, client:"Grace Okafor",     rating:4, date:"Apr 21, 2026", time:"3:45 PM",  comment:"Really effective training style. Sessions are intense but always safe. Noticed huge improvements in my fitness after just 6 weeks.", avatar:"https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=60&q=80" },
+  { id:4, client:"Dean McAllister",  rating:5, date:"Apr 18, 2026", time:"8:00 AM",  comment:"Sasha doesn't just train you — he coaches you. The mental side is just as strong as the physical. Highly recommend.", avatar:"https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=60&q=80" },
+  { id:5, client:"Priya Sundaram",   rating:4, date:"Apr 15, 2026", time:"12:30 PM", comment:"Fantastic conditioning programme. Packed my schedule but every session has a clear purpose. My endurance has skyrocketed.", avatar:"https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=60&q=80" },
+  { id:6, client:"Liam Thornton",    rating:5, date:"Apr 10, 2026", time:"6:20 PM",  comment:"Came in after a 2-year gym break and Sasha had me back to full fitness in 8 weeks. Incredible knowledge and patience.", avatar:"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=60&q=80" },
 ];
 
-const OTHER_TRAINERS = [
-  { name: "Jessica Hale", avatar: "https://randomuser.me/api/portraits/women/12.jpg" },
-  { name: "Leon Cruz",    avatar: "https://randomuser.me/api/portraits/men/15.jpg" },
-  { name: "Alicia Chen",  avatar: "https://randomuser.me/api/portraits/women/25.jpg" },
-  { name: "Derek Wong",   avatar: "https://randomuser.me/api/portraits/men/45.jpg" },
-  { name: "Sofia Martinez", avatar: "https://randomuser.me/api/portraits/women/37.jpg" },
-  { name: "James Lee",    avatar: "https://randomuser.me/api/portraits/men/62.jpg" },
+/* My internal grades (received from senior/admin — read-only to this trainer) */
+const MY_GRADES_BY_MONTH = [
+  { month:"Jan", internal:75, criteria:{ performance:7.5, motivation:8.0, interaction:7.0, knowledge:7.5, punctuality:7.5 }, notes:"Solid start. Push for more client check-ins." },
+  { month:"Feb", internal:78, criteria:{ performance:7.8, motivation:8.2, interaction:7.5, knowledge:8.0, punctuality:7.8 }, notes:"Improvement across the board. Keep it up." },
+  { month:"Mar", internal:80, criteria:{ performance:8.0, motivation:8.5, interaction:8.0, knowledge:8.2, punctuality:7.8 }, notes:"Strong month. Client retention improved." },
+  { month:"Apr", internal:82, criteria:{ performance:8.2, motivation:8.5, interaction:8.2, knowledge:8.5, punctuality:8.0 }, notes:"Excellent consistency. Near top performer." },
+  { month:"May", internal:79, criteria:{ performance:8.0, motivation:8.0, interaction:7.8, knowledge:8.0, punctuality:7.5 }, notes:"Minor dip — focus on punctuality." },
+  { month:"Jun", internal:83, criteria:{ performance:8.5, motivation:8.8, interaction:8.2, knowledge:8.5, punctuality:8.0 }, notes:"Back on track. Best month yet." },
+  { month:"Jul", internal:85, criteria:{ performance:8.8, motivation:9.0, interaction:8.5, knowledge:8.5, punctuality:8.2 }, notes:"Outstanding performance this month." },
+  { month:"Aug", internal:84, criteria:{ performance:8.5, motivation:8.8, interaction:8.5, knowledge:8.5, punctuality:8.0 }, notes:"Consistent excellence." },
+  { month:"Sep", internal:86, criteria:{ performance:9.0, motivation:9.0, interaction:8.5, knowledge:8.8, punctuality:8.5 }, notes:"Top 2 performer on the team this month." },
+  { month:"Oct", internal:88, criteria:{ performance:9.0, motivation:9.2, interaction:8.8, knowledge:9.0, punctuality:8.6 }, notes:"Exceptional. Keep this level going." },
+  { month:"Nov", internal:87, criteria:{ performance:8.8, motivation:9.0, interaction:8.8, knowledge:8.8, punctuality:8.6 }, notes:"Consistently excellent across all criteria." },
 ];
 
-const ASSESSMENT_CRITERIA = ["Knowledge", "Communication", "Professionalism", "Session Planning", "Motivation"];
-
-const MONTHLY_INTERNAL = [
-  { month: "Sep", score: 72, sessions: 14, clients: 10, attendance: 89 },
-  { month: "Oct", score: 78, sessions: 16, clients: 11, attendance: 91 },
-  { month: "Nov", score: 82, sessions: 18, clients: 11, attendance: 93 },
-  { month: "Dec", score: 75, sessions: 13, clients: 10, attendance: 87 },
-  { month: "Jan", score: 85, sessions: 19, clients: 12, attendance: 94 },
-  { month: "Feb", score: 87, sessions: 18, clients: 12, attendance: 94 },
+const CRITERIA_LABELS = [
+  { key:"performance", label:"Performance & Results", icon:"🏆" },
+  { key:"motivation",  label:"Motivation & Energy",   icon:"⚡" },
+  { key:"interaction", label:"Client Interaction",    icon:"🤝" },
+  { key:"knowledge",   label:"Technical Knowledge",   icon:"🧠" },
+  { key:"punctuality", label:"Punctuality",           icon:"⏱️" },
 ];
 
-const MONTHLY_CLIENT_RATINGS = [
-  { month: "Sep", rating: 4.2, reviews: 8 },
-  { month: "Oct", rating: 4.4, reviews: 9 },
-  { month: "Nov", rating: 4.5, reviews: 11 },
-  { month: "Dec", rating: 4.3, reviews: 7 },
-  { month: "Jan", rating: 4.6, reviews: 13 },
-  { month: "Feb", rating: 4.7, reviews: 15 },
-];
+/* ─────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────── */
+const avg       = (arr) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : 0;
+const gradeCol  = (s) => { if(s==null) return "#555"; if(s>=8.5) return "#22C55E"; if(s>=6) return "#F59E0B"; return "#EF4444"; };
+const gradeLbl  = (s) => { if(s==null) return "Not Graded"; if(s>=8.5) return "Excellent"; if(s>=6) return "Good"; return "Needs Improvement"; };
+const stars5    = (s) => s==null ? 0 : Math.round((s/10)*5);
 
-const PUBLIC_REVIEWS = [
-  { user: "Alice M.", rating: 5, comment: "Marcus completely transformed my approach to fitness. His programming is second to none.", avatar: "https://randomuser.me/api/portraits/women/14.jpg", date: "Feb 2026" },
-  { user: "Bob K.",   rating: 4, comment: "Very knowledgeable and professional. Sessions are always well-planned.", avatar: "https://randomuser.me/api/portraits/men/27.jpg", date: "Feb 2026" },
-  { user: "Sara L.",  rating: 5, comment: "Best trainer in the gym. Results speak for themselves!", avatar: "https://randomuser.me/api/portraits/women/68.jpg", date: "Jan 2026" },
-  { user: "Tom R.",   rating: 5, comment: "Incredible attention to detail and always motivating.", avatar: "https://randomuser.me/api/portraits/men/54.jpg", date: "Jan 2026" },
-];
+/* ─────────────────────────────────────────────
+   ICONS
+───────────────────────────────────────────── */
+const Ico = {
+  arrow:  ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+  close:  ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  shield: ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  swap:   ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>,
+  warn:   ()=><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+  lock:   ()=><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  clock:  ()=><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  up:     ()=><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>,
+  down:   ()=><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>,
+  star:   (f)=>f
+    ?<svg width="13" height="13" viewBox="0 0 24 24" fill="#F59E0B"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    :<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+};
 
-// ─── SMALL COMPONENTS ────────────────────────────────────────────────────────
-
-function StarRating({ value, max = 5, size = "md" }) {
+/* ─────────────────────────────────────────────
+   STAR ROW
+───────────────────────────────────────────── */
+function StarRow({ score, size="sm" }) {
+  const n = stars5(score);
   return (
-    <span className={`stars stars--${size}`}>
-      {Array.from({ length: max }).map((_, i) => (
-        <span key={i} className={i < Math.floor(value) ? "star star--full" : i < value ? "star star--half" : "star star--empty"}>★</span>
-      ))}
-    </span>
-  );
-}
-
-function MiniBarChart({ data, valueKey, label, color = "var(--accent)", maxVal }) {
-  const max = maxVal || Math.max(...data.map(d => d[valueKey]));
-  return (
-    <div className="mini-bar-chart">
-      {data.map((d, i) => (
-        <div key={i} className="mini-bar-wrap">
-          <div className="mini-bar-outer">
-            <div className="mini-bar-inner" style={{ height: `${(d[valueKey] / max) * 100}%`, background: color }} />
-          </div>
-          <span className="mini-bar-label">{d.month}</span>
-          <span className="mini-bar-val">{d[valueKey]}{label}</span>
-        </div>
-      ))}
+    <div className={`rt-stars rt-stars--${size}`}>
+      {[1,2,3,4,5].map(i=><span key={i}>{Ico.star(i<=n)}</span>)}
     </div>
   );
 }
 
-function LineChart({ data, valueKey, color = "var(--accent)", minVal, maxVal, suffix = "" }) {
-  const W = 420, H = 140, PAD = 20;
-  const vals = data.map(d => d[valueKey]);
-  const min = minVal ?? Math.min(...vals) - 5;
-  const max = maxVal ?? Math.max(...vals) + 5;
-  const pts = data.map((d, i) => {
-    const x = PAD + (i / (data.length - 1)) * (W - PAD * 2);
-    const y = H - PAD - ((d[valueKey] - min) / (max - min)) * (H - PAD * 2);
-    return { x, y, ...d };
-  });
-  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
-  const area = `${path} L${pts[pts.length - 1].x},${H - PAD} L${pts[0].x},${H - PAD} Z`;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="line-chart-svg">
-      <defs>
-        <linearGradient id={`grad-${valueKey}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#grad-${valueKey})`} />
-      <path d={path} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      {pts.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r="5" fill={color} stroke="white" strokeWidth="2" />
-          <title>{p.month}: {p[valueKey]}{suffix}</title>
-        </g>
-      ))}
-      {pts.map((p, i) => (
-        <text key={i} x={p.x} y={H - 2} textAnchor="middle" className="chart-tick">{p.month}</text>
-      ))}
-    </svg>
-  );
+/* ─────────────────────────────────────────────
+   TOAST
+───────────────────────────────────────────── */
+function Toast({ msg, show }) {
+  return <div className={`rt-toast${show?" rt-toast--on":""}`}>{msg}</div>;
 }
 
-function RadialProgress({ value, max = 100, size = 120, stroke = 10, color = "var(--accent)", label }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const fill = (value / max) * circ;
-  return (
-    <div className="radial-wrap" style={{ width: size, height: size }}>
-      <svg width={size} height={size}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e8e8e8" strokeWidth={stroke} />
-        <circle
-          cx={size / 2} cy={size / 2} r={r} fill="none"
-          stroke={color} strokeWidth={stroke}
-          strokeDasharray={`${fill} ${circ}`}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          style={{ transition: "stroke-dasharray 1s ease" }}
-        />
-      </svg>
-      <div className="radial-label">
-        <span className="radial-val">{value}{label || "%"}</span>
-      </div>
-    </div>
-  );
+/* ─────────────────────────────────────────────
+   PERFORMANCE CHART
+───────────────────────────────────────────── */
+function PerfChart({ internalArr, clientArr }) {
+  const ref = useRef(null);
+  const ch  = useRef(null);
+  const pts = internalArr.map((v,i)=>({ l:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov"][i], int:v, cli:clientArr[i] }));
+  useEffect(()=>{
+    if(!ref.current) return;
+    ch.current?.destroy();
+    ch.current = new Chart(ref.current, {
+      type:"line",
+      data:{
+        labels:pts.map(d=>d.l),
+        datasets:[
+          { label:"Internal %", data:pts.map(d=>d.int), borderColor:"#F26522", backgroundColor:"rgba(242,101,34,0.07)", borderWidth:2, tension:0.4, fill:true, pointBackgroundColor:"#F26522", pointRadius:4 },
+          { label:"Client ×20", data:pts.map(d=>d.cli*20), borderColor:"#22C55E", backgroundColor:"rgba(34,197,94,0.05)", borderWidth:2, borderDash:[4,3], tension:0.4, fill:false, pointBackgroundColor:"#22C55E", pointRadius:3 },
+        ],
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(c)=>c.datasetIndex===0?`Internal: ${c.raw}%`:`Client: ${(c.raw/20).toFixed(1)}/5` } } },
+        scales:{
+          x:{ grid:{color:"rgba(255,255,255,0.04)"}, ticks:{color:"#555",font:{size:10}} },
+          y:{ grid:{color:"rgba(255,255,255,0.04)"}, ticks:{color:"#555",font:{size:10}}, min:0, max:100 },
+        },
+      },
+    });
+    return()=>ch.current?.destroy();
+  },[]);
+  return <canvas ref={ref}/>;
 }
 
-// ─── SECTION: RATING HISTORY ─────────────────────────────────────────────────
-
-function RatingHistorySection() {
-  const [selected, setSelected] = useState(MONTHLY_INTERNAL.length - 1);
-  const sel = MONTHLY_INTERNAL[selected];
-  const clientSel = MONTHLY_CLIENT_RATINGS[selected];
-
+/* ─────────────────────────────────────────────
+   GRADE HISTORY CARD  (read-only)
+───────────────────────────────────────────── */
+function GradeHistoryCard({ entry, isSelected, onClick }) {
+  const col = gradeCol(entry.internal/10);
+  const pct = entry.internal;
   return (
-    <section className="section" id="history">
-      <div className="section-header">
-        <span className="section-tag">Analytics</span>
-        <h2 className="section-title">Performance History</h2>
-        <p className="section-sub">Monthly breakdown of internal scores and client satisfaction</p>
-      </div>
-
-      {/* Month selector pills */}
-      <div className="month-pills">
-        {MONTHLY_INTERNAL.map((m, i) => (
-          <button key={i} className={`month-pill ${selected === i ? "month-pill--active" : ""}`} onClick={() => setSelected(i)}>
-            {m.month}
-          </button>
+    <button
+      className={`rt-grade-tile${isSelected?" rt-grade-tile--active":""}`}
+      style={{"--tc":col}}
+      onClick={onClick}
+      title={`${entry.month}: ${pct}% — ${gradeLbl(entry.internal/10)}`}
+    >
+      <span className="rt-gt-month">{entry.month}</span>
+      <span className="rt-gt-score" style={{color:col}}>{(entry.internal/10).toFixed(1)}</span>
+      <span className="rt-gt-pct"   style={{color:col}}>{pct}%</span>
+      <div className="rt-gt-stars">
+        {[1,2,3,4,5].map(i=>(
+          <span key={i} style={{color:i<=stars5(entry.internal/10)?"#F59E0B":"rgba(255,255,255,0.1)",fontSize:8}}>★</span>
         ))}
       </div>
-
-      <div className="history-grid">
-        {/* Internal score card */}
-        <div className="history-card glass-card">
-          <div className="history-card-top">
-            <div>
-              <p className="history-card-label">Internal Score</p>
-              <p className="history-card-label">{sel.month} 2025–26</p>
-            </div>
-            <div className="history-score-badge" style={{ background: sel.score >= 80 ? "#16a34a" : sel.score >= 65 ? "#d97706" : "#dc2626" }}>
-              {sel.score}
-            </div>
-          </div>
-          <div className="history-stats-row">
-            <div className="hstat"><span className="hstat-val">{sel.sessions}</span><span className="hstat-label">Sessions</span></div>
-            <div className="hstat"><span className="hstat-val">{sel.clients}</span><span className="hstat-label">Clients</span></div>
-            <div className="hstat"><span className="hstat-val">{sel.attendance}%</span><span className="hstat-label">Attendance</span></div>
-          </div>
-          <LineChart data={MONTHLY_INTERNAL} valueKey="score" suffix="" minVal={60} maxVal={100} />
-        </div>
-
-        {/* Client rating card */}
-        <div className="history-card glass-card">
-          <div className="history-card-top">
-            <div>
-              <p className="history-card-label">Client Rating</p>
-              <p className="history-card-label">{clientSel.month} 2025–26</p>
-            </div>
-            <div className="history-score-badge" style={{ background: "var(--accent)" }}>
-              {clientSel.rating}
-            </div>
-          </div>
-          <div className="history-stats-row">
-            <div className="hstat"><span className="hstat-val">{clientSel.reviews}</span><span className="hstat-label">Reviews</span></div>
-            <div className="hstat"><StarRating value={clientSel.rating} size="sm" /></div>
-          </div>
-          <LineChart data={MONTHLY_CLIENT_RATINGS} valueKey="rating" color="#f59e0b" suffix="" minVal={3.5} maxVal={5} />
-        </div>
-      </div>
-    </section>
+    </button>
   );
 }
 
-// ─── SECTION: CLIENTS AT RISK ─────────────────────────────────────────────────
-
-function ClientsAtRiskSection() {
-  const [clients, setClients] = useState(ALL_CLIENTS);
-  const [showAll, setShowAll] = useState(false);
-  const [switchRequest, setSwitchRequest] = useState(null); // { clientId, targetTrainer }
-  const [switchModal, setSwitchModal] = useState(false);
-  const [switchTarget, setSwitchTarget] = useState(null);
-  const [switchClientId, setSwitchClientId] = useState(null);
-
-  const displayed = showAll ? clients : clients.slice(0, 5);
-
-  const handleIntervene = (clientId) => {
-    setClients(prev => prev.map(c =>
-      c.id === clientId ? { ...c, interventionTrainer: TRAINER.name } : c
-    ));
-  };
-
-  const handleRemoveIntervention = (clientId) => {
-    setClients(prev => prev.map(c =>
-      c.id === clientId ? { ...c, interventionTrainer: null } : c
-    ));
-  };
-
-  const openSwitchModal = (clientId) => {
-    setSwitchClientId(clientId);
-    setSwitchModal(true);
-    setSwitchTarget(null);
-  };
-
-  const submitSwitchRequest = () => {
-    if (!switchTarget) return;
-    setSwitchRequest({ clientId: switchClientId, targetTrainer: switchTarget });
-    setSwitchModal(false);
-    alert(`Switch request sent to ${switchTarget}. Awaiting their acceptance.`);
-  };
-
-  const riskColor = (progress) => {
-    if (progress < 20) return "#ef4444";
-    if (progress < 35) return "#f97316";
-    return "#eab308";
-  };
-
-  const riskLabel = (progress) => {
-    if (progress < 20) return "Critical";
-    if (progress < 35) return "High";
-    return "Moderate";
-  };
+/* ─────────────────────────────────────────────
+   RISK CLIENT CARD  (no intervention button — not senior)
+───────────────────────────────────────────── */
+function RiskCard({ client, transfers, onTransfer }) {
+  const rc  = {"high":"#EF4444","medium":"#F59E0B","low":"#22C55E"}[client.risk];
+  const rl  = {"high":"High Risk","medium":"Moderate","low":"Low Risk"}[client.risk];
+  const pending    = transfers.find(t=>t.clientId===client.id);
+  const seniorInt  = !!client.interventionBy;
 
   return (
-    <section className="section" id="clients">
-      <div className="section-header">
-        <span className="section-tag">Risk Monitor</span>
-        <h2 className="section-title">Clients at Risk</h2>
-        <p className="section-sub">Clients falling behind their goals — intervene or reassign</p>
+    <div className={`rt-risk-card rt-risk-card--${client.risk}`} style={{"--rc":rc}}>
+      <div className="rt-risk-top">
+        <div className="rt-risk-av-wrap">
+          <img src={client.img} alt={client.name} className="rt-risk-avatar"/>
+          <span className="rt-risk-pip" style={{background:rc}}/>
+        </div>
+        <div className="rt-risk-main">
+          <div className="rt-risk-name-row">
+            <span className="rt-risk-name">{client.name}</span>
+            <span className="rt-risk-badge" style={{background:`${rc}18`,border:`1px solid ${rc}40`,color:rc}}>{rl}</span>
+          </div>
+          <span className="rt-risk-goal">{client.goal}</span>
+          <div className="rt-risk-reason"><Ico.warn/>{client.reason}</div>
+        </div>
+        <div className="rt-risk-stats">
+          <div className="rt-risk-stat">
+            <span style={{color:client.progress<0?"#EF4444":"inherit"}}>{client.progress>0?"+":""}{client.progress}%</span>
+            <span>Progress</span>
+          </div>
+          <div className="rt-risk-stat">
+            <span>{client.attendance}%</span>
+            <span>Attendance</span>
+          </div>
+        </div>
       </div>
 
-      <div className="risk-grid">
-        {displayed.map(c => {
-          const myIntervention = c.interventionTrainer === TRAINER.name;
-          const otherIntervention = c.interventionTrainer && !myIntervention;
-          const hasPendingSwitch = switchRequest?.clientId === c.id;
-          const col = riskColor(c.progress);
+      {seniorInt && (
+        <div className="rt-risk-senior-banner">
+          <Ico.shield/> Senior trainer {client.interventionBy} is actively intervening
+        </div>
+      )}
 
-          return (
-            <div key={c.id} className="risk-card glass-card">
-              <div className="risk-card-top">
-                <img src={c.avatar} alt={c.name} className="risk-avatar" />
-                <div className="risk-name-wrap">
-                  <h4 className="risk-name">{c.name}</h4>
-                  <span className="risk-goal">{c.goal}</span>
+      <div className="rt-risk-footer">
+        <span className="rt-risk-seen">Last seen: {client.lastSeen}</span>
+        <div className="rt-risk-actions">
+          {pending
+            ? <span className="rt-risk-pending">⌛ Transfer Pending</span>
+            : <button className="rt-risk-btn rt-risk-btn--swap" onClick={()=>onTransfer(client.id,client.name)}>
+                <Ico.swap/> Request Transfer
+              </button>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   REVIEW CARD
+───────────────────────────────────────────── */
+function ReviewCard({ r }) {
+  return (
+    <div className="rt-review-card">
+      <div className="rt-review-top">
+        <img src={r.avatar} alt={r.client} className="rt-review-avatar"/>
+        <div className="rt-review-meta">
+          <span className="rt-review-client">{r.client}</span>
+          <span className="rt-review-datetime">{r.date} · {r.time}</span>
+        </div>
+        <div className="rt-review-rating">
+          <div className="rt-review-stars">
+            {[1,2,3,4,5].map(i=>(
+              <span key={i} style={{color:i<=r.rating?"#F59E0B":"rgba(255,255,255,0.12)",fontSize:15}}>★</span>
+            ))}
+          </div>
+          <span className="rt-review-score">{r.rating}.0 / 5</span>
+        </div>
+      </div>
+      <p className="rt-review-comment">"{r.comment}"</p>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   MAIN PAGE
+───────────────────────────────────────────── */
+export default function RegularTrainerPage() {
+  const [activeTab,       setActiveTab]       = useState("overview");
+  const [showAllRisk,     setShowAllRisk]      = useState(false);
+  const [transfers,       setTransfers]        = useState([]);
+  const [selectedGrade,   setSelectedGrade]    = useState(MY_GRADES_BY_MONTH.length - 1);
+  const [toast,           setToast]            = useState({show:false,msg:""});
+
+  const showToast = useCallback((msg)=>{
+    setToast({show:true,msg});
+    setTimeout(()=>setToast({show:false,msg:""}),2800);
+  },[]);
+
+  /* derived stats */
+  const intAvg     = Math.round(avg(TRAINER.myInternal));
+  const cliAvg     = +avg(TRAINER.myClient).toFixed(1);
+  const overall    = (((intAvg/20)+cliAvg)/2).toFixed(1);
+  const lastInt    = TRAINER.myInternal.slice(-1)[0];
+  const prevInt    = TRAINER.myInternal.slice(-2,-1)[0];
+  const lastCli    = TRAINER.myClient.slice(-1)[0];
+  const prevCli    = TRAINER.myClient.slice(-2,-1)[0];
+  const lastGrade  = MY_GRADES_BY_MONTH[MY_GRADES_BY_MONTH.length-1];
+  const selGrade   = MY_GRADES_BY_MONTH[selectedGrade];
+
+  const displayedRisk   = showAllRisk ? MY_CLIENTS : MY_CLIENTS.slice(0,5);
+  const avgReviewRating = (MY_REVIEWS.reduce((a,r)=>a+r.rating,0)/MY_REVIEWS.length).toFixed(1);
+
+  const TABS = [
+    { id:"overview", label:"Overview"       },
+    { id:"grades",   label:"My Grades"      },
+    { id:"risk",     label:"Clients at Risk"},
+    { id:"reviews",  label:"My Reviews"     },
+  ];
+
+  return (
+    <div className="rt-page">
+      <Toast msg={toast.msg} show={toast.show}/>
+
+      {/* ── HERO ── */}
+      <div className="rt-hero">
+        <div className="rt-hero-cover" style={{backgroundImage:`url(${TRAINER.coverImg})`}}/>
+        <div className="rt-hero-tint"/>
+        <div className="rt-hero-body">
+          {/* Avatar col */}
+          <div className="rt-hero-left">
+            <div className="rt-hero-avatar-ring">
+              <img src={TRAINER.img} alt={TRAINER.name} className="rt-hero-avatar"/>
+            </div>
+            <div className="rt-trainer-badge">Trainer</div>
+          </div>
+
+          {/* Copy col */}
+          <div className="rt-hero-copy">
+            <p className="rt-hero-eyebrow">B.A.D People Fitness · Trainer Dashboard</p>
+            <h1 className="rt-hero-name">{TRAINER.name}</h1>
+            <p className="rt-hero-title">{TRAINER.title}</p>
+            <p className="rt-hero-bio">{TRAINER.bio}</p>
+            <div className="rt-hero-tags">
+              {TRAINER.specs.map(s=><span key={s} className="rt-tag">{s}</span>)}
+            </div>
+            <div className="rt-hero-meta">
+              <div><span>Since</span><strong>{TRAINER.since}</strong></div>
+              <div><span>Experience</span><strong>{TRAINER.exp}</strong></div>
+              <div><span>Clients</span><strong>{TRAINER.clients}</strong></div>
+              <div><span>Active</span><strong>{TRAINER.active}</strong></div>
+            </div>
+            <blockquote className="rt-hero-quote">"{TRAINER.quote}"</blockquote>
+          </div>
+
+          {/* KPI col */}
+          <div className="rt-hero-kpis">
+            <div className="rt-hero-kpi">
+              <span className="rt-hero-kpi-val" style={{color:gradeCol(intAvg/10)}}>{intAvg}%</span>
+              <span>Internal Rating</span>
+            </div>
+            <div className="rt-hero-kpi">
+              <span className="rt-hero-kpi-val" style={{color:"#22C55E"}}>{cliAvg}/5</span>
+              <span>Client Rating</span>
+            </div>
+            <div className="rt-hero-kpi">
+              <span className="rt-hero-kpi-val" style={{color:"#F26522"}}>{overall}</span>
+              <span>Overall Score</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── TAB BAR ── */}
+      <div className="rt-tab-bar">
+        <div className="rt-tab-inner">
+          {TABS.map(t=>(
+            <button key={t.id}
+              className={`rt-tab${activeTab===t.id?" rt-tab--on":""}`}
+              onClick={()=>setActiveTab(t.id)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── MAIN CONTENT ── */}
+      <div className="rt-main">
+
+        {/* ═══ OVERVIEW ═══ */}
+        {activeTab==="overview" && (
+          <div className="rt-tab-content">
+
+            {/* KPI strip */}
+            <div className="rt-kpi-strip">
+              {[
+                { val:intAvg+"%",         lbl:"Avg Internal Rating",   col:gradeCol(intAvg/10) },
+                { val:cliAvg+"/5",        lbl:"Avg Client Rating",     col:"#22C55E"            },
+                { val:overall,            lbl:"Overall Score",          col:"#F26522"            },
+                { val:TRAINER.active,     lbl:"Active Clients",         col:"#F26522"            },
+                { val:MY_REVIEWS.length,  lbl:"Total Reviews",          col:"#F26522"            },
+                { val:lastGrade.internal+"%", lbl:"Latest Grade",       col:gradeCol(lastGrade.internal/10) },
+              ].map((k,i)=>(
+                <div key={i} className="rt-kpi-card">
+                  <span className="rt-kpi-val" style={{color:k.col}}>{k.val}</span>
+                  <span className="rt-kpi-lbl">{k.lbl}</span>
                 </div>
-                <div className="risk-badge" style={{ background: col }}>
-                  {riskLabel(c.progress)}
+              ))}
+            </div>
+
+            {/* Performance chart + quick grade snapshot */}
+            <div className="rt-two-col">
+              <div className="rt-panel">
+                <div className="rt-panel-hdr">
+                  <h3>My Performance — Jan–Nov</h3>
+                  <div className="rt-chart-legend">
+                    <span><span className="rt-leg-dot rt-leg-dot--orange"/>Internal %</span>
+                    <span><span className="rt-leg-dot rt-leg-dot--green"/>Client ×20</span>
+                  </div>
+                </div>
+                <div className="rt-chart-wrap">
+                  <PerfChart internalArr={TRAINER.myInternal} clientArr={TRAINER.myClient}/>
                 </div>
               </div>
 
-              <div className="risk-progress-wrap">
-                <div className="risk-progress-bar">
-                  <div className="risk-progress-fill" style={{ width: `${c.progress}%`, background: col }} />
+              <div className="rt-panel">
+                <div className="rt-panel-hdr"><h3>This Month at a Glance</h3></div>
+                <div className="rt-snapshot-list">
+                  {[
+                    { label:"Internal Rating",  val:lastInt+"%",    prev:prevInt+"%",   up:lastInt>=prevInt,  col:gradeCol(lastInt/10) },
+                    { label:"Client Rating",    val:lastCli+"/5",   prev:prevCli+"/5",  up:lastCli>=prevCli,  col:"#22C55E"           },
+                    { label:"Latest Grade",     val:(lastGrade.internal/10).toFixed(1)+"/10", prev:lastGrade.internal+"%", up:true, col:gradeCol(lastGrade.internal/10) },
+                    { label:"Active Clients",   val:TRAINER.active, prev:"of "+TRAINER.clients,up:null, col:"#F26522"              },
+                  ].map((s,i)=>(
+                    <div key={i} className="rt-snapshot-row">
+                      <span className="rt-snapshot-label">{s.label}</span>
+                      <div className="rt-snapshot-right">
+                        <span className="rt-snapshot-val" style={{color:s.col}}>{s.val}</span>
+                        {s.up!==null
+                          ? <span className={`rt-snapshot-trend${s.up?" rt-trend-up":" rt-trend-dn"}`}>
+                              {s.up?<Ico.up/>:<Ico.down/>} {s.prev}
+                            </span>
+                          : <span className="rt-snapshot-sub">{s.prev}</span>
+                        }
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <span className="risk-progress-val" style={{ color: col }}>{c.progress}%</span>
+
+                {/* Mini bar chart of my internal history */}
+                <div className="rt-panel-hdr" style={{marginTop:20}}><h3>Internal Rating Trend</h3></div>
+                <div className="rt-mini-bar-strip">
+                  {MY_GRADES_BY_MONTH.map((g,i)=>{
+                    const c   = gradeCol(g.internal/10);
+                    const pct = g.internal;
+                    return (
+                      <div key={i} className="rt-mini-bar-col">
+                        <div className="rt-mini-bar-fill" style={{height:`${(pct-60)*3}px`,background:c}}/>
+                        <span className="rt-mini-bar-label" style={{color:c}}>{g.month}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+            </div>
 
-              {c.interventionTrainer && (
-                <div className="intervention-banner" style={{ background: myIntervention ? "#16a34a22" : "#3b82f622", borderColor: myIntervention ? "#16a34a" : "#3b82f6" }}>
-                  <span style={{ color: myIntervention ? "#16a34a" : "#3b82f6" }}>
-                    {myIntervention ? "✓ You are intervening" : `⚡ ${c.interventionTrainer} is intervening`}
-                  </span>
-                </div>
-              )}
-
-              <div className="risk-actions">
-                {myIntervention ? (
-                  <button className="risk-btn risk-btn--danger" onClick={() => handleRemoveIntervention(c.id)}>
-                    Stop Intervening
-                  </button>
-                ) : otherIntervention ? (
-                  <button className="risk-btn risk-btn--disabled" disabled>
-                    Intervention Locked
-                  </button>
-                ) : (
-                  <button className="risk-btn risk-btn--primary" onClick={() => handleIntervene(c.id)}>
-                    ⚡ Intervene
-                  </button>
-                )}
-                <button className="risk-btn risk-btn--outline" onClick={() => openSwitchModal(c.id)}>
-                  {hasPendingSwitch ? "⌛ Pending..." : "⇄ Request Switch"}
+            {/* Recent clients preview */}
+            <div className="rt-panel">
+              <div className="rt-panel-hdr">
+                <h3>My Clients</h3>
+                <button className="rt-tab-link" onClick={()=>setActiveTab("risk")}>
+                  View At-Risk <Ico.arrow/>
                 </button>
               </div>
+              <div className="rt-clients-preview">
+                {MY_CLIENTS.map(c=>{
+                  const rc = {"high":"#EF4444","medium":"#F59E0B","low":"#22C55E"}[c.risk];
+                  return (
+                    <div key={c.id} className="rt-client-row">
+                      <img src={c.img} alt={c.name} className="rt-client-avatar"/>
+                      <div className="rt-client-info">
+                        <span className="rt-client-name">{c.name}</span>
+                        <span className="rt-client-goal">{c.goal}</span>
+                      </div>
+                      <div className="rt-client-bar-col">
+                        <div className="rt-client-bar-wrap">
+                          <div className="rt-client-bar" style={{width:`${c.attendance}%`,background:rc}}/>
+                        </div>
+                        <span className="rt-client-pct" style={{color:rc}}>{c.attendance}%</span>
+                      </div>
+                      <span className="rt-client-risk-dot" style={{background:rc}} title={c.risk}/>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        )}
 
-      {clients.length > 5 && (
-        <button className="view-more-btn" onClick={() => setShowAll(!showAll)}>
-          {showAll ? "Show Less ▲" : `View All ${clients.length} Clients ▼`}
-        </button>
-      )}
+        {/* ═══ MY GRADES (read-only) ═══ */}
+        {activeTab==="grades" && (
+          <div className="rt-tab-content">
+            <div className="rt-section-intro">
+              <h2 className="rt-section-title">My Internal Grades</h2>
+              <p className="rt-section-sub">Grades submitted by your senior trainer and management each month. Grades are read-only — speak to your senior trainer about any queries.</p>
+            </div>
 
-      {/* Switch Trainer Modal */}
-      {switchModal && (
-        <div className="modal-overlay" onClick={() => setSwitchModal(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <button className="modal-x" onClick={() => setSwitchModal(false)}>✕</button>
-            <h3 className="modal-title">Request Client Switch</h3>
-            <p className="modal-sub">Select a trainer to receive this client. They must accept before the switch is finalised.</p>
-            <div className="switch-trainer-list">
-              {OTHER_TRAINERS.map(t => (
-                <div
-                  key={t.name}
-                  className={`switch-trainer-item ${switchTarget === t.name ? "switch-trainer-item--selected" : ""}`}
-                  onClick={() => setSwitchTarget(t.name)}
-                >
-                  <img src={t.avatar} alt={t.name} className="switch-avatar" />
-                  <span>{t.name}</span>
-                  {switchTarget === t.name && <span className="switch-check">✓</span>}
+            {/* Month selector tiles */}
+            <div className="rt-panel">
+              <div className="rt-panel-hdr">
+                <h3>Select a Month</h3>
+                <div className="rt-grade-key">
+                  <span><span className="rt-key-dot" style={{background:"#22C55E"}}/>≥ 8.5 Excellent</span>
+                  <span><span className="rt-key-dot" style={{background:"#F59E0B"}}/>6–8.4 Good</span>
+                  <span><span className="rt-key-dot" style={{background:"#EF4444"}}/>Below 6</span>
                 </div>
+              </div>
+              <div className="rt-grade-tiles">
+                {MY_GRADES_BY_MONTH.map((g,i)=>(
+                  <GradeHistoryCard
+                    key={i} entry={g}
+                    isSelected={selectedGrade===i}
+                    onClick={()=>setSelectedGrade(i)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Selected month detail */}
+            {selGrade && (
+              <div className="rt-grade-detail-grid">
+                {/* Criteria breakdown */}
+                <div className="rt-panel">
+                  <div className="rt-panel-hdr">
+                    <h3>{selGrade.month} 2025–26 — Breakdown</h3>
+                    <div>
+                      <span className="rt-grade-overall-val" style={{color:gradeCol(selGrade.internal/10)}}>
+                        {(selGrade.internal/10).toFixed(1)}/10
+                      </span>
+                      <span className="rt-grade-overall-pct" style={{color:gradeCol(selGrade.internal/10)}}>
+                        {selGrade.internal}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="rt-crit-bars">
+                    {CRITERIA_LABELS.map(c=>{
+                      const v  = selGrade.criteria[c.key];
+                      const cc = gradeCol(v>=8.5?9:v>=6?7:4);
+                      return (
+                        <div key={c.key} className="rt-crit-row">
+                          <span className="rt-crit-icon">{c.icon}</span>
+                          <span className="rt-crit-label">{c.label}</span>
+                          <div className="rt-crit-bar-track">
+                            <div className="rt-crit-bar-fill" style={{width:`${v*10}%`,background:cc}}/>
+                          </div>
+                          <span className="rt-crit-val" style={{color:cc}}>{v.toFixed(1)}</span>
+                          <StarRow score={v} size="xs"/>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {selGrade.notes && (
+                    <div className="rt-grade-notes">
+                      <span className="rt-grade-notes-label">Trainer Notes</span>
+                      <p>"{selGrade.notes}"</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Summary card */}
+                <div className="rt-panel rt-grade-summary-panel">
+                  <div className="rt-grade-ring-wrap">
+                    <svg viewBox="0 0 80 80" className="rt-ring-svg">
+                      <circle cx="40" cy="40" r="30" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6"/>
+                      <circle cx="40" cy="40" r="30" fill="none"
+                        stroke={gradeCol(selGrade.internal/10)} strokeWidth="6"
+                        strokeDasharray={`${(selGrade.internal/100)*188.5} 188.5`}
+                        strokeLinecap="round" transform="rotate(-90 40 40)"
+                        style={{transition:"stroke-dasharray 0.4s ease"}}/>
+                      <text x="40" y="37" textAnchor="middle" fill={gradeCol(selGrade.internal/10)} fontSize="12" fontFamily="Bebas Neue" letterSpacing="1">
+                        {(selGrade.internal/10).toFixed(1)}
+                      </text>
+                      <text x="40" y="49" textAnchor="middle" fill={gradeCol(selGrade.internal/10)} fontSize="8" fontFamily="Barlow Condensed" fontWeight="700">
+                        {selGrade.internal}%
+                      </text>
+                    </svg>
+                  </div>
+                  <div className="rt-grade-summary-info">
+                    <span className="rt-grade-summary-month">{selGrade.month} 2025–26</span>
+                    <span className="rt-grade-summary-score" style={{color:gradeCol(selGrade.internal/10)}}>
+                      {(selGrade.internal/10).toFixed(2)} / 10
+                    </span>
+                    <span className="rt-grade-summary-label" style={{color:gradeCol(selGrade.internal/10)}}>
+                      {gradeLbl(selGrade.internal/10)}
+                    </span>
+                    <StarRow score={selGrade.internal/10} size="md"/>
+                  </div>
+                  {/* All months mini summary */}
+                  <div className="rt-grade-all-months">
+                    <span className="rt-grade-all-months-title">All Months</span>
+                    {MY_GRADES_BY_MONTH.map((g,i)=>(
+                      <div key={i}
+                        className={`rt-grade-month-row${selectedGrade===i?" rt-grade-month-row--active":""}`}
+                        onClick={()=>setSelectedGrade(i)}>
+                        <span>{g.month}</span>
+                        <span style={{color:gradeCol(g.internal/10)}}>{(g.internal/10).toFixed(1)}</span>
+                        <div className="rt-gm-bar-track">
+                          <div className="rt-gm-bar-fill" style={{width:`${g.internal}%`,background:gradeCol(g.internal/10)}}/>
+                        </div>
+                        <span style={{color:gradeCol(g.internal/10)}}>{g.internal}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ CLIENTS AT RISK ═══ */}
+        {activeTab==="risk" && (
+          <div className="rt-tab-content">
+            <div className="rt-section-intro">
+              <h2 className="rt-section-title">Clients at Risk</h2>
+              <p className="rt-section-sub">
+                Your clients showing warning signs. You can request a transfer to another trainer. If a client needs senior intervention, flag it to your senior trainer.
+              </p>
+            </div>
+
+            {/* Summary counts */}
+            <div className="rt-risk-summary">
+              {["high","medium","low"].map(level=>{
+                const cnt = MY_CLIENTS.filter(c=>c.risk===level).length;
+                const rc  = {"high":"#EF4444","medium":"#F59E0B","low":"#22C55E"}[level];
+                const rl  = {"high":"High Risk","medium":"Moderate","low":"Low Risk"}[level];
+                return (
+                  <div key={level} className="rt-risk-sum-item" style={{borderTopColor:rc}}>
+                    <span className="rt-risk-sum-val" style={{color:rc}}>{cnt}</span>
+                    <span>{rl}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="rt-risk-grid">
+              {displayedRisk.map(c=>(
+                <RiskCard
+                  key={c.id} client={c}
+                  transfers={transfers}
+                  onTransfer={(id,name)=>{ setTransfers(p=>[...p,{clientId:id,clientName:name}]); showToast(`Transfer request sent for ${name}`); }}
+                />
               ))}
             </div>
-            <button className="modal-confirm-btn" onClick={submitSwitchRequest} disabled={!switchTarget}>
-              Send Switch Request
-            </button>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
 
-// ─── SECTION: TRAINER ASSESSMENT ─────────────────────────────────────────────
-
-function TrainerAssessmentSection() {
-  const [assessments, setAssessments] = useState({});
-  const [assessed, setAssessed] = useState({});
-  const [modal, setModal] = useState(null);
-  const [scores, setScores] = useState({});
-  const [remarks, setRemarks] = useState("");
-
-  const open = (t) => {
-    setModal(t);
-    if (!scores[t.name]) {
-      setScores(prev => ({ ...prev, [t.name]: ASSESSMENT_CRITERIA.reduce((o, c) => ({ ...o, [c]: 0 }), {}) }));
-    }
-    setRemarks("");
-  };
-
-  const submit = () => {
-    const vals = Object.values(scores[modal.name] || {});
-    const avg = vals.length ? (vals.reduce((a, b) => a + Number(b), 0) / vals.length).toFixed(1) : 0;
-    setAssessed(prev => ({ ...prev, [modal.name]: { done: true, avg } }));
-    setModal(null);
-  };
-
-  return (
-    <section className="section" id="assessment">
-      <div className="section-header">
-        <span className="section-tag">Peer Review</span>
-        <h2 className="section-title">Trainer Assessment</h2>
-        <p className="section-sub">Evaluate your fellow trainers across key performance criteria</p>
-      </div>
-
-      <div className="assess-grid">
-        {OTHER_TRAINERS.map(t => {
-          const done = assessed[t.name]?.done;
-          return (
-            <div key={t.name} className={`assess-card glass-card ${done ? "assess-card--done" : ""}`}>
-              <img src={t.avatar} alt={t.name} className="assess-avatar" />
-              <div className="assess-info">
-                <h4 className="assess-name">{t.name}</h4>
-                {done && <span className="assess-score">Score: {assessed[t.name].avg}/10</span>}
-              </div>
-              <button className={`assess-btn ${done ? "assess-btn--redo" : "assess-btn--primary"}`} onClick={() => open(t)}>
-                {done ? "Re-assess" : "Assess"}
+            {MY_CLIENTS.length > 5 && (
+              <button className="rt-view-more" onClick={()=>setShowAllRisk(v=>!v)}>
+                {showAllRisk?"Show Less":`View All ${MY_CLIENTS.length} Clients`}
               </button>
-            </div>
-          );
-        })}
-      </div>
+            )}
+          </div>
+        )}
 
-      {modal && (
-        <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal-box modal-box--wide" onClick={e => e.stopPropagation()}>
-            <button className="modal-x" onClick={() => setModal(null)}>✕</button>
-            <div className="modal-assess-header">
-              <img src={modal.avatar} alt={modal.name} className="modal-assess-avatar" />
-              <div>
-                <h3 className="modal-title">Assessing {modal.name}</h3>
-                <p className="modal-sub">Rate each criterion from 0–10</p>
-              </div>
+        {/* ═══ REVIEWS ═══ */}
+        {activeTab==="reviews" && (
+          <div className="rt-tab-content">
+            <div className="rt-section-intro">
+              <h2 className="rt-section-title">My Reviews</h2>
+              <p className="rt-section-sub">Public client reviews submitted about your training sessions and coaching style.</p>
             </div>
-            <div className="sliders-wrap">
-              {ASSESSMENT_CRITERIA.map(c => (
-                <div key={c} className="slider-row">
-                  <label className="slider-label">{c}</label>
-                  <input
-                    type="range" min="0" max="10" step="1"
-                    value={scores[modal.name]?.[c] || 0}
-                    onChange={e => setScores(prev => ({ ...prev, [modal.name]: { ...prev[modal.name], [c]: e.target.value } }))}
-                    className="slider-input"
-                  />
-                  <span className="slider-val">{scores[modal.name]?.[c] || 0}</span>
+
+            {/* Overview score */}
+            <div className="rt-reviews-overview">
+              <div className="rt-reviews-score-block">
+                <span className="rt-reviews-big-num">{avgReviewRating}</span>
+                <div>
+                  <div className="rt-reviews-big-stars">
+                    {[1,2,3,4,5].map(i=>(
+                      <span key={i} style={{color:i<=Math.round(parseFloat(avgReviewRating))?"#F59E0B":"rgba(255,255,255,0.12)",fontSize:24}}>★</span>
+                    ))}
+                  </div>
+                  <span className="rt-reviews-count">{MY_REVIEWS.length} verified reviews</span>
                 </div>
-              ))}
-            </div>
-            <textarea placeholder="Add remarks (optional)..." className="modal-remarks" value={remarks} onChange={e => setRemarks(e.target.value)} />
-            <button className="modal-confirm-btn" onClick={submit}>Submit Assessment</button>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-// ─── SECTION: CLIENT SWITCH REQUESTS ─────────────────────────────────────────
-
-function ClientSwitchSection() {
-  const [inbound, setInbound] = useState([
-    { id: 1, from: "Jessica Hale", client: ALL_NON_RISK_CLIENTS[1], fromAvatar: "https://randomuser.me/api/portraits/women/12.jpg" },
-    { id: 2, from: "Leon Cruz",    client: ALL_NON_RISK_CLIENTS[2], fromAvatar: "https://randomuser.me/api/portraits/men/15.jpg" },
-  ]);
-
-  const respond = (id, accept) => {
-    setInbound(prev => prev.filter(r => r.id !== id));
-    alert(accept ? "Client accepted and added to your roster." : "Request declined.");
-  };
-
-  if (inbound.length === 0) return null;
-
-  return (
-    <section className="section" id="switches">
-      <div className="section-header">
-        <span className="section-tag">Incoming</span>
-        <h2 className="section-title">Switch Requests</h2>
-        <p className="section-sub">Other trainers want to hand over clients to you</p>
-      </div>
-      <div className="switch-req-list">
-        {inbound.map(r => (
-          <div key={r.id} className="switch-req-card glass-card">
-            <div className="switch-req-from">
-              <img src={r.fromAvatar} alt={r.from} className="switch-req-avatar" />
-              <div>
-                <span className="switch-req-label">From</span>
-                <span className="switch-req-name">{r.from}</span>
               </div>
-              <div className="switch-req-arrow">→</div>
-              <img src={r.client.avatar} alt={r.client.name} className="switch-req-avatar" />
-              <div>
-                <span className="switch-req-label">Client</span>
-                <span className="switch-req-name">{r.client.name}</span>
+              {/* Rating distribution */}
+              <div className="rt-reviews-dist">
+                {[5,4,3,2,1].map(star=>{
+                  const cnt = MY_REVIEWS.filter(r=>r.rating===star).length;
+                  const pct = MY_REVIEWS.length ? Math.round((cnt/MY_REVIEWS.length)*100) : 0;
+                  return (
+                    <div key={star} className="rt-dist-row">
+                      <span className="rt-dist-star">{star} ★</span>
+                      <div className="rt-dist-bar-wrap">
+                        <div className="rt-dist-bar" style={{width:`${pct}%`}}/>
+                      </div>
+                      <span className="rt-dist-count">{cnt}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <p className="switch-req-goal">Goal: {r.client.goal} — Progress: {r.client.progress}%</p>
-            <div className="switch-req-actions">
-              <button className="risk-btn risk-btn--primary" onClick={() => respond(r.id, true)}>Accept</button>
-              <button className="risk-btn risk-btn--danger" onClick={() => respond(r.id, false)}>Decline</button>
+
+            <div className="rt-reviews-grid">
+              {MY_REVIEWS.map(r=><ReviewCard key={r.id} r={r}/>)}
             </div>
           </div>
-        ))}
-      </div>
-    </section>
-  );
-}
+        )}
 
-// ─── SECTION: REVIEWS ─────────────────────────────────────────────────────────
-
-function ReviewsSection() {
-  const avgRating = (PUBLIC_REVIEWS.reduce((s, r) => s + r.rating, 0) / PUBLIC_REVIEWS.length).toFixed(1);
-  return (
-    <section className="section" id="reviews">
-      <div className="section-header">
-        <span className="section-tag">Feedback</span>
-        <h2 className="section-title">Public Reviews</h2>
       </div>
-      <div className="reviews-overview">
-        <div className="reviews-big-score">{avgRating}</div>
-        <div>
-          <StarRating value={Number(avgRating)} size="lg" />
-          <p className="reviews-count">{PUBLIC_REVIEWS.length} verified reviews</p>
+
+      {/* ── MARQUEE ── */}
+      <div className="rt-marquee">
+        <div className="rt-marquee-inner">
+          {["FORGE YOUR LEGACY","✦","ELITE COACHING","✦","REAL RESULTS","✦","B.A.D PEOPLE FITNESS","✦","FORGE YOUR LEGACY","✦","ELITE COACHING","✦","REAL RESULTS","✦","B.A.D PEOPLE FITNESS","✦"].map((t,i)=>(
+            <span key={i} className={t==="✦"?"rt-mq-sep":"rt-mq-text"}>{t}</span>
+          ))}
         </div>
       </div>
-      <div className="reviews-grid">
-        {PUBLIC_REVIEWS.map((r, i) => (
-          <div key={i} className="review-card glass-card">
-            <div className="review-top">
-              <img src={r.avatar} alt={r.user} className="review-avatar" />
-              <div>
-                <strong className="review-user">{r.user}</strong>
-                <span className="review-date">{r.date}</span>
-              </div>
-              <StarRating value={r.rating} size="sm" />
-            </div>
-            <p className="review-comment">"{r.comment}"</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// ─── SECTION: COACHING SESSION ────────────────────────────────────────────────
-
-function CoachingSection() {
-  const [form, setForm] = useState({ client: "", date: "", time: "", message: "" });
-  const send = () => {
-    alert(`Message sent to ${form.client || "client"}!`);
-    setForm({ client: "", date: "", time: "", message: "" });
-  };
-  return (
-    <section className="section" id="coaching">
-      <div className="section-header">
-        <span className="section-tag">Messaging</span>
-        <h2 className="section-title">Coaching Session</h2>
-        <p className="section-sub">Schedule and message clients directly</p>
-      </div>
-      <div className="coaching-card glass-card">
-        <div className="coaching-grid">
-          <div className="coaching-left">
-            <img
-              src="https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=600&q=80"
-              alt="coaching"
-              className="coaching-img"
-            />
-            <img
-              src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600&q=80"
-              alt="training"
-              className="coaching-img coaching-img--offset"
-            />
-          </div>
-          <div className="coaching-right">
-            <input className="form-input" placeholder="Client Name" value={form.client} onChange={e => setForm(p => ({ ...p, client: e.target.value }))} />
-            <div className="form-row">
-              <input className="form-input" type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
-              <input className="form-input" type="time" value={form.time} onChange={e => setForm(p => ({ ...p, time: e.target.value }))} />
-            </div>
-            <textarea className="form-input form-textarea" placeholder="Session message or notes..." rows={5} value={form.message} onChange={e => setForm(p => ({ ...p, message: e.target.value }))} />
-            <button className="cta-btn" onClick={send}>Send Message →</button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
-
-export default function TrainerPage() {
-  const [bgColor, setBgColor] = useState("#e63946");
-  const [showColors, setShowColors] = useState(false);
-  const [isEditCert, setIsEditCert] = useState(false);
-  const [cert, setCert] = useState(TRAINER.certification);
-  const [scrolled, setScrolled] = useState(false);
-
-  const COLORS = ["#e63946", "#ff6b00", "#2563eb", "#16a34a", "#7c3aed"];
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Compute aggregate stats from all clients
-  const avgProgress = Math.round(ALL_CLIENTS.reduce((s, c) => s + c.progress, 0) / ALL_CLIENTS.length);
-  const latestInternal = MONTHLY_INTERNAL[MONTHLY_INTERNAL.length - 1];
-  const latestClient   = MONTHLY_CLIENT_RATINGS[MONTHLY_CLIENT_RATINGS.length - 1];
-
-  return (
-    <div className="trainer-page" style={{ "--accent": bgColor }}>
-      {/* NAV */}
-      <nav className={`tp-nav ${scrolled ? "tp-nav--scrolled" : ""}`}>
-        <Link to="/" className="nav-back">← Back</Link>
-        <span className="nav-name">{TRAINER.name}</span>
-        <div className="color-picker">
-          <button className="color-trigger" onClick={() => setShowColors(!showColors)}>
-            <span className="color-dot-current" style={{ background: bgColor }} />
-          </button>
-          {showColors && (
-            <div className="color-dropdown">
-              {COLORS.map(c => (
-                <button key={c} className="color-swatch" style={{ background: c }}
-                  onClick={() => { setBgColor(c); setShowColors(false); }} />
-              ))}
-            </div>
-          )}
-        </div>
-      </nav>
-
-      {/* HERO */}
-      <header className="hero">
-        <div className="hero-bg">
-          <img src={TRAINER.coverImg} alt="gym" className="hero-bg-img" />
-          <div className="hero-overlay" />
-          <div className="hero-overlay-accent" style={{ background: `${bgColor}22` }} />
-        </div>
-        <div className="hero-body">
-          <div className="hero-left">
-            <div className="hero-avatar-wrap">
-              <img src={TRAINER.avatarImg} alt={TRAINER.name} className="hero-avatar" />
-              <div className="hero-avatar-ring" />
-            </div>
-            <div className="hero-tag-row">
-              <span className="hero-tag">{TRAINER.rank}</span>
-              <span className="hero-tag hero-tag--outline">{TRAINER.yearsExperience} yrs exp.</span>
-            </div>
-            <h1 className="hero-name">{TRAINER.name}</h1>
-            <p className="hero-bio">{TRAINER.bio}</p>
-            <div className="hero-meta">
-              <div className="hero-meta-item">
-                <span className="hero-meta-label">Specialisation</span>
-                <span className="hero-meta-val">{TRAINER.specialisation}</span>
-              </div>
-              <div className="hero-meta-item">
-                <span className="hero-meta-label">Certification</span>
-                {isEditCert ? (
-                  <input
-                    className="cert-input"
-                    value={cert}
-                    autoFocus
-                    onChange={e => setCert(e.target.value)}
-                    onBlur={() => setIsEditCert(false)}
-                    onKeyDown={e => e.key === "Enter" && setIsEditCert(false)}
-                  />
-                ) : (
-                  <span className="hero-meta-val" onClick={() => setIsEditCert(true)} style={{ cursor: "pointer", textDecoration: "underline dotted" }}>{cert}</span>
-                )}
-              </div>
-            </div>
-            <div className="hero-rating-row">
-              <StarRating value={TRAINER.rating} size="lg" />
-              <span className="hero-rating-val">{TRAINER.rating}</span>
-            </div>
-          </div>
-
-          {/* KPI strip */}
-          <div className="hero-kpis">
-            <div className="kpi">
-              <RadialProgress value={latestInternal.score} size={110} stroke={9} color={bgColor} />
-              <span className="kpi-label">Internal Score</span>
-            </div>
-            <div className="kpi">
-              <RadialProgress value={Math.round(latestClient.rating * 20)} size={110} stroke={9} color="#f59e0b" label="%" />
-              <span className="kpi-label">Client Rating</span>
-            </div>
-            <div className="kpi">
-              <RadialProgress value={avgProgress} size={110} stroke={9} color="#22c55e" />
-              <span className="kpi-label">Avg Client Progress</span>
-            </div>
-            <div className="kpi">
-              <RadialProgress value={latestInternal.attendance} size={110} stroke={9} color="#818cf8" />
-              <span className="kpi-label">Attendance</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Floating images */}
-        <div className="hero-float-imgs">
-          <img src="https://images.unsplash.com/photo-1581009137042-c552e485697a?w=400&q=80" alt="" className="float-img float-img--1" />
-          <img src="https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?w=400&q=80" alt="" className="float-img float-img--2" />
-        </div>
-      </header>
-
-      {/* QUICK STATS BANNER */}
-      <div className="stats-banner">
-        {[
-          { label: "Sessions This Month", val: latestInternal.sessions },
-          { label: "Clients Assigned",    val: latestInternal.clients },
-          { label: "Avg Assessment",      val: "8.3/10" },
-          { label: "At-Risk Clients",     val: ALL_CLIENTS.length },
-          { label: "Total Reviews",       val: PUBLIC_REVIEWS.length },
-        ].map((s, i) => (
-          <div key={i} className="stats-banner-item">
-            <span className="stats-banner-val">{s.val}</span>
-            <span className="stats-banner-label">{s.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* PAGE BODY */}
-      <main className="tp-main">
-        <RatingHistorySection />
-        <ClientsAtRiskSection />
-        <ClientSwitchSection />
-        <TrainerAssessmentSection />
-        <CoachingSection />
-        <ReviewsSection />
-      </main>
-
-      {/* FOOTER STRIP */}
-      <footer className="tp-footer">
-        <p>FitPro Studio · Trainer Dashboard · {TRAINER.name}</p>
-      </footer>
     </div>
   );
 }

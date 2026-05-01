@@ -1202,7 +1202,7 @@ export default function Account() {
                   </svg>
                 </div>
                 <div>
-                  <div className="ai-name">NutriAI</div>
+                  <div className="ai-name">Nutri-AI</div>
                   <div className="ai-online"><span className="ai-dot"/>Online · Elite Coach Mode</div>
                 </div>
               </div>

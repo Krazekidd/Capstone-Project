@@ -232,31 +232,48 @@ export default function Login() {
   };
 
   /* ── Sign In handler with role-based redirect ── */
-  const handleSignIn = async (e) => {
-    e.preventDefault();
-    setLoginError("");
-    setIsLoggingIn(true);
+const handleSignIn = async (e) => {
+  e.preventDefault();
+  setLoginError("");
+  setIsLoggingIn(true);
 
-    try {
-      const response = await authAPI.login(email, pw);
-      
-      // Store remembered email if checkbox exists
-      const rememberCheckbox = document.querySelector('input[name="remember"]');
-      if (rememberCheckbox && rememberCheckbox.checked) {
-        localStorage.setItem('remembered_email', email);
-      } else {
-        localStorage.removeItem('remembered_email');
-      }
-      
-      // Redirect based on role
-      const redirectPath = getRedirectPath(response.role);
-      navigate(redirectPath);
-    } catch (err) {
-      setLoginError(err.detail || "Login failed. Please check your credentials.");
-    } finally {
-      setIsLoggingIn(false);
+  try {
+    const response = await authAPI.login(email, pw);
+    
+    // Store remembered email if checkbox exists
+    const rememberCheckbox = document.querySelector('input[name="remember"]');
+    if (rememberCheckbox && rememberCheckbox.checked) {
+      localStorage.setItem('remembered_email', email);
+    } else {
+      localStorage.removeItem('remembered_email');
     }
-  };
+    
+    // Redirect based on role
+    const redirectPath = getRedirectPath(response.role);
+    navigate(redirectPath);
+  } catch (err) {
+    let errorMessage = "Login failed. Please check your credentials.";
+    
+    if (err.response?.data?.detail) {
+      if (Array.isArray(err.response.data.detail)) {
+        // Handle FastAPI validation errors (array of validation errors)
+        errorMessage = err.response.data.detail
+          .map(error => error.msg || error.message || 'Validation error')
+          .join(', ');
+      } else {
+        errorMessage = err.response.data.detail;
+      }
+    } else if (err.detail) {
+      errorMessage = err.detail;
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    
+    setLoginError(errorMessage);
+  } finally {
+    setIsLoggingIn(false);
+  }
+};
 
   /* ── Create-account helpers ── */
   const fc = e => {
@@ -312,10 +329,11 @@ export default function Login() {
     setIsCreating(true);
     try {
       const userData = {
-        name: `${form.firstName} ${form.lastName}`,
+        first_name: form.firstName,
+        last_name: form.lastName,
         email: form.email,
         password: form.password,
-        phone_number: form.phone || "",
+        phone: form.phone || "",
         height: form.height ? parseFloat(form.height) : null,
         weight: form.weight ? parseFloat(form.weight) : null,
         birthday: form.dob || null,
@@ -329,7 +347,24 @@ export default function Login() {
       const redirectPath = getRedirectPath(response.role);
       navigate(redirectPath);
     } catch (err) {
-      setErrs({ general: err.detail || "Registration failed. Please try again." });
+      let errorMessage = "Registration failed. Please try again.";
+      
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          // Handle FastAPI validation errors (array of validation errors)
+          errorMessage = err.response.data.detail
+            .map(error => error.msg || error.message || 'Validation error')
+            .join(', ');
+        } else {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.detail) {
+        errorMessage = err.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setErrs({ general: errorMessage });
     } finally {
       setIsCreating(false);
     }

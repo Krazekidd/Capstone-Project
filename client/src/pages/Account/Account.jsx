@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
+import { sendNutriMessage } from "../../api/nutriAI";
+import ReactMarkdown from "react-markdown";
 import "./Account.css";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -572,16 +574,54 @@ export default function Account() {
     if(!aiIn.trim()) return;
     const um={role:"user",text:aiIn,image:aiImg};
     setAiMsgs(m=>[...m,um]); setAiIn(""); setAiImg(null); setAiLoading(true);
+    
+    // Calculate age from birthday
+    const calculateAge = (birthday) => {
+      if (!birthday) return 28; // Default age if no birthday set
+      const today = new Date();
+      const birthDate = new Date(birthday);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    };
+
+    // Create user context for the AI (matching UserMetrics schema)
+    const userContext = {
+      weight_kg: parseFloat(meas.weight) || 84,
+      height_cm: parseFloat(meas.height) || 178,
+      age: calculateAge(birthday),
+      goal: goalType.toLowerCase() === "bulk up" ? "gain" : goalType.toLowerCase() === "slim down" ? "loss" : "maintain",
+      activity_level: "moderate" // Default activity level
+    };
+    
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:600,
-          system:`You are NutriAI, a GymPro elite fitness & nutrition coach. User: ${username}, ${gender}, BMI ${currentBMI} (${bmiCategory(currentBMI)}), goal: ${goalType}, health: ${health.join(", ")||"None"}. Give concise motivating advice under 100 words. Use fitness emojis.`,
-          messages:[{role:"user",content:aiIn}] }),
-      });
-      const data=await res.json();
-      setAiMsgs(m=>[...m,{role:"ai",text:data.content?.map(c=>c.text||"").join("")||"Try again!"}]);
-    } catch { setAiMsgs(m=>[...m,{role:"ai",text:"⚠️ Connection issue. Please try again."}]); }
+      let aiResponse = "";
+      await sendNutriMessage(aiIn, (chunk) => {
+        aiResponse += chunk;
+        // Update the last AI message with the accumulated response
+        setAiMsgs(prev => {
+          const newMsgs = [...prev];
+          const lastMsg = newMsgs[newMsgs.length - 1];
+          if (lastMsg && lastMsg.role === "ai") {
+            lastMsg.text = aiResponse;
+          } else {
+            newMsgs.push({ role: "ai", text: aiResponse });
+          }
+          return newMsgs;
+        });
+      }, userContext);
+      
+      // If no response was received, show error message
+      if (!aiResponse) {
+        setAiMsgs(m=>[...m,{role:"ai",text:"⚠️ No response received. Please try again."}]);
+      }
+    } catch (error) {
+      console.error("Nutri AI Error:", error);
+      setAiMsgs(m=>[...m,{role:"ai",text:"⚠️ Connection issue. Please try again."}]);
+    }
     setAiLoading(false);
   };
 
@@ -1214,7 +1254,7 @@ export default function Account() {
                   {m.role==="ai"&&<div className="ai-b-avatar">🤖</div>}
                   <div className="ai-b-text">
                     {m.image&&<img src={m.image} alt="" className="ai-b-img"/>}
-                    {m.text}
+                    <ReactMarkdown>{m.text}</ReactMarkdown>
                   </div>
                 </div>
               ))}

@@ -7,7 +7,7 @@ import logging
 from datetime import date, datetime
 from typing import Optional, List
 from database import get_user_db
-from models import User, Client, Trainer, Admin, ProgressTracking
+from models import User
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 

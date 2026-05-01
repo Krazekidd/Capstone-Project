@@ -1,15 +1,15 @@
 import api from './axiosConfig';
 
 export const updateProfile = async (profileData) => {
-  const response = await api.put('/api/user/profile', profileData);
+  const response = await api.patch('/api/v1/users/me', profileData);
   return response.data;
 };
 
 export const uploadProfileImage = async (imageFile) => {
   const formData = new FormData();
-  formData.append('image', imageFile);
+  formData.append('avatar_url', imageFile);
   
-  const response = await api.post('/api/user/profile-image', formData, {
+  const response = await api.post('/api/v1/users/me/avatar', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -17,12 +17,7 @@ export const uploadProfileImage = async (imageFile) => {
   return response.data;
 };
 
-export const updateBodyMetrics = async (metricsData) => {
-  const response = await api.put('/api/user/metrics', metricsData);
-  return response.data;
-};
-
-export const getBodyMetrics = async () => {
-  const response = await api.get('/api/user/metrics');
+export const updatePassword = async (passwordData) => {
+  const response = await api.patch('/api/v1/users/me/password', passwordData);
   return response.data;
 };

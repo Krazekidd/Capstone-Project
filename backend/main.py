@@ -2,14 +2,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from router import router
-from conversations_router import router as conversations_router
+from routers.auth.auth import router as auth_router
+from routers.bookings.booking import router as booking_router
+from routers.shop.shop import router as shop_router
+from routers.memberships.membership import router as membership_router
+from routers.ai.ai import router as ai_router
 from database import init_db
 from database import engine, Base
-from auth_router import router as auth_router
-from account_router import router as account_router
-from excursions_router import router as excursions_router
-from consultation_router import router as consultation_router
-from shop_router import router as shop_router
 import logging
 
 # Configure logging to print to terminal
@@ -65,12 +64,11 @@ app.add_middleware(
 
 # Include all routes
 app.include_router(router, tags=["api"])
-app.include_router(conversations_router)
 app.include_router(auth_router)
-app.include_router(account_router)
-app.include_router(excursions_router)
-app.include_router(consultation_router)
+app.include_router(booking_router)
 app.include_router(shop_router)
+app.include_router(membership_router)
+app.include_router(ai_router)
 
 
 @app.on_event("startup")

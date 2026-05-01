@@ -1,17 +1,17 @@
 import api from './axiosConfig';
 
-export const sendNutriMessage = async (message, onChunk) => {
+export const sendNutriMessage = async (message, onChunk, userContext = null) => {
   try {
-    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/chatbot/stream`, {
+    const response = await fetch(`${api.defaults.baseURL}/chatbot/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
       },
       body: JSON.stringify({ 
         message,
         session_id: 'nutri-ai-session',
-        user_context: null
+        user_context: userContext
       }),
     });
 

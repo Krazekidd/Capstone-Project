@@ -71,10 +71,17 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const closeTimer = useRef(null);
+  const userDropdownRef = useRef(null);
 
-  // Mock cart item count – replace with actual cart context later
-  const [cartItemCount, setCartItemCount] = useState(2);
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target)) setUserDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 60);
@@ -90,6 +97,9 @@ export default function Navbar() {
   const handleMouseLeave = () => {
     closeTimer.current = setTimeout(() => setActiveMenu(null), 180);
   };
+
+  // Mock cart item count – replace with actual cart context later
+  const [cartItemCount, setCartItemCount] = useState(2);
 
   // Get user display data
   const displayName = user?.firstName || user?.name || (user?.email ? user.email.split('@')[0] : 'Jordan');
@@ -156,13 +166,30 @@ export default function Navbar() {
         {/* Right side: conditional user pill OR sign-in buttons, plus cart icon */}
         <div className="nav-right-group">
           {isLoggedIn ? (
-            <Link to="/account" className="nav-user-pill">
-              <div className="nav-user-avatar">{userAvatar}</div>
-              <div className="nav-user-info">
-                <span className="nav-user-name">{displayName}</span>
-                <span className="nav-user-badge">{membershipType}</span>
-              </div>
-            </Link>
+            <div className="nav-user-pill-wrapper" ref={userDropdownRef}>
+              <button className="nav-user-pill" onClick={() => setUserDropdownOpen(v => !v)}>
+                <div className="nav-user-avatar">{userAvatar}</div>
+                <div className="nav-user-info">
+                  <span className="nav-user-name">{displayName}</span>
+                  <span className="nav-user-badge">{membershipType}</span>
+                </div>
+                <ChevDown />
+              </button>
+              {userDropdownOpen && (
+                <div className="nav-user-dropdown">
+                  <div className="nav-user-dropdown-inner">
+                    <Link to="/account" className="nav-user-dropdown-item" onClick={() => setUserDropdownOpen(false)}>
+                      <span className="ndi-label">My Account</span>
+                      <span className="ndi-desc">Profile & settings</span>
+                    </Link>
+                    <button onClick={() => { logout(); setUserDropdownOpen(false); }} className="nav-user-dropdown-item nav-user-dropdown-logout">
+                      <span className="ndi-label">Log Out</span>
+                      <span className="ndi-desc">Sign out of GymPro</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="nav-actions">
               <NavLink to="/login" className="nav-btn-ghost">Sign In</NavLink>
@@ -214,7 +241,10 @@ export default function Navbar() {
               </>
             )}
             {isLoggedIn && (
-              <Link to="/account" className="nav-btn-solid">My Account</Link>
+              <>
+                <Link to="/account" className="nav-btn-solid">My Account</Link>
+                <button onClick={logout} className="nav-btn-ghost">Log Out</button>
+              </>
             )}
             <Link to="/shop" className="nav-btn-solid nav-cart-mobile">
               Cart {cartItemCount > 0 && `(${cartItemCount})`}

@@ -92,7 +92,7 @@ export default function Navbar() {
   };
 
   // Get user display data
-  const displayName = user?.firstName || user?.name || (user?.email ? user.email.split('@')[0] : 'User');
+  const displayName = user?.firstName || user?.name || (user?.email ? user.email.split('@')[0] : 'Jordan');
   const userAvatar = user?.avatar || displayName.charAt(0).toUpperCase();
   const membershipType = user?.membership || "Member";
 

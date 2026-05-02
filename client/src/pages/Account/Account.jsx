@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 import { sendNutriMessage } from "../../api/nutriAI";
@@ -347,7 +348,8 @@ function CalendarModal({ attendedDays, onClose, onToggle, tz }) {
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function Account() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, logout } = useAuth();
+  const navigate = useNavigate();
   
   // Extract actual user data from nested structure
   const userData = user?.user || user;
@@ -487,6 +489,14 @@ export default function Account() {
     setToast({show:true,msg});
     setTimeout(()=>setToast({show:false,msg:""}),2600);
   },[]);
+
+  // Logout handler
+  const handleLogout = () => {
+    logout();
+    setShowSettings(false);
+    showToast("Logged out — see you next time! 👋");
+    navigate("/login");
+  };
 
   // Update measurements and gender when auth context changes
   useEffect(() => {
@@ -774,7 +784,7 @@ export default function Account() {
               <input type="date" className="settings-inp" value={birthday} onChange={e=>setBirthday(e.target.value)}/>
             </div>
             <div className="settings-sect">
-              <button className="btn-danger full" onClick={()=>{setShowSettings(false);showToast("Logged out — see you next time! 👋");}}>
+              <button className="btn-danger full" onClick={handleLogout}>
                 🚪 Log Out
               </button>
             </div>

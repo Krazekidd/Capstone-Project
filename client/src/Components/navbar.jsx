@@ -1,7 +1,7 @@
 // src/components/Navbar.jsx
 import { useState, useEffect, useRef } from "react";
 import { NavLink, Link } from "react-router-dom";
-// import { useAuth } from "../Context/AuthContext";
+import { useAuth } from "../Context/AuthContext";
 
 /* ─────────────────────────────────────────
    ICONS
@@ -66,9 +66,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Navbar() {
-  // const { user } = useAuth();
-  // Mock user data for demo purposes since auth context is disabled
-  const user = null; // Set to null to show login buttons, or mock user data to show user pill
+  const { user, logout } = useAuth();
   const isLoggedIn = !!user;
   const [scrolled, setScrolled] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);

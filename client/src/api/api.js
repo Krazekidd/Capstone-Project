@@ -11,13 +11,10 @@ export const authAPI = {
       });
       
       const data = response.data;
-      // Store tokens and user info
+      // Store token and user info
       localStorage.setItem('access_token', data.access_token);
-      if (data.refresh_token) {
-        localStorage.setItem('refresh_token', data.refresh_token);
-      }
-      localStorage.setItem('user_role', data.user?.id ? 'client' : 'client'); // Fallback role
-      localStorage.setItem('user_id', data.user?.id || data.user_id);
+      localStorage.setItem('user_role', data.role);
+      localStorage.setItem('user_id', data.user_id);
       return data;
     } catch (error) {
       throw error.response?.data || { detail: 'Login failed' };
@@ -26,15 +23,11 @@ export const authAPI = {
   
   register: async (userData) => {
     try {
-      const response = await axiosInstance.post('/auth/register', userData);
+      const response = await axiosInstance.post('/auth/register/client', userData);
       const data = response.data;
-      // Store tokens and user info
       localStorage.setItem('access_token', data.access_token);
-      if (data.refresh_token) {
-        localStorage.setItem('refresh_token', data.refresh_token);
-      }
-      localStorage.setItem('user_role', data.user?.id ? 'client' : 'client'); // Fallback role
-      localStorage.setItem('user_id', data.user?.id || data.user_id);
+      localStorage.setItem('user_role', data.role);
+      localStorage.setItem('user_id', data.user_id);
       return data;
     } catch (error) {
       throw error.response?.data || { detail: 'Registration failed' };
@@ -43,7 +36,6 @@ export const authAPI = {
   
   logout: () => {
     localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_role');
     localStorage.removeItem('user_id');
     localStorage.removeItem('remembered_email');
@@ -59,41 +51,36 @@ export const authAPI = {
   },
 
 
-  // Google auth not supported by backend yet
-  // googleLogin: async (credential) => {
-  //   try {
-  //     const response = await axiosInstance.post('/auth/google', { credential });
-  //     const data = response.data;
-  //     
-  //     if (data.access_token) {
-  //       localStorage.setItem('access_token', data.access_token);
-  //       if (data.refresh_token) {
-  //         localStorage.setItem('refresh_token', data.refresh_token);
-  //       }
-  //       localStorage.setItem('user_role', data.user?.id ? 'client' : 'client');
-  //       localStorage.setItem('user_id', data.user?.id || data.user_id);
-  //     }
-  //     
-  //     return data;
-  //   } catch (error) {
-  //     console.error('Google login API error:', error);
-  //     throw error.response?.data || { detail: 'Google login failed' };
-  //   }
-  // },
+  googleLogin: async (credential) => {
+    try {
+      const response = await axiosInstance.post('/auth/google', { credential });
+      const data = response.data;
+      
+      if (data.access_token) {
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('user_role', data.role);
+        localStorage.setItem('user_id', data.user_id);
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Google login API error:', error);
+      throw error.response?.data || { detail: 'Google login failed' };
+    }
+  },
 
-  // Google callback not supported by backend yet
-  // googleCallback: async (code) => {
-  //   try {
-  //       const response = await axiosInstance.get(`/auth/google/callback?code=${code}`);
-  //       const data = response.data;
-  //       localStorage.setItem('access_token', data.access_token);
-  //       localStorage.setItem('user_role', data.role);
-  //       localStorage.setItem('user_id', data.user_id);
-  //       return data;
-  //   } catch (error) {
-  //       throw error.response?.data || { detail: 'Google callback failed' };
-  //   }
-  // },
+  googleCallback: async (code) => {
+      try {
+          const response = await axiosInstance.get(`/auth/google/callback?code=${code}`);
+          const data = response.data;
+          localStorage.setItem('access_token', data.access_token);
+          localStorage.setItem('user_role', data.role);
+          localStorage.setItem('user_id', data.user_id);
+          return data;
+      } catch (error) {
+          throw error.response?.data || { detail: 'Google callback failed' };
+      }
+  },
   forgotPassword: async (email) => {
     try {
       const response = await axiosInstance.post('/auth/forgot-password', { email });
@@ -109,31 +96,6 @@ export const authAPI = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to reset password' };
-    }
-  },
-
-  refreshToken: async () => {
-    try {
-      const refresh_token = localStorage.getItem('refresh_token');
-      if (!refresh_token) {
-        throw new Error('No refresh token available');
-      }
-
-      const response = await axiosInstance.post('/auth/refresh', { refresh_token });
-      const data = response.data;
-      
-      // Store new tokens
-      localStorage.setItem('access_token', data.access_token);
-      if (data.refresh_token) {
-        localStorage.setItem('refresh_token', data.refresh_token);
-      }
-      localStorage.setItem('user_id', data.user?.id || data.user_id);
-      
-      return data;
-    } catch (error) {
-      // Refresh failed, clear tokens and redirect to login
-      authAPI.logout();
-      throw error.response?.data || { detail: 'Token refresh failed' };
     }
   },
 

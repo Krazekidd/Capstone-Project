@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 import { sendNutriMessage } from "../../api/nutriAI";
+import { useNavigate } from "react-router-dom";
+import { authAPI, accountAPI, progressAPI } from "../../api/api";
 import ReactMarkdown from "react-markdown";
 import "./Account.css";
 
@@ -346,12 +348,23 @@ function CalendarModal({ attendedDays, onClose, onToggle, tz }) {
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function Account() {
+  const navigate = useNavigate();
+  const handleLogout = () => {
+    authAPI.logout();
+    navigate('/');
+  };
+
   // Theme
   const [theme, setTheme] = useState(THEMES[0]);
   const [darkMode, setDarkMode] = useState(true);
   const [tz, setTz] = useState("AST (UTC-4)");
   const [showSettings, setShowSettings] = useState(false);
 
+    // User state from API
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
   // Profile
   const [profilePic, setProfilePic] = useState(null);
   const [username] = useState("Marcus Powell");
@@ -657,6 +670,27 @@ export default function Account() {
     return d>=sw&&d<=t;
   }).length;
 
+  // Load all user data on mount
+  useEffect(() => {
+    loadAllUserData();
+  }, []);
+
+  const loadAllUserData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get account info
+      const accountData = await accountAPI.getMyAccount();
+      setUserData(accountData);
+      setGender(accountData.gender?.toLowerCase() === "female" ? "female" : "male");
+    } catch (err) {
+      console.error("Error loading user data:", err);
+      setError("Failed to load user data");
+      showToast("Failed to load user data");
+    } finally {
+      setLoading(false);}
+  };
+
   return (
     <>
       {showConfetti && <Confetti/>}
@@ -728,7 +762,7 @@ export default function Account() {
               <input type="date" className="settings-inp" value={birthday} onChange={e=>setBirthday(e.target.value)}/>
             </div>
             <div className="settings-sect">
-              <button className="btn-danger full" onClick={()=>{setShowSettings(false);showToast("Logged out — see you next time! 👋");}}>
+              <button className="btn-danger full" onClick={handleLogout}>
                 🚪 Log Out
               </button>
             </div>
@@ -782,8 +816,8 @@ export default function Account() {
             }}/>
           </div>
           <div className="hero-info">
-            <div className="hero-name">{username}</div>
-            <div className="hero-handle">@marcus.lifts · Member since {memberSince} · {tz}</div>
+            <div className="hero-name">{userData?.name}</div>
+            <div className="hero-handle">{userData?.email?.split('@')[0] || 'member'} Member since {userData?.created_at ? new Date(userData.created_at).getFullYear(): ""} </div>
             <div className="hero-tags">
               <span className="htag" style={{color:level.color,borderColor:level.color,background:`${level.color}18`}}>⚡ {level.label}</span>
               <span className="htag orange">🔥 {streak}-Wk Streak</span>

@@ -7,7 +7,7 @@ import logging
 from datetime import date, datetime
 from typing import Optional, List
 from database import get_user_db
-from models import User
+from models import User, Client, Trainer, Admin, ProgressTracking
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -555,7 +555,6 @@ async def update_my_goals(
         db.add(new_goals)
     
     await db.commit()
-    
     return APIResponse(success=True, message="Goals updated successfully")
 
 # ============================================================

@@ -1,9 +1,9 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
-from config import DATABASE_URL
+from config.config import DATABASE_URL
 import logging
-from config import settings
+from config.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,29 @@ async def get_db():
             raise
 
 
+
+
+# ---------------------------------------------------------------------------
+# Startup helper – creates tables if they don't already exist
+# ---------------------------------------------------------------------------
+async def init_db():
+    # Import models so SQLAlchemy registers them against Base.metadata
+    from models import (
+        SavedConversation, ConversationMessage
+    )  # noqa: F401
+
+    async with engine.begin() as conn:
+        # Create citext extension if it doesn't exist
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext"))
+            logger.info("✅ citext extension enabled")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not create citext extension: {e}")
+        
+        await conn.run_sync(Base.metadata.create_all)
+        logger.info("✅ Database tables initialised")
+
+
 # User database
 # Create async engine
 userEngine = create_async_engine(
@@ -70,27 +93,3 @@ async def get_user_db():
             raise
         finally:
             await session.close()
-
-
-# ---------------------------------------------------------------------------
-# Startup helper – creates tables if they don't already exist
-# ---------------------------------------------------------------------------
-async def init_db():
-    # Import models so SQLAlchemy registers them against Base.metadata
-    from models import (
-        User, AuthToken, MembershipPlan, UserMembership, Coach,
-        CoachAvailabilitySchedule, CoachAvailabilityOverride,
-        ConsultationType, Booking, Product, Order, OrderItem,
-        ProductReview, Wishlist, SavedConversation, ConversationMessage
-    )  # noqa: F401
-
-    async with engine.begin() as conn:
-        # Create citext extension if it doesn't exist
-        try:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS citext"))
-            logger.info("✅ citext extension enabled")
-        except Exception as e:
-            logger.warning(f"⚠️  Could not create citext extension: {e}")
-        
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Database tables initialised")

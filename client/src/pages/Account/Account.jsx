@@ -4,6 +4,7 @@ import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 import { sendNutriMessage } from "../../api/nutriAI";
 import ReactMarkdown from "react-markdown";
+import { useAuth } from "../../Context/AuthContext";
 import "./Account.css";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -346,17 +347,23 @@ function CalendarModal({ attendedDays, onClose, onToggle, tz }) {
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function Account() {
+  const { user, isLoggedIn } = useAuth();
+  
+  // Extract actual user data from nested structure
+  const userData = user?.user || user;
+  
   // Theme
   const [theme, setTheme] = useState(THEMES[0]);
   const [darkMode, setDarkMode] = useState(true);
   const [tz, setTz] = useState("AST (UTC-4)");
   const [showSettings, setShowSettings] = useState(false);
 
-  // Profile
-  const [profilePic, setProfilePic] = useState(null);
-  const [username] = useState("Marcus Powell");
-  const [birthday, setBirthday] = useState("");
-  const [memberSince] = useState(2022);
+  // Profile - derived from auth context (no local state needed)
+  const profilePic = null;
+  const username = userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : userData?.email || "User";
+  const birthday = userData?.birthday || "";
+  const memberSince = new Date(userData?.created_at || Date.now()).getFullYear();
+  
   const picRef = useRef(null);
   const photoRef = useRef(null);
   const aiImgRef = useRef(null);
@@ -370,9 +377,25 @@ export default function Account() {
   const [bdayPopup, setBdayPopup] = useState(isBday);
   const [showConfetti, setShowConfetti] = useState(isBday);
 
-  // Measurements
-  const [meas, setMeas] = useState({ weight:"", height:"", bf:"", chest:"", waist:"", shoulders:"", armL:"", armR:"", neck:"", hips:"", thighL:"", thighR:"", calfL:"", calfR:"", glutes:"" });
-  const [gender, setGender] = useState("male");
+  // Measurements - derived from auth context
+  const [meas, setMeas] = useState({ 
+    weight: userData?.weight || "", 
+    height: userData?.height || "", 
+    bf: "", 
+    chest: "", 
+    waist: "", 
+    shoulders: "", 
+    armL: "", 
+    armR: "", 
+    neck: "", 
+    hips: "", 
+    thighL: "", 
+    thighR: "", 
+    calfL: "", 
+    calfR: "", 
+    glutes: "" 
+  });
+  const [gender, setGender] = useState(userData?.gender === "female" ? "female" : "male");
   const [measHist, setMeasHist] = useState([
     { date:"Mar 2026", data:{ weight:"84kg", waist:"84cm", chest:"96cm", bmi:"26.6" } },
     { date:"Feb 2026", data:{ weight:"85kg", waist:"85cm", chest:"97cm", bmi:"26.9" } },
@@ -447,9 +470,13 @@ export default function Account() {
   const [delRevId, setDelRevId] = useState(null);
   const [revTab, setRevTab] = useState("posted");
 
-  // Chat
+  // Chat - derived from auth context
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMsgs, setChatMsgs] = useState([{ role:"agent", text:"Hey Marcus! 👋 I'm your GymPro support agent. How can I help today?", time:"Just now" }]);
+  const [chatMsgs, setChatMsgs] = useState([{ 
+    role:"agent", 
+    text:`Hey ${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : userData?.email || "User"}! 👋 I'm your GymPro support agent. How can I help today?`, 
+    time:"Just now" 
+  }]);
   const [chatIn, setChatIn] = useState("");
   const chatRef = useRef(null);
   const replyIdx = useRef(0);
@@ -460,6 +487,25 @@ export default function Account() {
     setToast({show:true,msg});
     setTimeout(()=>setToast({show:false,msg:""}),2600);
   },[]);
+
+  // Update measurements and gender when auth context changes
+  useEffect(() => {
+    if (userData) {
+      setGender(userData?.gender === "female" ? "female" : "male");
+      setMeas(prev => ({
+        ...prev,
+        weight: userData?.weight || prev.weight,
+        height: userData?.height || prev.height,
+      }));
+      
+      // Update chat greeting when user changes
+      setChatMsgs([{ 
+        role:"agent", 
+        text:`Hey ${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : userData?.email || "User"}! 👋 I'm your GymPro support agent. How can I help today?`, 
+        time:"Just now" 
+      }]);
+    }
+  }, [userData]);
 
   // Time
   const [now, setNow] = useState(new Date());

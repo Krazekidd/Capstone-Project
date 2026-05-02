@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authAPI } from "../../api/api";
+import { useAuth } from "../../Context/AuthContext";
 import "./Login.css";
 
 /* ─────────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ const getRedirectPath = (role) => {
 ════════════════════════════════════════════════════════════ */
 export default function Login() {
   const navigate = useNavigate();
+  const { login, user, isLoggedIn } = useAuth();
 
   /* Sign-in state */
   const [email, setEmail]   = useState("");
@@ -123,6 +125,14 @@ export default function Login() {
 
   // Check if already logged in and redirect based on role
   useEffect(() => {
+    // Check auth context first
+    if (isLoggedIn && user) {
+      const redirectPath = getRedirectPath(user.role);
+      navigate(redirectPath);
+      return;
+    }
+    
+    // Fallback to token check
     const token = authAPI.getToken();
     const role = authAPI.getUserRole();
     
@@ -135,7 +145,7 @@ export default function Login() {
     if (rememberedEmail) {
       setEmail(rememberedEmail);
     }
-  }, [navigate]);
+  }, [navigate, isLoggedIn, user]);
 
   /* ─────────────────────────────────
      GOOGLE IDENTITY SERVICES — INIT
@@ -177,6 +187,10 @@ export default function Login() {
 
     try {
       const result = await authAPI.googleLogin(response.credential);
+      
+      // Store user data in auth context
+      login(result);
+      
       const redirectPath = getRedirectPath(result.role);
       navigate(redirectPath);
     } catch (err) {
@@ -207,6 +221,10 @@ export default function Login() {
             if (tokenResponse?.access_token) {
               try {
                 const result = await authAPI.googleLoginWithToken(tokenResponse.access_token);
+                
+                // Store user data in auth context
+                login(result);
+                
                 const redirectPath = getRedirectPath(result.role);
                 navigate(redirectPath);
               } catch (err) {
@@ -232,48 +250,51 @@ export default function Login() {
   };
 
   /* ── Sign In handler with role-based redirect ── */
-const handleSignIn = async (e) => {
-  e.preventDefault();
-  setLoginError("");
-  setIsLoggingIn(true);
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setLoginError("");
+    setIsLoggingIn(true);
 
-  try {
-    const response = await authAPI.login(email, pw);
-    
-    // Store remembered email if checkbox exists
-    const rememberCheckbox = document.querySelector('input[name="remember"]');
-    if (rememberCheckbox && rememberCheckbox.checked) {
-      localStorage.setItem('remembered_email', email);
-    } else {
-      localStorage.removeItem('remembered_email');
-    }
-    
-    // Redirect based on role
-    const redirectPath = getRedirectPath(response.role);
-    navigate(redirectPath);
-  } catch (err) {
-    let errorMessage = "Login failed. Please check your credentials.";
-    
-    if (err.response?.data?.detail) {
-      if (Array.isArray(err.response.data.detail)) {
-        // Handle FastAPI validation errors (array of validation errors)
-        errorMessage = err.response.data.detail
-          .map(error => error.msg || error.message || 'Validation error')
-          .join(', ');
+    try {
+      const response = await authAPI.login(email, pw);
+      
+      // Store user data in auth context
+      login(response);
+      
+      // Store remembered email if checkbox exists
+      const rememberCheckbox = document.querySelector('input[name="remember"]');
+      if (rememberCheckbox && rememberCheckbox.checked) {
+        localStorage.setItem('remembered_email', email);
       } else {
-        errorMessage = err.response.data.detail;
+        localStorage.removeItem('remembered_email');
       }
-    } else if (err.detail) {
-      errorMessage = err.detail;
-    } else if (err.message) {
-      errorMessage = err.message;
+      
+      // Redirect based on role
+      const redirectPath = getRedirectPath(response.role);
+      navigate(redirectPath);
+    } catch (err) {
+      let errorMessage = "Login failed. Please check your credentials.";
+      
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          // Handle FastAPI validation errors (array of validation errors)
+          errorMessage = err.response.data.detail
+            .map(error => error.msg || error.message || 'Validation error')
+            .join(', ');
+        } else {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.detail) {
+        errorMessage = err.detail;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setLoginError(errorMessage);
+    } finally {
+      setIsLoggingIn(false);
     }
-    
-    setLoginError(errorMessage);
-  } finally {
-    setIsLoggingIn(false);
-  }
-};
+  };
 
   /* ── Create-account helpers ── */
   const fc = e => {
@@ -341,6 +362,10 @@ const handleSignIn = async (e) => {
       };
       
       const response = await authAPI.register(userData);
+      
+      // Store user data in auth context
+      login(response);
+      
       closeCreate();
       
       // Redirect based on role (new clients always get client role)
@@ -442,7 +467,7 @@ const handleSignIn = async (e) => {
             </div>
           </div>
 
-          <div className="left-footer">© 2026 GymPRO Global Inc.</div>
+          <div className="left-footer"> 2026 GymPRO Global Inc.</div>
         </div>
 
         {/* ══ RIGHT PANEL ══ */}
@@ -480,6 +505,7 @@ const handleSignIn = async (e) => {
                   value={email} 
                   onChange={e => setEmail(e.target.value)}
                   autoComplete="email"
+                  disabled={isLoggedIn}
                   required
                 />
               </div>
@@ -495,7 +521,7 @@ const handleSignIn = async (e) => {
                     autoComplete="current-password"
                     required
                   />
-                  <button className="eye-btn" onClick={() => setShowPw(s => !s)} type="button" tabIndex={-1}>
+                  <button className="eye-btn" onClick={() => setShowPw(s => !s)} type="button" tabIndex={-1} disabled={isLoggedIn}>
                     <EyeIcon open={showPw}/>
                   </button>
                 </div>
@@ -506,12 +532,12 @@ const handleSignIn = async (e) => {
 
               <div className="options-row">
                 <label className="remember-checkbox">
-                  <input type="checkbox" name="remember" /> Remember Me
+                  <input type="checkbox" name="remember" disabled={isLoggedIn} /> Remember Me
                 </label>
               </div>
 
-              <button className="btn-main" type="submit" disabled={isLoggingIn}>
-                {isLoggingIn ? "Signing in..." : "Sign In"}
+              <button className="btn-main" type="submit" disabled={isLoggingIn || isLoggedIn}>
+                {isLoggedIn ? "Already Signed In" : isLoggingIn ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
@@ -522,10 +548,12 @@ const handleSignIn = async (e) => {
               className={`btn-google${gLoading ? " btn-google--loading" : ""}${!gReady ? " btn-google--disabled" : ""}`}
               type="button"
               onClick={handleGoogleClick}
-              disabled={!gReady || gLoading}
-              title={!gReady ? "Loading Google Sign-In…" : "Sign in with Google"}
+              disabled={!gReady || gLoading || isLoggedIn}
+              title={!gReady ? "Loading Google Sign-In…" : isLoggedIn ? "Already signed in" : "Sign in with Google"}
             >
-              {gLoading
+              {isLoggedIn
+                ? <><span>Already Signed In</span></>
+                : gLoading
                 ? <><SpinnerIcon/><span>Opening Google…</span></>
                 : <><GoogleIcon/><span>Continue with Google</span></>
               }

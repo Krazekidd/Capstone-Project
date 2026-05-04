@@ -194,17 +194,13 @@ function GameBadge({ badge, earned }) {
             <stop offset="100%" stopColor="transparent"/>
           </linearGradient>
         </defs>
-        {/* Shield */}
         <path d="M50 6 L90 20 L90 58 Q90 90 50 104 Q10 90 10 58 L10 20 Z"
           fill={`url(#g${badge.id})`} stroke={earned ? badge.shine : "#333345"} strokeWidth="1.5"
           filter={earned ? `url(#gl${badge.id})` : "none"} opacity={earned ? 1 : 0.35}/>
-        {/* Highlight */}
         <path d="M50 10 L86 23 L86 55 Q86 86 50 99 Q14 86 14 55 L14 23 Z"
           fill={`url(#sh${badge.id})`}/>
-        {/* Inner ring */}
         <path d="M50 18 L80 29 L80 56 Q80 79 50 90 Q20 79 20 56 L20 29 Z"
           fill="none" stroke={earned ? `${badge.shine}50` : "transparent"} strokeWidth="1"/>
-        {/* Star */}
         {earned
           ? <path d="M50 30 L54 42 L67 42 L57 50 L61 62 L50 54 L39 62 L43 50 L33 42 L46 42 Z"
               fill={badge.shine} filter={`url(#gl${badge.id})`} opacity="0.95"/>
@@ -214,10 +210,8 @@ function GameBadge({ badge, earned }) {
               <circle cx="50" cy="53" r="2" fill="#555"/>
             </g>
         }
-        {/* Ribbon base */}
         <rect x="34" y="97" width="32" height="10" rx="2" fill={earned ? badge.color : "#222"} opacity={earned ? 0.95 : 0.3}/>
         <path d="M36 107 L50 120 L64 107" fill={earned ? badge.color : "#222"} opacity={earned ? 0.9 : 0.3}/>
-        {/* Shine line */}
         {earned && <path d="M20 20 Q28 16 36 22" fill="none" stroke={`${badge.shine}70`} strokeWidth="2" strokeLinecap="round"/>}
       </svg>
       <div className="gbadge-name">{badge.name}</div>
@@ -360,25 +354,212 @@ export default function Account() {
   const [tz, setTz] = useState("AST (UTC-4)");
   const [showSettings, setShowSettings] = useState(false);
 
-    // User state from API
+  // ─── BACKEND DATA STATE ─────────────────────────────────────────────────────
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
+  // API-loaded states
+  const [apiGoals, setApiGoals] = useState(null);
+  const [apiHealthConditions, setApiHealthConditions] = useState([]);
+  const [apiWaterIntake, setApiWaterIntake] = useState({ cups_consumed: 0 });
+  const [apiStrengthRecords, setApiStrengthRecords] = useState([]);
+  const [apiTrainerRatings, setApiTrainerRatings] = useState({ ratings: [], average_rating: 0, total_ratings: 0 });
+  const [apiBadges, setApiBadges] = useState([]);
+  const [apiTrainingSchedule, setApiTrainingSchedule] = useState([]);
+  const [apiProgressHistory, setApiProgressHistory] = useState([]);
+  const [apiLatestProgress, setApiLatestProgress] = useState(null);
+
+// ─── LOAD ALL USER DATA ─────────────────────────────────────────────────────
+  const loadAllUserData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get account info
+      const accountData = await accountAPI.getMyAccount();
+      setUserData(accountData);
+      setGender(accountData.gender?.toLowerCase() === "female" ? "female" : "male");
+      
+      // Only load client-specific data if user is a client
+      if (accountData.role === "client" || !accountData.role) {
+        try {
+          // Load goals from API
+          const goalsData = await progressAPI.getGoals();
+          if (goalsData) {
+            setApiGoals(goalsData);
+            setGoalType(goalsData.goal_type || "Bulk Up");
+            setGoalIn({
+              weight: goalsData.target_weight_kg || 80,
+              chest: goalsData.target_chest_cm || 100,
+              waist: goalsData.target_waist_cm || 80,
+              hips: goalsData.target_hips_cm || 98,
+              thigh: goalsData.target_thigh_cm || 58,
+              arm: goalsData.target_arm_cm || 38
+            });
+            setGoals({
+              weight: goalsData.target_weight_kg || 80,
+              chest: goalsData.target_chest_cm || 100,
+              waist: goalsData.target_waist_cm || 80,
+              hips: goalsData.target_hips_cm || 98,
+              thigh: goalsData.target_thigh_cm || 58,
+              arm: goalsData.target_arm_cm || 38
+            });
+          }
+          
+          // Load health conditions
+          const healthData = await progressAPI.getHealthConditions();
+          if (healthData && Array.isArray(healthData)) {
+            const conditionNames = healthData.map(h => h.condition_name);
+            setApiHealthConditions(healthData);
+            setHealth(conditionNames);
+          }
+          
+          // Load water intake - FIX: Add debug logging and ensure proper value extraction
+          try {
+            const waterData = await progressAPI.getWaterIntake();
+            console.log('Water intake API response:', waterData); // Debug log
+            
+            if (waterData && typeof waterData.cups_consumed === 'number') {
+              console.log('Setting water cups to:', waterData.cups_consumed); // Debug log
+              setApiWaterIntake(waterData);
+              setWaterCups(waterData.cups_consumed);
+            } else if (waterData && waterData.cups_consumed !== undefined) {
+              // Handle string case
+              const cups = parseInt(waterData.cups_consumed, 10);
+              console.log('Parsed water cups to:', cups); // Debug log
+              setApiWaterIntake(waterData);
+              setWaterCups(isNaN(cups) ? 0 : cups);
+            } else {
+              console.log('No water intake data found, keeping default 0');
+            }
+          } catch (waterErr) {
+            console.error('Failed to load water intake:', waterErr);
+          }
+          
+          // Load strength records
+          const strengthData = await progressAPI.getStrengthRecords();
+          if (strengthData && Array.isArray(strengthData)) {
+            setApiStrengthRecords(strengthData);
+            // Map exercises to lifts state
+            const liftsMap = { bench: 100, squat: 130, dead: 160, ohp: 65, pullups: 18 };
+            strengthData.forEach(record => {
+              const name = record.exercise_name?.toLowerCase();
+              if (name?.includes("bench")) liftsMap.bench = record.current_weight_kg || 100;
+              else if (name?.includes("squat")) liftsMap.squat = record.current_weight_kg || 130;
+              else if (name?.includes("deadlift") || name?.includes("dead")) liftsMap.dead = record.current_weight_kg || 160;
+              else if (name?.includes("overhead") || name?.includes("ohp") || name?.includes("press")) liftsMap.ohp = record.current_weight_kg || 65;
+              else if (name?.includes("pull") || name?.includes("up")) liftsMap.pullups = record.current_reps || 18;
+            });
+            setLifts(liftsMap);
+          }
+          
+          // Load trainer ratings
+          const ratingsData = await progressAPI.getTrainerRatings();
+          if (ratingsData) {
+            setApiTrainerRatings(ratingsData);
+            // Map API ratings to reviews format
+            const apiReviews = (ratingsData.ratings || []).map((r, i) => ({
+              id: Date.now() + i,
+              trainer: r.trainer_name,
+              rating: r.rating,
+              comment: `Rated ${r.trainer_name} ${r.rating} stars`,
+              privacy: "public",
+              draft: false,
+              date: new Date().toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+            }));
+            if (apiReviews.length > 0) {
+              setReviews(prev => {
+                const existingNames = prev.filter(r => !r.draft).map(r => r.trainer);
+                const newOnes = apiReviews.filter(r => !existingNames.includes(r.trainer));
+                return [...prev, ...newOnes];
+              });
+            }
+          }
+          
+          // Load badges
+          const badgesData = await progressAPI.getBadges();
+          if (badgesData && Array.isArray(badgesData)) {
+            setApiBadges(badgesData);
+          }
+          
+          // Load training schedule
+          const scheduleData = await progressAPI.getTrainingSchedule();
+          if (scheduleData && Array.isArray(scheduleData)) {
+            setApiTrainingSchedule(scheduleData);
+          }
+          
+          // Load progress history
+          const progressHistory = await progressAPI.getProgressHistory(12);
+          if (progressHistory && Array.isArray(progressHistory)) {
+            setApiProgressHistory(progressHistory);
+          }
+          
+          // Load latest progress
+          const latestProgress = await progressAPI.getLatestProgress();
+          if (latestProgress) {
+            setApiLatestProgress(latestProgress);
+            // Update measurements from latest progress
+            if (latestProgress.weight) setMeas(prev => ({ ...prev, weight: String(latestProgress.weight) }));
+            if (latestProgress.height) setMeas(prev => ({ ...prev, height: String(latestProgress.height) }));
+            if (latestProgress.measurements) {
+              const m = latestProgress.measurements;
+              setMeas(prev => ({
+                ...prev,
+                bf: m.body_fat ? String(m.body_fat) : prev.bf,
+                chest: m.chest ? String(m.chest) : prev.chest,
+                waist: m.waist ? String(m.waist) : prev.waist,
+                shoulders: m.shoulders ? String(m.shoulders) : prev.shoulders,
+                armL: m.arm_left ? String(m.arm_left) : prev.armL,
+                armR: m.arm_right ? String(m.arm_right) : prev.armR,
+                neck: m.neck ? String(m.neck) : prev.neck,
+                hips: m.hips ? String(m.hips) : prev.hips,
+                thighL: m.thigh_left ? String(m.thigh_left) : prev.thighL,
+                thighR: m.thigh_right ? String(m.thigh_right) : prev.thighR,
+                calfL: m.calf_left ? String(m.calf_left) : prev.calfL,
+                calfR: m.calf_right ? String(m.calf_right) : prev.calfR,
+                glutes: m.glutes ? String(m.glutes) : prev.glutes,
+              }));
+            }
+          }
+        } catch (clientErr) {
+          console.warn("Some client data failed to load:", clientErr);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading user data:", err);
+      setError("Failed to load user data");
+      showToast("Failed to load user data");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Load all data on mount
+  useEffect(() => {
+    loadAllUserData();
+  }, []);
+
   // Profile
   const [profilePic, setProfilePic] = useState(null);
-  const [username] = useState("Marcus Powell");
   const [birthday, setBirthday] = useState("");
   const [memberSince] = useState(2022);
   const picRef = useRef(null);
   const photoRef = useRef(null);
   const aiImgRef = useRef(null);
 
+  // Set birthday from user data
+  useEffect(() => {
+    if (userData?.birthday) {
+      setBirthday(userData.birthday);
+    }
+  }, [userData]);
+
   // Birthday
   const isBday = (() => {
-    if (!birthday) return false;
-    const t=new Date(), b=new Date(birthday);
-    return t.getMonth()===b.getMonth()&&t.getDate()===b.getDate();
+    if (!birthday || !userData?.birthday) return false;
+    const t = new Date();
+    const b = new Date(userData.birthday);
+    return t.getMonth() === b.getMonth() && t.getDate() === b.getDate();
   })();
   const [bdayPopup, setBdayPopup] = useState(isBday);
   const [showConfetti, setShowConfetti] = useState(isBday);
@@ -386,13 +567,31 @@ export default function Account() {
   // Measurements
   const [meas, setMeas] = useState({ weight:"", height:"", bf:"", chest:"", waist:"", shoulders:"", armL:"", armR:"", neck:"", hips:"", thighL:"", thighR:"", calfL:"", calfR:"", glutes:"" });
   const [gender, setGender] = useState("male");
-  const [measHist, setMeasHist] = useState([
-    { date:"Mar 2026", data:{ weight:"84kg", waist:"84cm", chest:"96cm", bmi:"26.6" } },
-    { date:"Feb 2026", data:{ weight:"85kg", waist:"85cm", chest:"97cm", bmi:"26.9" } },
-  ]);
+  const [measHist, setMeasHist] = useState([]);
   const [progressPhotos, setProgressPhotos] = useState([]);
   const [showMeasHist, setShowMeasHist] = useState(false);
   const [restoreMeas, setRestoreMeas] = useState(null);
+
+  // Build measurement history from API data
+  useEffect(() => {
+    if (apiProgressHistory && apiProgressHistory.length > 0) {
+      const hist = apiProgressHistory.map(entry => {
+        const d = new Date(entry.recorded_at);
+        const month = MONTHS[d.getMonth()];
+        const year = d.getFullYear();
+        return {
+          date: `${month} ${year}`,
+          data: {
+            weight: entry.weight ? `${entry.weight}kg` : "—",
+            waist: entry.measurements?.waist ? `${entry.measurements.waist}cm` : "—",
+            chest: entry.measurements?.chest ? `${entry.measurements.chest}cm` : "—",
+            bmi: entry.weight && entry.height ? calcBMI(entry.weight, entry.height).toString() : "—"
+          }
+        };
+      });
+      setMeasHist(hist);
+    }
+  }, [apiProgressHistory]);
 
   const currentBMI = calcBMI(parseFloat(meas.weight)||84, parseFloat(meas.height)||178);
 
@@ -451,10 +650,7 @@ export default function Account() {
   const [activeTarget, setActiveTarget] = useState(null);
 
   // Reviews
-  const [reviews, setReviews] = useState([
-    { id:1, trainer:"Coach Alex Reid",  rating:5, comment:"Absolutely incredible. Best trainer at the gym.", privacy:"public",  draft:false, date:"Feb 2026" },
-    { id:2, trainer:"Coach Marcus Lee", rating:4, comment:"Great session structure, really organised.",       privacy:"private", draft:false, date:"Jan 2026" },
-  ]);
+  const [reviews, setReviews] = useState([]);
   const [rDraft, setRDraft] = useState({ trainer:TRAINER_LIST[0], rating:0, comment:"", privacy:"public" });
   const [editRev, setEditRev] = useState(null);
   const [delRevId, setDelRevId] = useState(null);
@@ -462,7 +658,7 @@ export default function Account() {
 
   // Chat
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMsgs, setChatMsgs] = useState([{ role:"agent", text:"Hey Marcus! 👋 I'm your GymPro support agent. How can I help today?", time:"Just now" }]);
+  const [chatMsgs, setChatMsgs] = useState([{ role:"agent", text:"Hey! 👋 I'm your GymPro support agent. How can I help today?", time:"Just now" }]);
   const [chatIn, setChatIn] = useState("");
   const chatRef = useRef(null);
   const replyIdx = useRef(0);
@@ -503,7 +699,7 @@ export default function Account() {
 
   // Level
   const level = (() => {
-    const yrs = now.getFullYear()-memberSince;
+    const yrs = now.getFullYear()-(userData?.created_at ? new Date(userData.created_at).getFullYear() : memberSince);
     const sc = yrs*10+(currentBMI>=18.5&&currentBMI<25?20:currentBMI>=25&&currentBMI<30?10:5);
     if(sc>=50) return { label:"Elite",        color:"#ffd700", tier:5 };
     if(sc>=35) return { label:"Advanced",     color:"#ff6b1a", tier:4 };
@@ -554,24 +750,129 @@ export default function Account() {
     </div>
   );
 
-  // Handlers
+  // ─── HANDLERS (with API integration) ────────────────────────────────────────
+
+  // Save Goals to API
   const saveGoals = () => setConfirmGoal(true);
-  const doSaveGoals = () => {
-    const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
-    setGoalHist(h=>[{date:d,data:{...goalIn,type:goalType}},...h]);
-    setGoals({...goalIn}); setConfirmGoal(false); showToast("✓ Goals updated!");
+  const doSaveGoals = async () => {
+    try {
+      const goalsPayload = {
+        goal_type: goalType,
+        target_weight_kg: goalIn.weight,
+        target_chest_cm: goalIn.chest,
+        target_waist_cm: goalIn.waist,
+        target_hips_cm: goalIn.hips,
+        target_thigh_cm: goalIn.thigh,
+        target_arm_cm: goalIn.arm
+      };
+      await progressAPI.updateGoals(goalsPayload);
+      
+      const d = now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+      setGoalHist(h=>[{date:d,data:{...goalIn,type:goalType}},...h]);
+      setGoals({...goalIn});
+      setConfirmGoal(false);
+      showToast("✓ Goals updated!");
+    } catch (err) {
+      console.error("Failed to save goals:", err);
+      showToast("⚠️ Failed to save goals. Please try again.");
+    }
   };
 
-  const saveMeas = () => {
-    const mo=MONTHS[now.getMonth()], yr=now.getFullYear();
-    setMeasHist(h=>[{ date:`${mo} ${yr}`, data:{ weight:(meas.weight||"84")+"kg", waist:(meas.waist||"84")+"cm", chest:(meas.chest||"96")+"cm", bmi:currentBMI.toString() } },...h]);
-    showToast(`✓ ${mo} ${yr} measurements saved!`);
+  // Save Measurements to API
+  const saveMeas = async () => {
+    try {
+      const measurementPayload = {
+        weight: parseFloat(meas.weight) || undefined,
+        height: parseFloat(meas.height) || undefined,
+        body_fat: parseFloat(meas.bf) || undefined,
+        chest: parseFloat(meas.chest) || undefined,
+        waist: parseFloat(meas.waist) || undefined,
+        shoulders: parseFloat(meas.shoulders) || undefined,
+        arm_left: parseFloat(meas.armL) || undefined,
+        arm_right: parseFloat(meas.armR) || undefined,
+        neck: parseFloat(meas.neck) || undefined,
+        hips: parseFloat(meas.hips) || undefined,
+        thigh_left: parseFloat(meas.thighL) || undefined,
+        thigh_right: parseFloat(meas.thighR) || undefined,
+        calf_left: parseFloat(meas.calfL) || undefined,
+        calf_right: parseFloat(meas.calfR) || undefined,
+        glutes: parseFloat(meas.glutes) || undefined,
+      };
+      
+      // Remove undefined values
+      Object.keys(measurementPayload).forEach(key => {
+        if (measurementPayload[key] === undefined) delete measurementPayload[key];
+      });
+      
+      await progressAPI.saveProgress(measurementPayload);
+      
+      const mo=MONTHS[now.getMonth()], yr=now.getFullYear();
+      setMeasHist(h=>[{ date:`${mo} ${yr}`, data:{ weight:(meas.weight||"84")+"kg", waist:(meas.waist||"84")+"cm", chest:(meas.chest||"96")+"cm", bmi:currentBMI.toString() } },...h]);
+      showToast(`✓ ${mo} ${yr} measurements saved!`);
+    } catch (err) {
+      console.error("Failed to save measurements:", err);
+      showToast("⚠️ Failed to save measurements. Please try again.");
+    }
   };
 
-  const saveHealth = () => {
-    const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
-    setHealthHist(h=>[{date:d,data:{ conditions:health.join(", ")||"None", notes:healthNotes||"—" }},...h]);
-    showToast("✓ Health profile saved!");
+  // Save Health Conditions to API
+  const saveHealth = async () => {
+    try {
+      await progressAPI.updateHealthConditions(health);
+      
+      const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+      setHealthHist(h=>[{date:d,data:{ conditions:health.join(", ")||"None", notes:healthNotes||"—" }},...h]);
+      showToast("✓ Health profile saved!");
+    } catch (err) {
+      console.error("Failed to save health conditions:", err);
+      showToast("⚠️ Failed to save health conditions. Please try again.");
+    }
+  };
+
+  // Save Strength Records to API
+  const saveStrength = async () => {
+    try {
+      const exercises = [
+        { name: "Bench Press", weight: lifts.bench },
+        { name: "Squat", weight: lifts.squat },
+        { name: "Deadlift", weight: lifts.dead },
+        { name: "Overhead Press", weight: lifts.ohp },
+        { name: "Pull-ups", reps: lifts.pullups },
+      ];
+      
+      for (const ex of exercises) {
+        const payload = {};
+        if (ex.weight) payload.current_weight_kg = ex.weight;
+        if (ex.reps) payload.current_reps = ex.reps;
+        await progressAPI.updateStrengthRecord(ex.name, payload);
+      }
+      
+      const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+      setLiftHist(h=>[{date:d,data:{bench:lifts.bench+"kg",squat:lifts.squat+"kg",dead:lifts.dead+"kg"}},...h]);
+      showToast("✓ Strength saved!");
+    } catch (err) {
+      console.error("Failed to save strength records:", err);
+      showToast("⚠️ Failed to save strength records. Please try again.");
+    }
+  };
+
+  // Log Water Intake to API
+  const logWaterToAPI = async (cups) => {
+    try {
+      await progressAPI.logWaterIntake(cups);
+    } catch (err) {
+      console.error("Failed to log water intake:", err);
+    }
+  };
+
+  // Rate Trainer via API
+  const rateTrainer = async (trainerName, rating) => {
+    try {
+      await progressAPI.rateTrainer(trainerName, rating);
+    } catch (err) {
+      console.error("Failed to rate trainer:", err);
+      showToast("⚠️ Failed to save rating. Please try again.");
+    }
   };
 
   const toggleDay = (key, morningOnly) => {
@@ -588,9 +889,8 @@ export default function Account() {
     const um={role:"user",text:aiIn,image:aiImg};
     setAiMsgs(m=>[...m,um]); setAiIn(""); setAiImg(null); setAiLoading(true);
     
-    // Calculate age from birthday
     const calculateAge = (birthday) => {
-      if (!birthday) return 28; // Default age if no birthday set
+      if (!birthday) return 28;
       const today = new Date();
       const birthDate = new Date(birthday);
       let age = today.getFullYear() - birthDate.getFullYear();
@@ -601,20 +901,18 @@ export default function Account() {
       return age;
     };
 
-    // Create user context for the AI (matching UserMetrics schema)
     const userContext = {
       weight_kg: parseFloat(meas.weight) || 84,
       height_cm: parseFloat(meas.height) || 178,
       age: calculateAge(birthday),
       goal: goalType.toLowerCase() === "bulk up" ? "gain" : goalType.toLowerCase() === "slim down" ? "loss" : "maintain",
-      activity_level: "moderate" // Default activity level
+      activity_level: "moderate"
     };
     
     try {
       let aiResponse = "";
       await sendNutriMessage(aiIn, (chunk) => {
         aiResponse += chunk;
-        // Update the last AI message with the accumulated response
         setAiMsgs(prev => {
           const newMsgs = [...prev];
           const lastMsg = newMsgs[newMsgs.length - 1];
@@ -627,7 +925,6 @@ export default function Account() {
         });
       }, userContext);
       
-      // If no response was received, show error message
       if (!aiResponse) {
         setAiMsgs(m=>[...m,{role:"ai",text:"⚠️ No response received. Please try again."}]);
       }
@@ -638,12 +935,17 @@ export default function Account() {
     setAiLoading(false);
   };
 
-  const postReview = () => {
+  const postReview = async () => {
     if(!rDraft.rating||!rDraft.comment.trim()){showToast("⚠️ Rating and comment required.");return;}
+    
+    // Save to API
+    await rateTrainer(rDraft.trainer, rDraft.rating);
+    
     setReviews(r=>[...r,{...rDraft,id:Date.now(),draft:false,date:now.toLocaleDateString("en-GB",{month:"short",year:"numeric"})}]);
     setRDraft({trainer:TRAINER_LIST[0],rating:0,comment:"",privacy:"public"});
     showToast("✓ Review posted!");
   };
+  
   const saveDraft = () => {
     if(!rDraft.comment.trim()){showToast("⚠️ Write something first.");return;}
     setReviews(r=>[...r,{...rDraft,id:Date.now(),draft:true,date:"Draft"}]);
@@ -670,26 +972,14 @@ export default function Account() {
     return d>=sw&&d<=t;
   }).length;
 
-  // Load all user data on mount
-  useEffect(() => {
-    loadAllUserData();
-  }, []);
-
-  const loadAllUserData = async () => {
-    try {
-      setLoading(true);
-      
-      // Get account info
-      const accountData = await accountAPI.getMyAccount();
-      setUserData(accountData);
-      setGender(accountData.gender?.toLowerCase() === "female" ? "female" : "male");
-    } catch (err) {
-      console.error("Error loading user data:", err);
-      setError("Failed to load user data");
-      showToast("Failed to load user data");
-    } finally {
-      setLoading(false);}
-  };
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-spinner"/>
+        <p>Loading your account...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -701,7 +991,7 @@ export default function Account() {
         <div className="overlay-dark">
           <div className="bday-popup">
             <div className="bday-emoji-ring">🎂</div>
-            <div className="bday-title">Happy Birthday, {username.split(" ")[0]}!</div>
+            <div className="bday-title">Happy Birthday, {userData?.name?.split(" ")[0]}!</div>
             <p className="bday-msg">The entire GymPro family celebrates you today. Keep smashing those goals — today and every day! 🎉💪</p>
             <button className="btn-accent" onClick={()=>setBdayPopup(false)}>Thank You! 🎊</button>
           </div>
@@ -774,7 +1064,6 @@ export default function Account() {
           HERO BANNER — cinematic parallax style
       ══════════════════════════════════════════════ */}
       <div className="hero-banner">
-        {/* Background gym photos mosaic */}
         <div className="hero-mosaic">
           {GYM_PHOTOS.map((url,i)=>(
             <div key={i} className="mosaic-tile" style={{ animationDelay:`${i*0.8}s` }}>
@@ -782,12 +1071,9 @@ export default function Account() {
             </div>
           ))}
         </div>
-        {/* Overlay gradient */}
         <div className="hero-overlay"/>
-        {/* Noise texture */}
         <div className="hero-noise"/>
 
-        {/* Top bar */}
         <div className="hero-topbar">
           <div className="logo-lockup">
             <div className="logo-orb"/>
@@ -800,9 +1086,8 @@ export default function Account() {
           </button>
         </div>
 
-        {isBday && <div className="bday-ribbon">🎂 Happy Birthday, {username.split(" ")[0]}! Your gym family celebrates you today! 🎉</div>}
+        {isBday && <div className="bday-ribbon">🎂 Happy Birthday, {userData?.name?.split(" ")[0]}! Your gym family celebrates you today! 🎉</div>}
 
-        {/* Profile card floating on hero */}
         <div className="hero-profile">
           <div className="hero-pic-wrap" onClick={()=>picRef.current?.click()}>
             <img src={profilePic||`https://images.unsplash.com/photo-1534367610401-9f5ed68180aa?w=300&q=80`} alt="Profile" className="hero-pic"/>
@@ -816,8 +1101,8 @@ export default function Account() {
             }}/>
           </div>
           <div className="hero-info">
-            <div className="hero-name">{userData?.name}</div>
-            <div className="hero-handle">{userData?.email?.split('@')[0] || 'member'} Member since {userData?.created_at ? new Date(userData.created_at).getFullYear(): ""} </div>
+            <div className="hero-name">{userData?.name || "Member"}</div>
+            <div className="hero-handle">{userData?.email?.split('@')[0] || 'member'} · Member since {userData?.created_at ? new Date(userData.created_at).getFullYear(): "—"}</div>
             <div className="hero-tags">
               <span className="htag" style={{color:level.color,borderColor:level.color,background:`${level.color}18`}}>⚡ {level.label}</span>
               <span className="htag orange">🔥 {streak}-Wk Streak</span>
@@ -872,7 +1157,6 @@ export default function Account() {
         </div>
 
         <div className="card card-goals">
-          {/* Photo accent */}
           <div className="card-photo-accent">
             <img src="https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=600&q=80" alt="gym"/>
             <div className="card-photo-fade"/>
@@ -976,7 +1260,6 @@ export default function Account() {
           )}
 
           <div className="tracker-layout">
-            {/* Avatar panel */}
             <div className="avatar-panel">
               <div className="avatar-panel-title">Body Shape Preview</div>
               <div className="avatar-wrap">
@@ -986,7 +1269,6 @@ export default function Account() {
                     <div className="astat" key={l}><span className="astat-l">{l}</span><span className="astat-v">{meas[l.toLowerCase()]?v+" cm":"—"}</span></div>
                   ))}
                 </div>
-                {/* BMI panel */}
                 <div className="bmi-panel">
                   <div className="bmi-gauge">
                     <svg viewBox="0 0 100 60" width="100" height="60">
@@ -1003,7 +1285,6 @@ export default function Account() {
               </div>
             </div>
 
-            {/* Inputs */}
             <div className="meas-section">
               <div className="meas-header">
                 <span className="meas-title">{currentMo} {now.getFullYear()} Entry</span>
@@ -1102,7 +1383,16 @@ export default function Account() {
               <div className="cups-grid">
                 {Array.from({length:WGOAL},(_,i)=>(
                   <div key={i} className={`cup${i<waterCups?" full":""}`}
-                    onClick={()=>{if(i<waterCups)setWaterCups(i);else if(i===waterCups){setWaterCups(i+1);showToast(`💧 Cup ${i+1} logged!`);}}}>
+                    onClick={()=>{
+                      if(i<waterCups) {
+                        setWaterCups(i);
+                        logWaterToAPI(i);
+                      } else if(i===waterCups) {
+                        setWaterCups(i+1);
+                        logWaterToAPI(i+1);
+                        showToast(`💧 Cup ${i+1} logged!`);
+                      }
+                    }}>
                     <svg viewBox="0 0 32 40" width="32" height="40">
                       <path d="M5 10 L27 10 L24 38 L8 38 Z" fill={i<waterCups?"url(#cupFill)":"rgba(255,255,255,0.06)"} style={{transition:"fill 0.3s"}}/>
                       <path d="M5 10 L27 10 L29 5 L3 5 Z" fill={i<waterCups?"#4a9eff":"rgba(255,255,255,0.1)"}/>
@@ -1183,7 +1473,7 @@ export default function Account() {
           <div style={{display:chartTab==="strength"?"block":"none"}}><div className="chart-wrap"><ChartBar id="sc" data={sData}/></div></div>
         </div>
 
-        {/* ═══════════ WORKOUTS ═══════════ */}
+        {/* ═══════════ WORKOUTS ═══════════ — UNTOUCHED */}
         <div className="card card-workouts">
           <div className="card-photo-accent">
             <img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=800&q=80" alt="workout"/>
@@ -1231,11 +1521,7 @@ export default function Account() {
             ))}
           </div>
           <div className="chart-wrap" style={{marginTop:16}}><ChartBar id="str2" data={sData}/></div>
-          <button className="btn-accent" style={{marginTop:14}} onClick={()=>{
-            const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
-            setLiftHist(h=>[{date:d,data:{bench:lifts.bench+"kg",squat:lifts.squat+"kg",dead:lifts.dead+"kg"}},...h]);
-            showToast("✓ Strength saved!");
-          }}>💾 Save Progress</button>
+          <button className="btn-accent" style={{marginTop:14}} onClick={saveStrength}>💾 Save Progress</button>
         </div>
 
         {/* ═══════════ AI NUTRI COACH ═══════════ */}
@@ -1268,7 +1554,6 @@ export default function Account() {
                     <path d="M33 48 Q40 52 47 48" stroke="#8a4e2e" strokeWidth="2" fill="none" strokeLinecap="round"/>
                     <circle cx="40" cy="60" r="8" fill="#ff6b1a"/>
                     <text x="40" y="64" textAnchor="middle" fill="white" fontSize="9" fontWeight="800">AI</text>
-                    {/* Circuit lines */}
                     <line x1="8" y1="40" x2="22" y2="40" stroke="#ff6b1a" strokeWidth="1" opacity="0.5"/>
                     <line x1="58" y1="40" x2="72" y2="40" stroke="#ff6b1a" strokeWidth="1" opacity="0.5"/>
                     <circle cx="8" cy="40" r="2" fill="#ff6b1a" opacity="0.7"/>
@@ -1329,7 +1614,6 @@ export default function Account() {
         <div className="card card-reviews">
           <div className="ctitle">⭐ Rate Your Trainer</div>
 
-          {/* Trainer photo strip */}
           <div className="trainer-strip">
             {TRAINER_LIST.map(t=>(
               <div key={t} className={`trainer-card${rDraft.trainer===t?" on":""}`} onClick={()=>setRDraft(d=>({...d,trainer:t}))}>
@@ -1430,7 +1714,6 @@ export default function Account() {
                 return <GameBadge key={badge.id} badge={badge} earned={earned}/>;
               })}
             </div>
-            {/* XP bar */}
             <div className="xp-row">
               <div className="xp-info">
                 <span className="xp-val">{BADGE_DEFS.filter(b=>b.type==="sessions"?totalSessions>=b.req:b.type==="streak"?streak>=b.req:b.type==="water"?waterCups>=5:true).reduce((s,b)=>s+b.req,0).toLocaleString()} XP</span>
@@ -1477,6 +1760,5 @@ export default function Account() {
     </>
   );
 
-  // Moved up to avoid hoisting issue
   function handleAskAI() { askAI(); }
 }

@@ -371,7 +371,8 @@ async def save_progress(
     return {
         "message": "Progress saved successfully",
         "id": str(uuid.UUID(bytes=new_measurement.id))
-    }@router.get("/progress/history", response_model=list[ProgressTrackingResponse])
+    }
+@router.get("/progress/history", response_model=list[ProgressTrackingResponse])
 async def get_progress_history(
     limit: int = Query(12, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
@@ -438,34 +439,65 @@ async def get_progress_history(
         logger.error(f"Error getting progress history: {e}", exc_info=True)
         # Return empty list instead of throwing error
         return []
+        
 @router.get("/progress/latest", response_model=ProgressTrackingResponse)
 async def get_latest_progress(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Get the most recent progress entry"""
+    """Get the most recent progress entry from body_measurements"""
+    from models import BodyMeasurement
+    
     user_id = current_user["user_id"]
     user_id_bytes = user_id.bytes
     
     result = await db.execute(
-        select(ProgressTracking)
-        .where(ProgressTracking.user_id == user_id_bytes)
-        .order_by(desc(ProgressTracking.recorded_at))
+        select(BodyMeasurement)
+        .where(BodyMeasurement.user_id == user_id_bytes)
+        .order_by(desc(BodyMeasurement.recorded_at))
         .limit(1)
     )
     entry = result.scalar_one_or_none()
     
     if not entry:
-        raise HTTPException(status_code=404, detail="No progress data found")
+        # Return empty response instead of 404
+        return ProgressTrackingResponse(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            weight=None,
+            height=None,
+            measurements=None,
+            recorded_at=datetime.utcnow(),
+            created_at=datetime.utcnow()
+        )
     
-    measurements_data = json.loads(entry.measurements) if entry.measurements else {}
+    # Build measurements from individual fields
+    measurements_dict = {
+        "weight": entry.weight,
+        "height": entry.height,
+        "body_fat": entry.body_fat,
+        "chest": entry.chest,
+        "waist": entry.waist,
+        "shoulders": entry.shoulders,
+        "arm_left": entry.arm_left,
+        "arm_right": entry.arm_right,
+        "neck": entry.neck,
+        "hips": entry.hips,
+        "thigh_left": entry.thigh_left,
+        "thigh_right": entry.thigh_right,
+        "calf_left": entry.calf_left,
+        "calf_right": entry.calf_right,
+        "glutes": entry.glutes,
+    }
+    # Remove None values
+    measurements_dict = {k: v for k, v in measurements_dict.items() if v is not None}
     
     return ProgressTrackingResponse(
         id=uuid.UUID(bytes=entry.id),
-        user_id=uuid.UUID(bytes=entry.user_id),
+        user_id=user_id,
         weight=entry.weight,
         height=entry.height,
-        measurements=BodyMeasurements(**measurements_data) if measurements_data else None,
+        measurements=BodyMeasurements(**measurements_dict) if measurements_dict else None,
         recorded_at=entry.recorded_at,
         created_at=entry.created_at
     )

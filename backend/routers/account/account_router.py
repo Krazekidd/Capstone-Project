@@ -18,9 +18,9 @@ from schemas import (
     TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse,
     TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,OrderItemResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
-    DashboardStatsResponse
+    DashboardStatsResponse, SeniorProfileResponse, TrainerForAssessment, ClientRisk, TrainerReviewResponse, CoachingMessageRequest
 )
-from auth_router import get_current_user
+from routers.auth.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/account", tags=["account"])

@@ -902,3 +902,54 @@ class DashboardStatsResponse(BaseModel):
     total_trainers: int
     pending_orders: int
     revenue_mtd: float
+
+# ============================================================
+# SENIOR TRAINER SCHEMAS
+# ============================================================
+
+class SeniorProfileResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: EmailStr
+    rank: str
+    age: Optional[int] = None
+    rating: Optional[float] = None
+    specialisation: Optional[str] = None
+    certification: Optional[str] = None
+    years_experience: Optional[int] = None
+    monthly_score: Optional[float] = None
+    sessions_attended: Optional[int] = None
+    sessions_completed: Optional[int] = None
+    clients_assigned: Optional[int] = None
+    attendance_rate: Optional[float] = None
+    last_assessment_date: Optional[date] = None
+    average_assessment_score: Optional[float] = None
+    created_at: datetime
+    updated_at: datetime
+
+class TrainerForAssessment(BaseModel):
+    id: uuid.UUID
+    name: str
+    last_assessed: Optional[date] = None
+    average_rating: Optional[float] = None
+
+class ClientRisk(BaseModel):
+    id: uuid.UUID
+    name: str
+    goal: Optional[str] = None
+    progress_percentage: int
+
+class TrainerReviewResponse(BaseModel):
+    id: int
+    trainer_name: str
+    reviewer_name: str
+    rating: int
+    comment: str
+    created_at: datetime
+
+class CoachingMessageRequest(BaseModel):
+    client_name: str
+    client_email: str
+    message: str
+    session_date: Optional[str] = None
+    session_time: Optional[str] = None

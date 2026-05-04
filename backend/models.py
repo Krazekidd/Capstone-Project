@@ -118,6 +118,14 @@ class Trainer(Base):
     rating = Column(Float, default=0)
     trainer_level = Column(Float, default=1)
     is_senior = Column(Boolean, default=False)
+    
+    birthday = Column(Date, nullable=True)
+    specialisation = Column(String(100), nullable=True)
+    years_experience = Column(Integer, nullable=True)
+    sessions_attended = Column(Integer, default=0)
+    sessions_completed = Column(Integer, default=0)
+    attendance_rate = Column(Float, default=0.0)
+    
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
     

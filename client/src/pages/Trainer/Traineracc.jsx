@@ -1,12 +1,39 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { authAPI } from "../../api/api";
-import "./trainer.css";
-  const handleLogout = () => {
-    authAPI.logout();
-    navigate('/');
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import "./Trainer.css";
+
+// Helper to get auth token from localStorage
+const getAuthToken = () => localStorage.getItem("access_token");
+
+// API request helper with authentication
+const apiRequest = async (endpoint, options = {}) => {
+  const token = getAuthToken();
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
   };
+  const response = await fetch(`http://localhost:8000${endpoint}`, {
+    ...options,
+    headers,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || `Request failed with status ${response.status}`);
+  }
+  return response.json();
+};
+
 export default function TrainerPage() {
+  const navigate = useNavigate();
+
+  // State for trainer profile and UI
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [trainer, setTrainer] = useState(null);
+  const [otherTrainers, setOtherTrainers] = useState([]);
+  const [clientsAtRisk, setClientsAtRisk] = useState([]);
+  const [trainerReviews, setTrainerReviews] = useState([]);
   const [showTrainerModal, setShowTrainerModal] = useState(false);
   const [selectedTrainer, setSelectedTrainer] = useState(null);
   const [trainerAssessments, setTrainerAssessments] = useState({});
@@ -14,123 +41,243 @@ export default function TrainerPage() {
   const [bgColor, setBgColor] = useState("#ff6b00");
   const [showColorMenu, setShowColorMenu] = useState(false);
   const [isEditingCert, setIsEditingCert] = useState(false);
-  const [certification, setCertification] = useState("NASM, ACE, CSCS");
+  const [certification, setCertification] = useState("");
   const [coachingMessage, setCoachingMessage] = useState({
-    client: "",
+    clientName: "",
+    clientEmail: "",
     date: "",
     time: "",
-    message: ""
+    message: "",
   });
 
-  const trainer = {
-    name: "Marcus Steele",
-    age: 34,
-    rank: "Senior Trainer",
-    specialisation: "Strength & Conditioning, Functional Training",
-    certification: certification,
-    yearsExperience: 8,
-    rating: 4.7,
-    otherTrainers: ["Jessica Hale", "Leon Cruz", "Alicia Chen", "Derek Wong", "Sofia Martinez", "James Lee"],
-    clientsAlerts: [
-      { name: "Robert Johnson", progress: 32, goal: "Lose 15kg" },
-      { name: "Emily Davis", progress: 28, goal: "Run 5k" },
-      { name: "Michael Brown", progress: 45, goal: "Gain 5kg muscle" },
-    ],
-    publicReviews: [
-      { user: "Alice", rating: 5, comment: "Amazing trainer!" },
-      { user: "Bob", rating: 4, comment: "Very helpful sessions." },
-    ],
-    assessmentCriteria: [
-      "Knowledge",
-      "Communication",
-      "Professionalism",
-      "Session Planning",
-      "Motivation"
-    ],
-    monthlyScore: 87,
-    sessionsAttended: 92,
-    sessionsCompleted: 18,
-    clientsAssigned: 12,
-    attendanceRate: 94,
-    lastAssessmentDate: "15/02/26",
-    averageAssessmentScore: 8.3,
+  // Assessment criteria (same as before)
+  const assessmentCriteria = [
+    "Knowledge",
+    "Communication",
+    "Professionalism",
+    "Session Planning",
+    "Motivation",
+  ];
+
+  // Helper to map criteria names to backend keys
+  const criteriaToBackend = {
+    Knowledge: "knowledge",
+    Communication: "interact",
+    Professionalism: "punct",
+    "Session Planning": "perf",
+    Motivation: "motiv",
   };
 
-  const standing = trainer.monthlyScore > 80 ? "Good" : trainer.monthlyScore > 60 ? "Decent" : "Bad";
-  const avgProgress = Math.round((trainer.monthlyScore + trainer.sessionsAttended) / 2);
+  // Fetch all data on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // Fetch profile
+        const profile = await apiRequest("/account/senior/profile");
+        setTrainer(profile);
+        setCertification(profile.certification || "");
 
-  const openTrainerModal = (trainerName) => {
-    setSelectedTrainer(trainerName);
+        // Fetch other trainers for assessment
+        const trainersList = await apiRequest("/account/senior/other-trainers");
+        setOtherTrainers(trainersList);
+
+        // Fetch clients at risk
+        const riskClients = await apiRequest("/account/senior/clients-at-risk");
+        setClientsAtRisk(riskClients);
+
+        // Fetch trainer reviews (optional)
+        const reviews = await apiRequest("/account/senior/trainer-reviews");
+        setTrainerReviews(reviews);
+      } catch (err) {
+        console.error("Error loading trainer data:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Handler for editing certification
+  const handleEditToggle = () => {
+    setIsEditingCert(!isEditingCert);
+  };
+  const handleCertChange = (e) => {
+    setCertification(e.target.value);
+  };
+  const handleBlur = async () => {
+    if (isEditingCert) {
+      setIsEditingCert(false);
+      try {
+        await apiRequest("/account/me", {
+          method: "PUT",
+          body: JSON.stringify({ certification }),
+        });
+        setTrainer((prev) => ({ ...prev, certification }));
+      } catch (err) {
+        console.error("Failed to update certification:", err);
+      }
+    }
+  };
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      handleBlur();
+    }
+  };
+
+  // Open assessment modal for a trainer
+  const openTrainerModal = (trainerItem) => {
+    setSelectedTrainer(trainerItem);
     setShowTrainerModal(true);
-    if (!trainerAssessments[trainerName]) {
-      setTrainerAssessments(prev => ({
+    if (!trainerAssessments[trainerItem.name]) {
+      const initialScores = {};
+      assessmentCriteria.forEach((c) => {
+        initialScores[c] = 0;
+      });
+      setTrainerAssessments((prev) => ({
         ...prev,
-        [trainerName]: trainer.assessmentCriteria.reduce(
-          (obj, c) => ({ ...obj, [c]: 0 }),
-          {}
-        )
+        [trainerItem.name]: initialScores,
       }));
     }
   };
 
   const handleAssessmentChange = (criteria, value) => {
-    setTrainerAssessments(prev => ({
+    setTrainerAssessments((prev) => ({
       ...prev,
-      [selectedTrainer]: {
-        ...prev[selectedTrainer],
-        [criteria]: value
-      }
+      [selectedTrainer.name]: {
+        ...prev[selectedTrainer.name],
+        [criteria]: value,
+      },
     }));
   };
 
-  const submitAssessment = () => {
-    const scores = Object.values(trainerAssessments[selectedTrainer] || {});
-    const avg = scores.length ? (scores.reduce((a,b) => a + Number(b), 0) / scores.length).toFixed(1) : 0;
-    setAssessedTrainers(prev => ({
-      ...prev,
-      [selectedTrainer]: { assessed: true, rating: avg }
-    }));
-    setShowTrainerModal(false);
-  };
+  const submitAssessment = async () => {
+    const scoresObj = trainerAssessments[selectedTrainer.name] || {};
+    const backendScores = {
+      perf: parseFloat(scoresObj["Session Planning"] || 0),
+      motiv: parseFloat(scoresObj["Motivation"] || 0),
+      interact: parseFloat(scoresObj["Communication"] || 0),
+      knowledge: parseFloat(scoresObj["Knowledge"] || 0),
+      punct: parseFloat(scoresObj["Professionalism"] || 0),
+    };
+    const avg =
+      Object.values(backendScores).reduce((a, b) => a + b, 0) / 5;
+    const standing =
+      avg >= 8.5 ? "Excellent" : avg >= 7 ? "Good" : avg >= 5 ? "Warning" : "Critical";
 
-  const redoAssessment = (trainerName) => {
-    setAssessedTrainers(prev => ({
-      ...prev,
-      [trainerName]: { assessed: false }
-    }));
-    openTrainerModal(trainerName);
-  };
-
-  const handleEditToggle = () => {
-    setIsEditingCert(!isEditingCert);
-  };
-
-  const handleCertChange = (e) => {
-    setCertification(e.target.value);
-  };
-
-  const handleBlur = () => {
-    setIsEditingCert(false);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      setIsEditingCert(false);
+    try {
+      await apiRequest("/account/senior/assessments", {
+        method: "POST",
+        body: JSON.stringify({
+          trainer_id: selectedTrainer.id,
+          trainer_name: selectedTrainer.name,
+          scores: backendScores,
+          average: avg,
+          standing: standing,
+          notes: "",
+        }),
+      });
+      // Update local assessedTrainers state
+      setAssessedTrainers((prev) => ({
+        ...prev,
+        [selectedTrainer.name]: { assessed: true, rating: avg.toFixed(1) },
+      }));
+      setShowTrainerModal(false);
+    } catch (err) {
+      console.error("Failed to submit assessment:", err);
+      alert("Failed to submit assessment. Please try again.");
     }
   };
 
+  const redoAssessment = (trainerName) => {
+    setAssessedTrainers((prev) => ({
+      ...prev,
+      [trainerName]: { assessed: false },
+    }));
+    const trainerObj = otherTrainers.find((t) => t.name === trainerName);
+    if (trainerObj) openTrainerModal(trainerObj);
+  };
+
+  // Coaching message handlers
   const handleCoachingChange = (e) => {
     const { name, value } = e.target;
-    setCoachingMessage(prev => ({ ...prev, [name]: value }));
+    setCoachingMessage((prev) => ({ ...prev, [name]: value }));
+  };
+  const sendCoachingMessage = async () => {
+    const { clientName, clientEmail, date, time, message } = coachingMessage;
+    if (!clientName || !clientEmail || !message) {
+      alert("Please fill in client name, email, and message.");
+      return;
+    }
+    try {
+      await apiRequest("/account/senior/send-coaching-message", {
+        method: "POST",
+        body: JSON.stringify({
+          client_name: clientName,
+          client_email: clientEmail,
+          session_date: date,
+          session_time: time,
+          message: message,
+        }),
+      });
+      alert(`Coaching message sent to ${clientName}`);
+      setCoachingMessage({ clientName: "", clientEmail: "", date: "", time: "", message: "" });
+    } catch (err) {
+      console.error("Failed to send coaching message:", err);
+      alert("Failed to send message. Please try again.");
+    }
   };
 
-  const sendCoachingMessage = () => {
-    alert(`Message sent to ${coachingMessage.client || "client"}`);
-    setCoachingMessage({ client: "", date: "", time: "", message: "" });
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("gympro_user");
+    navigate("/login");
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="trainer-page" style={{ "--accent": bgColor }}>
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading senior trainer dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="trainer-page" style={{ "--accent": bgColor }}>
+        <div className="error-container">
+          <p>Error loading data: {error}</p>
+          <button onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      </div>
+    );
+  }
+  if (!trainer) return null;
+
+  // Compute derived values for the UI
+  const avgProgress = trainer.monthly_score
+    ? Math.round(trainer.monthly_score)
+    : trainer.average_assessment_score
+    ? Math.round(trainer.average_assessment_score)
+    : 70;
+  const standingText =
+    trainer.monthly_score >= 80
+      ? "Good"
+      : trainer.monthly_score >= 60
+      ? "Decent"
+      : "Bad";
 
   const getInitials = (name) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
   };
 
   const colors = ["#ff6b00", "#e63946", "#1e88e5"];
@@ -138,28 +285,35 @@ export default function TrainerPage() {
   return (
     <div className="trainer-page" style={{ "--accent": bgColor }}>
       {/* Floating Home Button */}
-      <Link to="/" className="floating-home">← Home</Link>
-          <button className="logout-btn" onClick={handleLogout}>
-            Sign Out
-          </button>
+      <button onClick={() => navigate("/")} className="floating-home">
+        ← Home
+      </button>
+      <button className="logout-btn" onClick={handleLogout}>
+        Sign Out
+      </button>
       {/* Floating Color Picker */}
       <div className="floating-color-menu">
-        <button className="color-dots" onClick={() => setShowColorMenu(!showColorMenu)}>⋮</button>
+        <button className="color-dots" onClick={() => setShowColorMenu(!showColorMenu)}>
+          ⋮
+        </button>
         {showColorMenu && (
           <div className="color-options">
-            {colors.map(c => (
+            {colors.map((c) => (
               <div
                 key={c}
                 className="color-option"
                 style={{ background: c }}
-                onClick={() => { setBgColor(c); setShowColorMenu(false); }}
+                onClick={() => {
+                  setBgColor(c);
+                  setShowColorMenu(false);
+                }}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Header with gym background */}
+      {/* Header */}
       <header className="trainer-header">
         <div className="header-background">
           <img
@@ -177,16 +331,20 @@ export default function TrainerPage() {
             />
           </div>
           <h1 className="profile-name">{trainer.name}</h1>
-          <p className="profile-rank-age">{trainer.rank} | Age: {trainer.age}</p>
+          <p className="profile-rank-age">
+            {trainer.rank} | Age: {trainer.age || "—"}
+          </p>
           <div className="profile-rating">
             <span className="stars">
-              {"★".repeat(Math.floor(trainer.rating))}
-              {"☆".repeat(5 - Math.floor(trainer.rating))}
+              {"★".repeat(Math.floor(trainer.rating || 0))}
+              {"☆".repeat(5 - Math.floor(trainer.rating || 0))}
             </span>
-            <span className="rating-value">{trainer.rating}</span>
+            <span className="rating-value">{trainer.rating || "—"}</span>
           </div>
           <div className="profile-spec-cert">
-            <p className="spec"><strong>Specialisation:</strong> {trainer.specialisation}</p>
+            <p className="spec">
+              <strong>Specialisation:</strong> {trainer.specialisation || "General"}
+            </p>
             {isEditingCert ? (
               <div className="cert-edit">
                 <strong>Certification:</strong>
@@ -200,7 +358,9 @@ export default function TrainerPage() {
                 />
               </div>
             ) : (
-              <p className="cert"><strong>Certification:</strong> {trainer.certification}</p>
+              <p className="cert">
+                <strong>Certification:</strong> {trainer.certification || "Not set"}
+              </p>
             )}
             <button className="edit-cert-btn" onClick={handleEditToggle}>
               {isEditingCert ? "Save" : "Edit"}
@@ -215,15 +375,21 @@ export default function TrainerPage() {
           <div className="card-left">
             <h3>Overall Ratings</h3>
             <div className="ratings-summary">
-              <div className="rating-large">{trainer.rating}</div>
+              <div className="rating-large">{trainer.rating || "—"}</div>
               <div className="stars-large">
-                {"★".repeat(Math.floor(trainer.rating))}
-                {"☆".repeat(5 - Math.floor(trainer.rating))}
+                {"★".repeat(Math.floor(trainer.rating || 0))}
+                {"☆".repeat(5 - Math.floor(trainer.rating || 0))}
               </div>
             </div>
             <div className="assessment-info">
-              <p><strong>Average Assessment Score:</strong> {trainer.averageAssessmentScore}/10</p>
-              <p className="assessment-date">Based on assessment done {trainer.lastAssessmentDate}</p>
+              <p>
+                <strong>Average Assessment Score:</strong>{" "}
+                {trainer.average_assessment_score || "—"}/10
+              </p>
+              <p className="assessment-date">
+                Based on assessment done{" "}
+                {trainer.last_assessment_date || "N/A"}
+              </p>
               <button className="btn small">View All Assessments</button>
             </div>
           </div>
@@ -232,22 +398,31 @@ export default function TrainerPage() {
             <h3>Monthly Performance</h3>
             <div className="monthly-performance">
               <div className="progress-circle-container">
-                <div className="progress-circle" style={{ background: `conic-gradient(var(--accent) ${avgProgress * 3.6}deg, #eee 0deg)` }}>
+                <div
+                  className="progress-circle"
+                  style={{
+                    background: `conic-gradient(var(--accent) ${
+                      avgProgress * 3.6
+                    }deg, #eee 0deg)`,
+                  }}
+                >
                   <span>{avgProgress}%</span>
                 </div>
               </div>
               <div className="stats-grid">
                 <div className="stat-item">
                   <span className="stat-label">Sessions Completed</span>
-                  <span className="stat-value">{trainer.sessionsCompleted}</span>
+                  <span className="stat-value">
+                    {trainer.sessions_completed || 0}
+                  </span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Clients Assigned</span>
-                  <span className="stat-value">{trainer.clientsAssigned}</span>
+                  <span className="stat-value">{trainer.clients_assigned || 0}</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Attendance %</span>
-                  <span className="stat-value">{trainer.attendanceRate}%</span>
+                  <span className="stat-value">{trainer.attendance_rate || 0}%</span>
                 </div>
               </div>
             </div>
@@ -259,16 +434,18 @@ export default function TrainerPage() {
           <div className="card-left">
             <h3>Trainer Assessment</h3>
             <div className="trainer-grid">
-              {trainer.otherTrainers.map((t) => {
-                const assessed = assessedTrainers[t]?.assessed;
-                const avgRating = assessedTrainers[t]?.rating;
+              {otherTrainers.map((t) => {
+                const assessed = assessedTrainers[t.name]?.assessed;
+                const avgRating = assessedTrainers[t.name]?.rating;
                 return (
                   <div
-                    key={t}
-                    className={`trainer-name-btn ${assessed ? 'assessed' : ''}`}
-                    onClick={() => assessed ? redoAssessment(t) : openTrainerModal(t)}
+                    key={t.id}
+                    className={`trainer-name-btn ${assessed ? "assessed" : ""}`}
+                    onClick={() =>
+                      assessed ? redoAssessment(t.name) : openTrainerModal(t)
+                    }
                   >
-                    {t}
+                    {t.name}
                     {assessed && <span className="avg-rating-small">{avgRating}</span>}
                   </div>
                 );
@@ -281,9 +458,16 @@ export default function TrainerPage() {
             <div className="coaching-form">
               <input
                 type="text"
-                name="client"
+                name="clientName"
                 placeholder="Client Name"
-                value={coachingMessage.client}
+                value={coachingMessage.clientName}
+                onChange={handleCoachingChange}
+              />
+              <input
+                type="email"
+                name="clientEmail"
+                placeholder="Client Email"
+                value={coachingMessage.clientEmail}
                 onChange={handleCoachingChange}
               />
               <div className="row">
@@ -307,7 +491,9 @@ export default function TrainerPage() {
                 value={coachingMessage.message}
                 onChange={handleCoachingChange}
               ></textarea>
-              <button className="btn" onClick={sendCoachingMessage}>Send Message</button>
+              <button className="btn" onClick={sendCoachingMessage}>
+                Send Message
+              </button>
             </div>
           </div>
         </div>
@@ -315,14 +501,22 @@ export default function TrainerPage() {
         {/* Clients at Risk */}
         <div className="card">
           <h3>Clients at Risk</h3>
-          {trainer.clientsAlerts.map((c, i) => (
-            <div key={i} className="client-risk-row">
+          {clientsAtRisk.length === 0 && (
+            <p>No clients at risk.</p>
+          )}
+          {clientsAtRisk.map((c) => (
+            <div key={c.id} className="client-risk-row">
               <div className="client-risk-info">
-                <span className="client-initials" title={c.name}>{getInitials(c.name)}</span>
+                <span className="client-initials" title={c.name}>
+                  {getInitials(c.name)}
+                </span>
                 <div className="progress-bar-container small">
-                  <div className="progress-bar-fill" style={{ width: `${c.progress}%`, background: "var(--accent)" }}></div>
+                  <div
+                    className="progress-bar-fill"
+                    style={{ width: `${c.progress_percentage}%`, background: "var(--accent)" }}
+                  ></div>
                 </div>
-                <span className="client-progress">{c.progress}%</span>
+                <span className="client-progress">{c.progress_percentage}%</span>
               </div>
               <button className="btn small warn-btn">Warn & Assist</button>
             </div>
@@ -332,9 +526,12 @@ export default function TrainerPage() {
         {/* Public Reviews */}
         <div className="card">
           <h3>Public Reviews</h3>
-          {trainer.publicReviews.map((r, i) => (
-            <div key={i} className="review">
-              <strong>{r.user}</strong>
+          {trainerReviews.length === 0 && (
+            <p>No reviews yet.</p>
+          )}
+          {trainerReviews.map((r) => (
+            <div key={r.id} className="review">
+              <strong>{r.reviewer_name}</strong>
               <div className="stars-small">
                 {"★".repeat(r.rating)}
                 {"☆".repeat(5 - r.rating)}
@@ -347,26 +544,34 @@ export default function TrainerPage() {
       </div>
 
       {/* Assessment Modal */}
-      {showTrainerModal && (
+      {showTrainerModal && selectedTrainer && (
         <div className="modal">
           <div className="modal-content">
-            <button className="modal-close" onClick={() => setShowTrainerModal(false)}>✕</button>
-            <h3>Assessing {selectedTrainer}</h3>
-            {trainer.assessmentCriteria.map((c) => (
+            <button
+              className="modal-close"
+              onClick={() => setShowTrainerModal(false)}
+            >
+              ✕
+            </button>
+            <h3>Assessing {selectedTrainer.name}</h3>
+            {assessmentCriteria.map((c) => (
               <div key={c} className="slider">
                 <label>{c}</label>
                 <input
                   type="range"
                   min="0"
                   max="10"
-                  value={trainerAssessments[selectedTrainer]?.[c] || 0}
-                  onChange={(e) => handleAssessmentChange(c, e.target.value)}
+                  step="0.5"
+                  value={trainerAssessments[selectedTrainer.name]?.[c] || 0}
+                  onChange={(e) => handleAssessmentChange(c, parseFloat(e.target.value))}
                 />
-                <span>{trainerAssessments[selectedTrainer]?.[c] || 0}</span>
+                <span>{trainerAssessments[selectedTrainer.name]?.[c] || 0}</span>
               </div>
             ))}
             <textarea placeholder="Add remarks..." className="remarks" />
-            <button className="btn" onClick={submitAssessment}>Submit Assessment</button>
+            <button className="btn" onClick={submitAssessment}>
+              Submit Assessment
+            </button>
           </div>
         </div>
       )}

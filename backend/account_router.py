@@ -20,7 +20,13 @@ from schemas import (
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
     DashboardStatsResponse
 )
-from auth_router import get_current_user
+# ========== ADD THESE NEW IMPORTS ==========
+from models import TrainerAssessment, ClientStatus, TrainerRating
+from schemas import (
+    SeniorProfileResponse, TrainerForAssessment, ClientRisk,
+    TrainerReviewResponse, CoachingMessageRequest
+)
+from email_service import send_coaching_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/account", tags=["account"])
@@ -371,7 +377,8 @@ async def save_progress(
     return {
         "message": "Progress saved successfully",
         "id": str(uuid.UUID(bytes=new_measurement.id))
-    }@router.get("/progress/history", response_model=list[ProgressTrackingResponse])
+    }
+@router.get("/progress/history", response_model=list[ProgressTrackingResponse])
 async def get_progress_history(
     limit: int = Query(12, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
@@ -1669,3 +1676,266 @@ async def send_birthday_email_to_client(
         return APIResponse(success=True, message=f"Birthday wishes sent to {client.name}!")
     else:
         raise HTTPException(status_code=500, detail="Failed to send email")
+
+# ============================================================
+# SENIOR TRAINER HELPER
+# ============================================================
+async def _is_senior_trainer(user_id: bytes, db: AsyncSession) -> bool:
+    result = await db.execute(select(Trainer.is_senior).where(Trainer.id == user_id))
+    is_senior = result.scalar_one_or_none()
+    return is_senior is True
+
+# ============================================================
+# SENIOR TRAINER ENDPOINTS
+# ============================================================
+
+@router.get("/senior/profile", response_model=SeniorProfileResponse)
+async def get_senior_profile(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get senior trainer's profile with aggregated statistics"""
+    if current_user["role"] != "trainer":
+        raise HTTPException(403, "Not a trainer")
+    if not await _is_senior_trainer(current_user["user_id"].bytes, db):
+        raise HTTPException(403, "Not a senior trainer")
+
+    trainer_id_bytes = current_user["user_id"].bytes
+    result = await db.execute(
+        select(Trainer, User.email)
+        .join(User, Trainer.id == User.id)
+        .where(Trainer.id == trainer_id_bytes)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(404, "Trainer not found")
+    trainer, email = row
+
+    # Calculate derived stats
+    client_count_result = await db.execute(
+        select(func.count(ClientStatus.id))
+        .where(ClientStatus.assigned_trainer_id == trainer_id_bytes)
+    )
+    clients_assigned = client_count_result.scalar() or 0
+
+    assess_result = await db.execute(
+        select(func.max(TrainerAssessment.assessment_date), func.avg(TrainerAssessment.average_score))
+        .where(TrainerAssessment.trainer_id == trainer_id_bytes)
+    )
+    last_assess_date, avg_assess_score = assess_result.first()
+    avg_assess_score = float(avg_assess_score) if avg_assess_score else None
+    monthly_score = avg_assess_score
+
+    sessions_completed = getattr(trainer, 'sessions_completed', 0)
+    attendance_rate = getattr(trainer, 'attendance_rate', 0.0)
+
+    return SeniorProfileResponse(
+        id=uuid.UUID(bytes=trainer.id),
+        name=trainer.name,
+        email=email,
+        rank="Senior Trainer" if trainer.is_senior else "Trainer",
+        age=datetime.now().year - trainer.birthday.year if trainer.birthday else None,
+        rating=float(trainer.rating) if trainer.rating else None,
+        specialisation=getattr(trainer, 'specialisation', None),
+        certification=trainer.certification,
+        years_experience=getattr(trainer, 'years_experience', None),
+        monthly_score=monthly_score,
+        sessions_attended=getattr(trainer, 'sessions_attended', None),
+        sessions_completed=sessions_completed,
+        clients_assigned=clients_assigned,
+        attendance_rate=attendance_rate,
+        last_assessment_date=last_assess_date,
+        average_assessment_score=avg_assess_score,
+        created_at=trainer.created_at,
+        updated_at=trainer.updated_at
+    )
+
+@router.get("/senior/other-trainers", response_model=List[TrainerForAssessment])
+async def get_other_trainers(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Return list of trainers (excluding the current senior)"""
+    if current_user["role"] != "trainer":
+        raise HTTPException(403, "Not a trainer")
+    if not await _is_senior_trainer(current_user["user_id"].bytes, db):
+        raise HTTPException(403, "Not a senior trainer")
+
+    self_id = current_user["user_id"].bytes
+    result = await db.execute(
+        select(Trainer.id, Trainer.name, Trainer.is_senior)
+        .where(Trainer.id != self_id)
+        .order_by(Trainer.name)
+    )
+    rows = result.all()
+
+    trainers_list = []
+    for trainer_id, name, is_senior in rows:
+        assess_result = await db.execute(
+            select(func.max(TrainerAssessment.assessment_date), func.avg(TrainerAssessment.average_score))
+            .where(TrainerAssessment.trainer_id == trainer_id)
+        )
+        last_date, avg_rating = assess_result.first()
+        trainers_list.append(
+            TrainerForAssessment(
+                id=uuid.UUID(bytes=trainer_id),
+                name=name,
+                last_assessed=last_date,
+                average_rating=float(avg_rating) if avg_rating else None
+            )
+        )
+    return trainers_list
+
+@router.get("/senior/clients-at-risk", response_model=List[ClientRisk])
+async def get_clients_at_risk(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Return clients with progress_percentage < 50%"""
+    if current_user["role"] != "trainer":
+        raise HTTPException(403, "Not a trainer")
+    if not await _is_senior_trainer(current_user["user_id"].bytes, db):
+        raise HTTPException(403, "Not a senior trainer")
+
+    result = await db.execute(
+        select(Client.id, Client.name, ClientStatus.fitness_goal, ClientStatus.progress_percentage)
+        .outerjoin(ClientStatus, Client.id == ClientStatus.client_id)
+        .where(ClientStatus.progress_percentage < 50)
+        .order_by(ClientStatus.progress_percentage)
+        .limit(10)
+    )
+    rows = result.all()
+
+    return [
+        ClientRisk(
+            id=uuid.UUID(bytes=cid),
+            name=name,
+            goal=goal,
+            progress_percentage=progress or 0
+        )
+        for cid, name, goal, progress in rows
+    ]
+
+@router.post("/senior/assessments", response_model=APIResponse)
+async def assess_trainer(
+    assessment: TrainerAssessmentRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Senior trainer submits assessment for another trainer"""
+    if current_user["role"] != "trainer":
+        raise HTTPException(403, "Not a trainer")
+    if not await _is_senior_trainer(current_user["user_id"].bytes, db):
+        raise HTTPException(403, "Not a senior trainer")
+
+    trainer_id_bytes = assessment.trainer_id.bytes
+
+    target = await db.get(Trainer, trainer_id_bytes)
+    if not target:
+        raise HTTPException(404, "Target trainer not found")
+
+    new_assessment = TrainerAssessment(
+        trainer_id=trainer_id_bytes,
+        trainer_name=assessment.trainer_name,
+        performance_score=assessment.scores.perf,
+        motivation_score=assessment.scores.motiv,
+        interaction_score=assessment.scores.interact,
+        knowledge_score=assessment.scores.knowledge,
+        punctuality_score=assessment.scores.punct,
+        average_score=assessment.average,
+        standing=assessment.standing,
+        assessment_date=datetime.utcnow().date(),
+        notes=assessment.notes
+    )
+    db.add(new_assessment)
+    await db.commit()
+
+    avg_result = await db.execute(
+        select(func.avg(TrainerAssessment.average_score))
+        .where(TrainerAssessment.trainer_id == trainer_id_bytes)
+    )
+    new_avg = avg_result.scalar() or 0
+    await db.execute(
+        update(Trainer)
+        .where(Trainer.id == trainer_id_bytes)
+        .values(rating=float(new_avg))
+    )
+    await db.commit()
+
+    return APIResponse(success=True, message="Assessment submitted", data={"average_rating": float(new_avg)})
+
+@router.get("/senior/assessments/{trainer_id}", response_model=List[TrainerAssessmentResponse])
+async def get_trainer_assessments(
+    trainer_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get all assessments for a given trainer (senior only)"""
+    if current_user["role"] != "trainer":
+        raise HTTPException(403, "Not a trainer")
+    if not await _is_senior_trainer(current_user["user_id"].bytes, db):
+        raise HTTPException(403, "Not a senior trainer")
+
+    result = await db.execute(
+        select(TrainerAssessment)
+        .where(TrainerAssessment.trainer_id == trainer_id.bytes)
+        .order_by(TrainerAssessment.assessment_date.desc())
+    )
+    assessments = result.scalars().all()
+    return [TrainerAssessmentResponse.model_validate(a) for a in assessments]
+
+@router.get("/senior/trainer-reviews", response_model=List[TrainerReviewResponse])
+async def get_trainer_reviews(
+    trainer_name: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get public reviews for trainers (uses trainer_ratings table)"""
+    if current_user["role"] != "trainer":
+        raise HTTPException(403, "Not a trainer")
+    if not await _is_senior_trainer(current_user["user_id"].bytes, db):
+        raise HTTPException(403, "Not a senior trainer")
+
+    query = select(TrainerRating).order_by(TrainerRating.created_at.desc())
+    if trainer_name:
+        query = query.where(TrainerRating.trainer_name == trainer_name)
+    result = await db.execute(query)
+    ratings = result.scalars().all()
+
+    reviews = []
+    for r in ratings:
+        reviews.append(
+            TrainerReviewResponse(
+                id=r.id,
+                trainer_name=r.trainer_name,
+                reviewer_name="Client",
+                rating=r.rating,
+                comment="No comment",
+                created_at=r.created_at
+            )
+        )
+    return reviews
+
+@router.post("/senior/send-coaching-message")
+async def send_coaching_message(
+    request: CoachingMessageRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Send a coaching message to a client (email)"""
+    if current_user["role"] != "trainer":
+        raise HTTPException(403, "Not a trainer")
+    if not await _is_senior_trainer(current_user["user_id"].bytes, db):
+        raise HTTPException(403, "Not a senior trainer")
+
+    from email_service import send_coaching_email
+    success = await send_coaching_email(
+        to_email=request.client_email,
+        client_name=request.client_name,
+        message=request.message,
+        session_date=request.session_date,
+        session_time=request.session_time
+    )
+    if not success:
+        raise HTTPException(500, "Failed to send email")
+    return {"message": "Coaching message sent"}

@@ -1,7 +1,9 @@
 import uuid
+import json
 from datetime import datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB, CITEXT, INET
+from sqlalchemy.dialects.mysql import BINARY, JSON
 from sqlalchemy import (
     Enum,
     Date,
@@ -18,6 +20,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ARRAY,
+    LargeBinary,
 )
 from sqlalchemy.sql import func
 from database import Base
@@ -455,3 +458,643 @@ class ConversationMessage(Base):
         Index('idx_conversation_messages_conversation_id', 'conversation_id'),
         Index('idx_conversation_messages_order', 'conversation_id', 'sequence_order'),
     )
+
+
+# =============================================================
+# LEGACY USER SYSTEM (from main models.py)
+# =============================================================
+
+def generate_uuid():
+    return uuid.uuid4().bytes
+
+
+class LegacyUser(Base):
+    """Legacy user system for compatibility with existing tables"""
+    __tablename__ = "Accounts"
+    
+    id = Column(BINARY(16), primary_key=True, default=generate_uuid)
+    email = Column(String(100), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(Enum('client', 'trainer', 'admin', name='user_roles'), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationships
+    client_profile = relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    trainer_profile = relationship("Trainer", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    admin_profile = relationship("Admin", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    progress_entries = relationship("ProgressTracking", back_populates="user", cascade="all, delete-orphan")
+    body_measurements = relationship("BodyMeasurement", back_populates="user", cascade="all, delete-orphan")
+    reset_tokens = relationship("PasswordResetToken", backref="user")
+
+
+class Client(Base):
+    __tablename__ = "clients"
+    
+    id = Column(BINARY(16), ForeignKey("Accounts.id"), primary_key=True)
+    name = Column(String(100), nullable=False)
+    phone_number = Column(String(20))
+    height = Column(Float)
+    weight = Column(Float)
+    birthday = Column(Date, nullable=True)
+    gender = Column(String(10), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationships
+    user = relationship("LegacyUser", back_populates="client_profile")
+    goals = relationship("ClientGoal", backref="client")
+    health_conditions = relationship("ClientHealthCondition", backref="client")
+    water_intake = relationship("ClientWaterIntake", backref="client")
+    workout_sessions = relationship("ClientWorkoutSession", backref="client")
+    strength_records = relationship("ClientStrengthRecord", backref="client")
+    trainer_ratings = relationship("TrainerRating", backref="client")
+    badges = relationship("ClientBadge", backref="client")
+    training_schedule = relationship("TrainingSchedule", backref="client")
+    excursion_bookings = relationship("ExcursionBooking", backref="client")
+    consultation_bookings = relationship("ConsultationBooking", backref="client")
+    cart_items = relationship("ShopCartItem", backref="client")
+    wishlist_items = relationship("ShopWishlistItem", backref="client")
+    orders = relationship("ShopOrder", backref="client")
+    status_info = relationship("ClientStatus", backref="client")
+
+
+class Trainer(Base):
+    __tablename__ = "trainers"
+    
+    id = Column(BINARY(16), ForeignKey("Accounts.id"), primary_key=True)
+    name = Column(String(100), nullable=False)
+    certification = Column(String(100))
+    rating = Column(Float, default=0)
+    trainer_level = Column(Float, default=1)
+    is_senior = Column(Boolean, default=False)
+    birthday = Column(Date, nullable=True)
+    specialisation = Column(String(100), nullable=True)
+    years_experience = Column(Integer, nullable=True)
+    sessions_attended = Column(Integer, default=0)
+    sessions_completed = Column(Integer, default=0)
+    attendance_rate = Column(Float, default=0.0)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationships
+    user = relationship("LegacyUser", back_populates="trainer_profile")
+    assessments = relationship("TrainerAssessment", backref="trainer")
+    assigned_clients = relationship("ClientStatus", backref="assigned_trainer")
+
+
+class Admin(Base):
+    __tablename__ = "admins"
+    
+    id = Column(BINARY(16), ForeignKey("Accounts.id"), primary_key=True)
+    name = Column(String(100), nullable=False)
+    phone_number = Column(String(20))
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationships
+    user = relationship("LegacyUser", back_populates="admin_profile")
+
+
+# =============================================================
+# PROGRESS TRACKING
+# =============================================================
+
+class ProgressTracking(Base):
+    __tablename__ = "progress_tracking"
+    
+    id = Column(BINARY(16), primary_key=True, default=generate_uuid)
+    user_id = Column(BINARY(16), ForeignKey("Accounts.id"), nullable=False)
+    weight = Column(Float, nullable=True)
+    height = Column(Float, nullable=True)
+    measurements = Column(Text, nullable=True)  # JSON string with all measurements
+    recorded_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationships
+    user = relationship("LegacyUser", back_populates="progress_entries")
+    
+    def set_measurements(self, data):
+        """Store measurements as JSON string"""
+        if data:
+            self.measurements = json.dumps(data)
+        else:
+            self.measurements = None
+    
+    def get_measurements(self):
+        """Retrieve measurements as dictionary"""
+        if self.measurements:
+            return json.loads(self.measurements)
+        return {}
+
+
+class BodyMeasurement(Base):
+    __tablename__ = "body_measurements"
+    
+    id = Column(BINARY(16), primary_key=True, default=generate_uuid)
+    user_id = Column(BINARY(16), ForeignKey("Accounts.id"), nullable=False)
+    recorded_at = Column(DateTime, server_default=func.now())
+    
+    # Body basics
+    weight = Column(Float, nullable=True)
+    height = Column(Float, nullable=True)
+    body_fat = Column(Float, nullable=True)
+    
+    # Upper body
+    chest = Column(Float, nullable=True)
+    waist = Column(Float, nullable=True)
+    shoulders = Column(Float, nullable=True)
+    arm_left = Column(Float, nullable=True)
+    arm_right = Column(Float, nullable=True)
+    neck = Column(Float, nullable=True)
+    
+    # Lower body
+    hips = Column(Float, nullable=True)
+    thigh_left = Column(Float, nullable=True)
+    thigh_right = Column(Float, nullable=True)
+    calf_left = Column(Float, nullable=True)
+    calf_right = Column(Float, nullable=True)
+    glutes = Column(Float, nullable=True)
+    
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationships
+    user = relationship("LegacyUser", back_populates="body_measurements")
+
+
+# =============================================================
+# CLIENT GOALS & HEALTH
+# =============================================================
+
+class ClientGoal(Base):
+    __tablename__ = "client_goals"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    goal_type = Column(String(50), default="Bulk Up")
+    primary_goal = Column(String(100))
+    target_weight_kg = Column(Numeric(5,1))
+    target_chest_cm = Column(Numeric(5,1))
+    target_waist_cm = Column(Numeric(5,1))
+    target_hips_cm = Column(Numeric(5,1))
+    target_thigh_cm = Column(Numeric(5,1))
+    target_arm_cm = Column(Numeric(5,1))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ClientHealthCondition(Base):
+    __tablename__ = "client_health_conditions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    condition_name = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ClientWaterIntake(Base):
+    __tablename__ = "client_water_intake"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    intake_date = Column(Date, nullable=False)
+    cups_consumed = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ClientWorkoutSession(Base):
+    __tablename__ = "client_workout_sessions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    session_date = Column(Date, nullable=False)
+    session_type = Column(String(50))
+    duration_minutes = Column(Integer)
+    calories_burned = Column(Integer)
+    avg_heart_rate = Column(Integer)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ClientStrengthRecord(Base):
+    __tablename__ = "client_strength_records"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    exercise_name = Column(String(50), nullable=False)
+    current_weight_kg = Column(Numeric(5,1))
+    goal_weight_kg = Column(Numeric(5,1))
+    current_reps = Column(Integer)
+    goal_reps = Column(Integer)
+    percentage_progress = Column(Integer)
+    record_date = Column(Date)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TrainerRating(Base):
+    __tablename__ = "trainer_ratings"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    trainer_name = Column(String(100), nullable=False)
+    rating = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ClientBadge(Base):
+    __tablename__ = "client_badges"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    badge_name = Column(String(100), nullable=False)
+    awarded_date = Column(Date, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class TrainingSchedule(Base):
+    __tablename__ = "training_schedule"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    day_of_week = Column(String(10))
+    day_number = Column(Integer)
+    session_name = Column(String(100))
+    session_time = Column(Time)
+    has_session = Column(Boolean, default=False)
+    is_today = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# =============================================================
+# PASSWORD RESET
+# =============================================================
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(BINARY(16), ForeignKey("Accounts.id", ondelete="CASCADE"), nullable=False)
+    token = Column(String(255), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    used_at = Column(DateTime, nullable=True)  # Track when token was used
+
+
+# =============================================================
+# EXCURSION SYSTEM
+# =============================================================
+
+class Excursion(Base):
+    __tablename__ = "excursions"
+    
+    id = Column(String(50), primary_key=True)
+    name = Column(String(255), nullable=False)
+    location = Column(String(255), nullable=False)
+    level = Column(String(20), nullable=False)
+    level_label = Column(String(20), nullable=False)
+    date = Column(Date, nullable=False)
+    time = Column(Time, nullable=False)
+    duration = Column(String(50), nullable=False)
+    spots = Column(Integer, nullable=False, default=0)
+    spots_left = Column(Integer, nullable=False, default=0)
+    cost = Column(Numeric(10,2), nullable=False)
+    img_url = Column(String(500))
+    thumb_url = Column(String(500))
+    map_url = Column(String(500))
+    description = Column(Text)
+    guide = Column(String(100))
+    meetup_point = Column(String(255))
+    min_bmi = Column(Integer, default=15)
+    max_bmi = Column(Integer, default=40)
+    min_level = Column(String(20), default="beginner")
+    required_tenure_months = Column(Integer, default=0)
+    difficulty = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    tags = relationship("ExcursionTag", back_populates="excursion", cascade="all, delete-orphan")
+    bring_items = relationship("ExcursionBringItem", back_populates="excursion", cascade="all, delete-orphan")
+    bookings = relationship("ExcursionBooking", back_populates="excursion")
+    
+    # Property to easily access bring items as list
+    @property
+    def what_to_bring(self):
+        """Property to get bring items as a list of strings"""
+        return [item.item_name for item in self.bring_items]
+
+
+class ExcursionTag(Base):
+    __tablename__ = "excursion_tags"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    excursion_id = Column(String(50), ForeignKey("excursions.id", ondelete="CASCADE"), nullable=False)
+    tag_name = Column(String(50), nullable=False)
+    
+    # Relationships
+    excursion = relationship("Excursion", back_populates="tags")
+
+
+class ExcursionBringItem(Base):
+    __tablename__ = "excursion_bring_items"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    excursion_id = Column(String(50), ForeignKey("excursions.id", ondelete="CASCADE"), nullable=False)
+    item_name = Column(String(255), nullable=False)
+    display_order = Column(Integer, default=0)
+    
+    # Relationships
+    excursion = relationship("Excursion", back_populates="bring_items")
+
+
+class ExcursionBooking(Base):
+    __tablename__ = "excursion_bookings"
+    
+    id = Column(LargeBinary(16), primary_key=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    excursion_id = Column(String(50), ForeignKey("excursions.id", ondelete="RESTRICT"), nullable=False)
+    booking_reference = Column(String(50), unique=True, nullable=False)
+    booked_for_name = Column(String(255), nullable=False)
+    booked_for_email = Column(String(255), nullable=False)
+    booked_for_phone = Column(String(50), nullable=False)
+    special_notes = Column(Text)
+    payment_method = Column(String(50), default="online")
+    payment_status = Column(String(50), default="pending")
+    booking_status = Column(String(50), default="confirmed")
+    total_amount = Column(Numeric(10,2), nullable=False)
+    booked_at = Column(DateTime, default=datetime.utcnow)
+    cancelled_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    excursion = relationship("Excursion", back_populates="bookings")
+
+
+class ExcursionMLScore(Base):
+    __tablename__ = "excursion_ml_scores"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    excursion_id = Column(String(50), ForeignKey("excursions.id", ondelete="CASCADE"), nullable=False)
+    score = Column(Integer, nullable=False)
+    calculated_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================
+# LEGACY CONSULTATION SYSTEM
+# =============================================================
+
+class LegacyConsultationType(Base):
+    __tablename__ = "legacy_consultation_types"
+    
+    id = Column(String(50), primary_key=True)
+    icon = Column(String(10))
+    title = Column(String(100), nullable=False)
+    subtitle = Column(String(200))
+    duration_minutes = Column(Integer, nullable=False)
+    price = Column(Numeric(10,2), nullable=False)
+    price_display = Column(String(50), nullable=False)
+    badge_text = Column(String(50))
+    badge_color = Column(String(20))
+    description = Column(Text)
+    coach_description = Column(String(200))
+    img_url = Column(String(500))
+    includes = Column(JSON)
+    is_active = Column(Boolean, default=True)
+    display_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    bookings = relationship("ConsultationBooking", back_populates="consultation_type")
+
+
+class ConsultationBooking(Base):
+    __tablename__ = "legacy_consultation_bookings"
+    
+    id = Column(LargeBinary(16), primary_key=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    consultation_type_id = Column(String(50), ForeignKey("legacy_consultation_types.id"), nullable=False)
+    booking_reference = Column(String(50), unique=True, nullable=False)
+    booking_date = Column(Date, nullable=False)
+    booking_time = Column(Time, nullable=False)
+    session_format = Column(String(20), default="in-person")
+    status = Column(String(20), default="confirmed")
+    notes = Column(Text)
+    client_name = Column(String(255), nullable=False)
+    client_email = Column(String(255), nullable=False)
+    cancelled_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    consultation_type = relationship("LegacyConsultationType", back_populates="bookings")
+
+
+class ConsultationAvailability(Base):
+    __tablename__ = "consultation_availability"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    booking_date = Column(Date, nullable=False)
+    time_slot = Column(Time, nullable=False)
+    is_booked = Column(Boolean, default=False)
+    booked_by = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
+    booking_id = Column(LargeBinary(16), ForeignKey("legacy_consultation_bookings.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class BusinessHours(Base):
+    __tablename__ = "business_hours"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    day_of_week = Column(Integer, nullable=False)
+    is_open = Column(Boolean, default=True)
+    start_time = Column(Time, nullable=True)
+    end_time = Column(Time, nullable=True)
+    slot_interval_minutes = Column(Integer, default=60)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Holiday(Base):
+    __tablename__ = "holidays"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    holiday_date = Column(Date, nullable=False, unique=True)
+    name = Column(String(100))
+    is_closed = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================
+# LEGACY SHOP SYSTEM
+# =============================================================
+
+class ShopCategory(Base):
+    __tablename__ = "shop_categories"
+    
+    id = Column(String(50), primary_key=True)
+    name = Column(String(100), nullable=False)
+    display_name = Column(String(100), nullable=False)
+    icon = Column(String(10))
+    display_order = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    products = relationship("ShopProduct", back_populates="category")
+
+
+class ShopProduct(Base):
+    __tablename__ = "shop_products"
+    
+    id = Column(String(50), primary_key=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)
+    price = Column(Numeric(10,2), nullable=False)
+    category_id = Column(String(50), ForeignKey("shop_categories.id"), nullable=False)
+    image_url = Column(String(500))
+    badge_text = Column(String(100))
+    badge_color = Column(String(20))
+    rating = Column(Numeric(2,1), default=4.5)
+    review_count = Column(Integer, default=0)
+    stock_quantity = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    featured = Column(Boolean, default=False)
+    display_order = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    category = relationship("ShopCategory", back_populates="products")
+    cart_items = relationship("ShopCartItem", back_populates="product")
+    wishlist_items = relationship("ShopWishlistItem", back_populates="product")
+    order_items = relationship("ShopOrderItem", back_populates="product")
+
+
+class ShopCartItem(Base):
+    __tablename__ = "shop_cart_items"
+    
+    id = Column(LargeBinary(16), primary_key=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(String(50), ForeignKey("shop_products.id", ondelete="CASCADE"), nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    product = relationship("ShopProduct", back_populates="cart_items")
+
+
+class ShopWishlistItem(Base):
+    __tablename__ = "shop_wishlist_items"
+    
+    id = Column(LargeBinary(16), primary_key=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(String(50), ForeignKey("shop_products.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    product = relationship("ShopProduct", back_populates="wishlist_items")
+
+
+class ShopOrder(Base):
+    __tablename__ = "shop_orders"
+    
+    id = Column(LargeBinary(16), primary_key=True)
+    order_reference = Column(String(50), unique=True, nullable=False)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    order_status = Column(String(50), default="pending")
+    payment_status = Column(String(50), default="pending")
+    payment_method = Column(String(50), default="card")
+    subtotal = Column(Numeric(10,2), nullable=False)
+    tax = Column(Numeric(10,2), nullable=False)
+    shipping_cost = Column(Numeric(10,2), nullable=False)
+    total = Column(Numeric(10,2), nullable=False)
+    shipping_address = Column(Text, nullable=False)
+    city = Column(String(100), nullable=False)
+    phone = Column(String(50), nullable=False)
+    email = Column(String(255), nullable=False)
+    customer_name = Column(String(255), nullable=False)
+    notes = Column(Text)
+    placed_at = Column(DateTime, default=datetime.utcnow)
+    delivered_at = Column(DateTime, nullable=True)
+    cancelled_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    items = relationship("ShopOrderItem", back_populates="order", cascade="all, delete-orphan")
+
+
+class ShopOrderItem(Base):
+    __tablename__ = "shop_order_items"
+    
+    id = Column(LargeBinary(16), primary_key=True)
+    order_id = Column(LargeBinary(16), ForeignKey("shop_orders.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(String(50), ForeignKey("shop_products.id", ondelete="RESTRICT"), nullable=False)
+    product_name = Column(String(255), nullable=False)
+    product_price = Column(Numeric(10,2), nullable=False)
+    quantity = Column(Integer, nullable=False)
+    total = Column(Numeric(10,2), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    order = relationship("ShopOrder", back_populates="items")
+    product = relationship("ShopProduct", back_populates="order_items")
+
+
+# =============================================================
+# TRAINER ASSESSMENT SYSTEM
+# =============================================================
+
+class TrainerAssessment(Base):
+    __tablename__ = "trainer_assessments"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trainer_id = Column(LargeBinary(16), ForeignKey("trainers.id", ondelete="CASCADE"), nullable=False)
+    trainer_name = Column(String(100), nullable=False)
+    performance_score = Column(Numeric(3,1), default=0)
+    motivation_score = Column(Numeric(3,1), default=0)
+    interaction_score = Column(Numeric(3,1), default=0)
+    knowledge_score = Column(Numeric(3,1), default=0)
+    punctuality_score = Column(Numeric(3,1), default=0)
+    average_score = Column(Numeric(3,1), default=0)
+    standing = Column(String(20))
+    assessment_date = Column(Date, nullable=False)
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# =============================================================
+# CLIENT STATUS SYSTEM
+# =============================================================
+
+class ClientStatus(Base):
+    __tablename__ = "client_status"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(LargeBinary(16), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, unique=True)
+    status = Column(String(20), default="Active")
+    last_visit = Column(Date, nullable=True)
+    membership_plan = Column(String(50), default="Standard")
+    assigned_trainer_id = Column(LargeBinary(16), ForeignKey("trainers.id", ondelete="SET NULL"), nullable=True)
+    fitness_goal = Column(String(100))
+    progress_percentage = Column(Integer, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# Create indexes for legacy system
+Index('idx_users_email', LegacyUser.email)
+Index('idx_users_role', LegacyUser.role)
+Index('idx_progress_user_id', ProgressTracking.user_id)
+Index('idx_progress_recorded_at', ProgressTracking.recorded_at)

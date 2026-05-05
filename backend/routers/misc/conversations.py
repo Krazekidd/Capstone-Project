@@ -105,7 +105,7 @@ async def save_conversation(
                 conversation_id=conversation.id,
                 role=msg["role"],
                 content=msg["content"],
-                position=i,
+                sequence_order=i,
             )
         )
 

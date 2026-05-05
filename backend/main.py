@@ -1,13 +1,18 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from router import router
 from routers.auth.auth import router as auth_router
 from routers.bookings.booking import router as booking_router
 from routers.shop.shop import router as shop_router
 from routers.memberships.membership import router as membership_router
 from routers.ai.ai import router as ai_router
-from routers.account.account_router import router as account_router
+from routers.misc.conversations import router as conversations_router
+from routers.ml.ml.workouts import router as ml_workouts_router
+from routers.ml.ml.progress import router as ml_progress_router
+from routers.ml.ml.food import router as ml_food_router
+from database import init_db
+from database import engine, Base
 import logging
 
 # Configure logging to print to terminal
@@ -20,27 +25,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Create tables (for development only - use Alembic for production)
+async def init_db1():
+    async with engine.begin() as conn:
+        # await conn.run_sync(Base.metadata.drop_all)  # Uncomment to drop tables
+        await conn.run_sync(Base.metadata.create_all)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialise database tables on startup."""
     logger.info("🚀 Starting application...")
-    
-    # Database connectivity check
-    try:
-        from database import init_db, engine
-        logger.info("🔍 Checking database connectivity...")
-        
-        # Test database connection
-        async with engine.begin() as conn:
-            await conn.execute(text("SELECT 1"))
-            logger.info("✅ Database connection successful")
-        
-    except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
-        raise
-    
+    await init_db()
     logger.info("✅ Application started successfully")
     yield
     logger.info("👋 Shutting down application...")
@@ -71,12 +67,21 @@ app.add_middleware(
 
 
 # Include all routes
+app.include_router(router, tags=["api"])
 app.include_router(auth_router)
 app.include_router(booking_router)
 app.include_router(shop_router)
 app.include_router(membership_router)
 app.include_router(ai_router)
-app.include_router(account_router)
+app.include_router(conversations_router)
+app.include_router(ml_workouts_router)
+app.include_router(ml_progress_router)
+app.include_router(ml_food_router)
+
+
+@app.get("startup")
+async def startup():
+    await init_db()
 
 
 @app.get("/")

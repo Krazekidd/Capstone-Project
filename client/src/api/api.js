@@ -298,13 +298,42 @@ export const progressAPI = {
     }
   },
   
-  rateTrainer: async (trainerName, rating) => {
+  rateTrainer: async (trainerName, rating, comment = '', privacy = 'private') => {
     try {
-      const response = await axiosInstance.post('/account/trainer-ratings', { trainer_name: trainerName, rating });
+      const response = await axiosInstance.post('/account/trainer-ratings', { 
+        trainer_name: trainerName, 
+        rating, 
+        comment,
+        privacy
+      });
       return response.data;
     } catch (error) {
       console.error('Rate trainer error:', error.response?.data);
       throw error.response?.data || { detail: 'Failed to rate trainer' };
+    }
+  },
+  
+  updateTrainerRating: async (ratingId, rating, comment, privacy) => {
+    try {
+      const response = await axiosInstance.put(`/account/trainer-ratings/${ratingId}`, {
+        rating,
+        comment,
+        privacy
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Update trainer rating error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to update trainer rating' };
+    }
+  },
+
+  deleteTrainerRating: async (ratingId) => {
+    try {
+      const response = await axiosInstance.delete(`/account/trainer-ratings/${ratingId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete trainer rating error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to delete trainer rating' };
     }
   },
   
@@ -319,7 +348,7 @@ export const progressAPI = {
     }
   },
   
-  // Training Schedule
+  // Training Schedule/Attendance
   getTrainingSchedule: async () => {
     try {
       const response = await axiosInstance.get('/account/training-schedule');
@@ -337,6 +366,101 @@ export const progressAPI = {
     } catch (error) {
       console.error('Update training schedule error:', error.response?.data);
       throw error.response?.data || { detail: 'Failed to update training schedule' };
+    }
+  },
+
+  logAttendance: async (date, sessionType = 'am') => {
+    try {
+      const response = await axiosInstance.post('/account/attendance', {
+        date,
+        session_type: sessionType
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Log attendance error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to log attendance' };
+    }
+  },
+
+  getAttendanceHistory: async () => {
+    try {
+      const response = await axiosInstance.get('/account/attendance');
+      return response.data || {};
+    } catch (error) {
+      console.error('Get attendance history error:', error.response?.data);
+      return {};
+    }
+  },
+
+  // Progress Photos
+  uploadProgressPhoto: async (photoFile, date, category = 'front') => {
+    try {
+      const formData = new FormData();
+      formData.append('photo', photoFile);
+      formData.append('date', date);
+      formData.append('category', category);
+      
+      const response = await axiosInstance.post('/account/progress-photos', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Upload progress photo error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to upload progress photo' };
+    }
+  },
+
+  getProgressPhotos: async () => {
+    try {
+      const response = await axiosInstance.get('/account/progress-photos');
+      return response.data || [];
+    } catch (error) {
+      console.error('Get progress photos error:', error.response?.data);
+      return [];
+    }
+  },
+
+  deleteProgressPhoto: async (photoId) => {
+    try {
+      const response = await axiosInstance.delete(`/account/progress-photos/${photoId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete progress photo error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to delete progress photo' };
+    }
+  },
+
+  // Activity/Sessions tracking
+  getSessionStats: async () => {
+    try {
+      const response = await axiosInstance.get('/account/session-stats');
+      return response.data || { total_sessions: 0, current_streak: 0, attended_days: {} };
+    } catch (error) {
+      console.error('Get session stats error:', error.response?.data);
+      return { total_sessions: 0, current_streak: 0, attended_days: {} };
+    }
+  },
+
+  // Nutrition tracking
+  getNutritionPlan: async () => {
+    try {
+      const response = await axiosInstance.get('/account/nutrition-plan');
+      return response.data || null;
+    } catch (error) {
+      console.error('Get nutrition plan error:', error.response?.data);
+      return null;
+    }
+  },
+
+  updateNutritionGoals: async (goals) => {
+    try {
+      const response = await axiosInstance.put('/account/nutrition-goals', goals);
+      return response.data;
+    } catch (error) {
+      console.error('Update nutrition goals error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to update nutrition goals' };
     }
   },
 };
@@ -404,63 +528,49 @@ export const excursionsAPI = {
       throw error.response?.data || { detail: 'Failed to fetch recommendations' };
     }
   },
-};
-
-export const consultationsAPI = {
-  getConsultationTypes: async () => {
+  // Enhanced excursion functions
+  getExcursionsByLevel: async (level) => {
     try {
-      const response = await axiosInstance.get('/consultations/types');
+      const response = await axiosInstance.get('/excursions/by-level', {
+        params: { level }
+      });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch consultation types' };
+      throw error.response?.data || { detail: 'Failed to fetch excursions by level' };
     }
   },
-  
-  getAvailability: async (date) => {
+  getExcursionsByDate: async (startDate, endDate) => {
     try {
-      const response = await axiosInstance.get(`/consultations/availability/${date}`);
+      const response = await axiosInstance.get('/excursions/by-date', {
+        params: { start_date: startDate, end_date: endDate }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch excursions by date' };
+    }
+  },
+  getExcursionAvailability: async (excursionId) => {
+    try {
+      const response = await axiosInstance.get(`/excursions/${excursionId}/availability`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch availability' };
     }
   },
-  
-  bookConsultation: async (bookingData) => {
+  checkExcursionEligibility: async (excursionId) => {
     try {
-      const response = await axiosInstance.post('/consultations/book', bookingData);
+      const response = await axiosInstance.get(`/excursions/${excursionId}/check-eligibility`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { detail: 'Failed to book consultation' };
+      throw error.response?.data || { detail: 'Failed to check eligibility' };
     }
   },
-  
-  getMyConsultations: async () => {
+  getExcursionReviews: async (excursionId) => {
     try {
-      const response = await axiosInstance.get('/consultations/my-bookings');
+      const response = await axiosInstance.get(`/excursions/${excursionId}/reviews`);
       return response.data;
     } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch consultations' };
-    }
-  },
-  
-  cancelConsultation: async (bookingId) => {
-    try {
-      const response = await axiosInstance.delete(`/consultations/bookings/${bookingId}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to cancel consultation' };
-    }
-  },
-};
-
-export const shopAPI = {
-  // Categories
-  getCategories: async () => {
-    try {
-      const response = await axiosInstance.get('/shop/categories');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch categories' };
+      throw error.response?.data || { detail: 'Failed to fetch reviews' };
     }
   },
   
@@ -710,4 +820,235 @@ export const adminAPI = {
     }
   },
 
+  // Additional admin functions
+  getMemberStats: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/member-stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch member stats' };
+    }
+  },
+
+  getRevenueStats: async (period = 'month') => {
+    try {
+      const response = await axiosInstance.get('/account/admin/revenue-stats', {
+        params: { period }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch revenue stats' };
+    }
+  },
+
+  getAttendanceStats: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/attendance-stats');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch attendance stats' };
+    }
+  },
+
+  getEquipmentStatus: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/equipment-status');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch equipment status' };
+    }
+  },
+
+  updateEquipmentStatus: async (equipmentId, statusData) => {
+    try {
+      const response = await axiosInstance.put(`/account/admin/equipment/${equipmentId}/status`, statusData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update equipment status' };
+    }
+  },
+
+  getClassSchedule: async (date) => {
+    try {
+      const response = await axiosInstance.get('/account/admin/class-schedule', {
+        params: { date }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch class schedule' };
+    }
+  },
+
+  updateClassSchedule: async (scheduleId, scheduleData) => {
+    try {
+      const response = await axiosInstance.put(`/account/admin/class-schedule/${scheduleId}`, scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update class schedule' };
+    }
+  },
+
+  getTrainerSchedule: async (trainerId, date) => {
+    try {
+      const response = await axiosInstance.get(`/account/admin/trainer-schedule/${trainerId}`, {
+        params: { date }
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch trainer schedule' };
+    }
+  },
+
+  createTrainerSchedule: async (scheduleData) => {
+    try {
+      const response = await axiosInstance.post('/account/admin/trainer-schedule', scheduleData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to create trainer schedule' };
+    }
+  },
+
+  getMemberProgress: async (memberId) => {
+    try {
+      const response = await axiosInstance.get(`/account/admin/member-progress/${memberId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch member progress' };
+    }
+  },
+
+  updateMemberProgress: async (memberId, progressData) => {
+    try {
+      const response = await axiosInstance.put(`/account/admin/member-progress/${memberId}`, progressData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update member progress' };
+    }
+  },
+
+  getMemberNotes: async (memberId) => {
+    try {
+      const response = await axiosInstance.get(`/account/admin/member-notes/${memberId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch member notes' };
+    }
+  },
+
+  addMemberNote: async (memberId, noteData) => {
+    try {
+      const response = await axiosInstance.post(`/account/admin/member-notes/${memberId}`, noteData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to add member note' };
+    }
+  },
+
+  getSystemHealth: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/system-health');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch system health' };
+    }
+  },
+
+  getAuditLogs: async (params = {}) => {
+    try {
+      const response = await axiosInstance.get('/account/admin/audit-logs', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch audit logs' };
+    }
+  },
+
+  getReports: async (reportType, params = {}) => {
+    try {
+      const response = await axiosInstance.get(`/account/admin/reports/${reportType}`, { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch reports' };
+    }
+  },
+
+  generateReport: async (reportType, params) => {
+    try {
+      const response = await axiosInstance.post(`/account/admin/reports/${reportType}/generate`, params);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to generate report' };
+    }
+  },
+
+  getNotifications: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/notifications');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch notifications' };
+    }
+  },
+
+  markNotificationRead: async (notificationId) => {
+    try {
+      const response = await axiosInstance.patch(`/account/admin/notifications/${notificationId}/read`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to mark notification as read' };
+    }
+  },
+
+  sendNotification: async (notificationData) => {
+    try {
+      const response = await axiosInstance.post('/account/admin/notifications/send', notificationData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to send notification' };
+    }
+  },
+
+  getSettings: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/settings');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch settings' };
+    }
+  },
+
+  updateSettings: async (settingsData) => {
+    try {
+      const response = await axiosInstance.put('/account/admin/settings', settingsData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update settings' };
+    }
+  },
+
+  getBackupStatus: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/backup-status');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch backup status' };
+    }
+  },
+
+  createBackup: async (backupData) => {
+    try {
+      const response = await axiosInstance.post('/account/admin/backup', backupData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to create backup' };
+    }
+  },
+
+  restoreBackup: async (backupId) => {
+    try {
+      const response = await axiosInstance.post(`/account/admin/restore/${backupId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to restore backup' };
+    }
+  },
 };

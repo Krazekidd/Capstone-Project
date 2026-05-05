@@ -1,0 +1,12 @@
+{
+  "gender": {
+    "Female": 0,
+    "Male": 1
+  },
+  "workout_type": {
+    "Cardio": 0,
+    "HIIT": 1,
+    "Strength": 2,
+    "Yoga": 3
+  }
+}

@@ -36,3 +36,64 @@ export const cancelBooking = async (bookingId, reason) => {
   const response = await api.patch(`/api/v1/bookings/${bookingId}/cancel`, { reason });
   return response.data;
 };
+
+export const rescheduleBooking = async (bookingId, newDate, newTime) => {
+  const response = await api.patch(`/api/v1/bookings/${bookingId}/reschedule`, {
+    new_date: newDate,
+    new_time: newTime
+  });
+  return response.data;
+};
+
+export const confirmBooking = async (bookingId) => {
+  const response = await api.patch(`/api/v1/bookings/${bookingId}/confirm`);
+  return response.data;
+};
+
+export const getBookingHistory = async (limit = 10) => {
+  const response = await api.get('/api/v1/bookings/history', { params: { limit } });
+  return response.data;
+};
+
+export const getUpcomingBookings = async () => {
+  const response = await api.get('/api/v1/bookings/upcoming');
+  return response.data;
+};
+
+export const getPastBookings = async () => {
+  const response = await api.get('/api/v1/bookings/past');
+  return response.data;
+};
+
+export const addBookingNote = async (bookingId, note) => {
+  const response = await api.post(`/api/v1/bookings/${bookingId}/notes`, { note });
+  return response.data;
+};
+
+export const getBookingNotes = async (bookingId) => {
+  const response = await api.get(`/api/v1/bookings/${bookingId}/notes`);
+  return response.data;
+};
+
+export const rateConsultation = async (bookingId, rating, feedback) => {
+  const response = await api.post(`/api/v1/bookings/${bookingId}/rate`, {
+    rating,
+    feedback
+  });
+  return response.data;
+};
+
+export const getConsultationStats = async () => {
+  const response = await api.get('/api/v1/bookings/stats');
+  return response.data;
+};
+
+export const checkBookingEligibility = async (consultationTypeId) => {
+  const response = await api.get(`/api/v1/bookings/check-eligibility/${consultationTypeId}`);
+  return response.data;
+};
+
+export const sendBookingReminder = async (bookingId) => {
+  const response = await api.post(`/api/v1/bookings/${bookingId}/remind`);
+  return response.data;
+};

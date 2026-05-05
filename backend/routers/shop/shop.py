@@ -345,7 +345,7 @@ async def create_order(
     await db.refresh(new_order)
     
     # Load items for response
-    await db.refresh(new_order, ["items"])
+    await db.refresh(new_order, ["order_items"])
     
     return new_order
 

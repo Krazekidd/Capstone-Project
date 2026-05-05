@@ -47,21 +47,19 @@ async def get_db():
             raise
 
 
-# User database
-# Create async engine
+# User database engine
 userEngine = create_async_engine(
-    settings.DATABASE_URL, echo=True, future=True  # Set to False in production
+    settings.DATABASE_URL, echo=False, future=True
 )
 
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
+UserAsyncSessionLocal = async_sessionmaker(
     userEngine, class_=AsyncSession, expire_on_commit=False
 )
 
 
 # Dependency to get DB session
 async def get_user_db():
-    async with AsyncSessionLocal() as session:
+    async with UserAsyncSessionLocal() as session:
         try:
             yield session
             await session.commit()

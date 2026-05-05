@@ -426,36 +426,22 @@ $$;
 --     d.dow,
 --     CASE WHEN d.dow BETWEEN 1 AND 5 THEN '06:00'::TIME ELSE '07:00'::TIME END,
 --     CASE WHEN d.dow BETWEEN 1 AND 5 THEN '20:00'::TIME ELSE '17:00'::TIME END
+-- FROM coaches c
+-- CROSS JOIN (VALUES (1),(2),(3),(4),(5),(6)) AS d(dow)   -- Mon=1 … Sat=6
+-- WHERE NOT EXISTS (SELECT 1 FROM coach_availability_schedule LIMIT 1);
 
 
 -- =============================================================
 -- DONE
 -- =============================================================
 -- Tables created (idempotent):
---   MODERN SYSTEM (PostgreSQL UUID-based):
 --   users, auth_tokens,
 --   membership_plans, user_memberships,
 --   coaches, coach_availability_schedule, coach_availability_overrides,
 --   consultation_types,
 --   bookings,
 --   products, orders, order_items,
---   product_reviews, wishlists,
---   saved_conversations, conversation_messages
---
--- LEGACY SYSTEM (Binary UUID storage for MySQL compatibility):
---   accounts, clients, trainers, admins,
---   progress_tracking, body_measurements,
---   client_goals, client_health_conditions, client_water_intake,
---   client_workout_sessions, client_strength_records,
---   trainer_ratings, client_badges, training_schedule,
---   password_reset_tokens,
---   excursions, excursion_tags, excursion_bring_items,
---   excursion_bookings, excursion_ml_scores,
---   legacy_consultation_types, legacy_consultation_bookings,
---   consultation_availability, business_hours, holidays,
---   shop_categories, shop_products, shop_cart_items,
---   shop_wishlist_items, shop_orders, shop_order_items,
---   trainer_assessments, client_status
+--   product_reviews, wishlists
 --
 -- JWT strategy:
 --   • Sign short-lived ACCESS tokens (e.g. 15 min) in your API layer
@@ -464,10 +450,4 @@ $$;
 --   • On logout: set auth_tokens.revoked = TRUE, revoked_at = NOW().
 --   • On token refresh: verify token_hash, check revoked/expires_at,
 --     issue new access token.
---
--- Migration Strategy:
---   • Modern system uses PostgreSQL UUIDs and JSONB
---   • Legacy system uses binary UUID storage for MySQL compatibility
---   • Both systems can coexist for gradual migration
---   • Legacy tables use bytea for UUID storage (gen_random_uuid()::bytea)
 -- =============================================================

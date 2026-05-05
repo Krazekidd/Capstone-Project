@@ -687,6 +687,120 @@ export const excursionsAPI = {
   },
 };
 
+export const shopAPI = {
+  // Products
+  getProducts: async (params = {}) => {
+    try {
+      const response = await axiosInstance.get('/shop/products', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch products' };
+    }
+  },
+  
+  getProductById: async (productId) => {
+    try {
+      const response = await axiosInstance.get(`/shop/products/${productId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch product' };
+    }
+  },
+  
+  // Cart
+  getCart: async () => {
+    try {
+      const response = await axiosInstance.get('/shop/cart');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch cart' };
+    }
+  },
+  
+  addToCart: async (productId, quantity = 1) => {
+    try {
+      const response = await axiosInstance.post('/shop/cart/add', { product_id: productId, quantity });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to add to cart' };
+    }
+  },
+  
+  updateCartItem: async (productId, quantity) => {
+    try {
+      const response = await axiosInstance.put('/shop/cart/update', { product_id: productId, quantity });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update cart' };
+    }
+  },
+  
+  removeFromCart: async (productId) => {
+    try {
+      const response = await axiosInstance.delete(`/shop/cart/remove/${productId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to remove from cart' };
+    }
+  },
+  
+  clearCart: async () => {
+    try {
+      const response = await axiosInstance.delete('/shop/cart/clear');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to clear cart' };
+    }
+  },
+  
+  // Wishlist
+  getWishlist: async () => {
+    try {
+      const response = await axiosInstance.get('/shop/wishlist');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch wishlist' };
+    }
+  },
+  
+  addToWishlist: async (productId) => {
+    try {
+      const response = await axiosInstance.post('/shop/wishlist/add', { product_id: productId });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to add to wishlist' };
+    }
+  },
+  
+  removeFromWishlist: async (productId) => {
+    try {
+      const response = await axiosInstance.delete(`/shop/wishlist/remove/${productId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to remove from wishlist' };
+    }
+  },
+  
+  // Orders
+  placeOrder: async (orderData) => {
+    try {
+      const response = await axiosInstance.post('/shop/order/place', orderData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to place order' };
+    }
+  },
+  
+  getMyOrders: async () => {
+    try {
+      const response = await axiosInstance.get('/shop/orders');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch orders' };
+    }
+  },
+};
+
 export const adminAPI = {
   getAllClients: async () => {
     try {

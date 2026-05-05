@@ -39,6 +39,16 @@ export const changePassword = async (currentPassword, newPassword) => {
   return response.data;
 };
 
+export const refreshToken = async (refreshToken) => {
+  const response = await api.post('/auth/refresh', { refresh_token: refreshToken });
+  return response.data;
+};
+
+export const verifyToken = async () => {
+  const response = await api.get('/auth/verify');
+  return response.data;
+};
+
 // Google auth not supported by backend yet
 // export const googleLogin = async (credential) => {
 //   const response = await api.post('/auth/google', { credential });

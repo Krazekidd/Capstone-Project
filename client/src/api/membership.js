@@ -27,18 +27,19 @@ export const cancelMembership = async () => {
   return response.data;
 };
 
+// Enhanced membership functions (need backend implementation)
 export const updateMembership = async (membershipData) => {
   const response = await api.put('/api/v1/memberships/mine', membershipData);
   return response.data;
 };
 
-export const pauseMembership = async (pauseData) => {
-  const response = await api.post('/api/v1/memberships/pause', pauseData);
+export const pauseMembership = async (reason) => {
+  const response = await api.post('/api/v1/memberships/mine/pause', { reason });
   return response.data;
 };
 
 export const resumeMembership = async () => {
-  const response = await api.post('/api/v1/memberships/resume');
+  const response = await api.post('/api/v1/memberships/mine/resume');
   return response.data;
 };
 
@@ -47,13 +48,13 @@ export const getMembershipHistory = async () => {
   return response.data;
 };
 
-export const upgradeMembership = async (newPlanId) => {
-  const response = await api.post('/api/v1/memberships/upgrade', { plan_id: newPlanId });
+export const upgradeMembership = async (targetPlanId) => {
+  const response = await api.post('/api/v1/memberships/mine/upgrade', { target_plan_id: targetPlanId });
   return response.data;
 };
 
-export const downgradeMembership = async (newPlanId) => {
-  const response = await api.post('/api/v1/memberships/downgrade', { plan_id: newPlanId });
+export const downgradeMembership = async (targetPlanId) => {
+  const response = await api.post('/api/v1/memberships/mine/downgrade', { target_plan_id: targetPlanId });
   return response.data;
 };
 
@@ -63,7 +64,7 @@ export const getMembershipBenefits = async (planId) => {
 };
 
 export const checkMembershipEligibility = async (planId) => {
-  const response = await api.get(`/api/v1/memberships/check-eligibility/${planId}`);
+  const response = await api.get(`/api/v1/memberships/plans/${planId}/eligibility`);
   return response.data;
 };
 

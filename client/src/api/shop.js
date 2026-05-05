@@ -7,18 +7,13 @@ export const getCategories = async () => {
 };
 
 // Products
-export const getProducts = async (filters = {}) => {
-  const response = await api.get('/api/v1/shop/products', { params: filters });
+export const getProducts = async (params = {}) => {
+  const response = await api.get('/api/v1/shop/products', { params });
   return response.data;
 };
 
-export const getProduct = async (slug) => {
+export const getProductById = async (slug) => {
   const response = await api.get(`/api/v1/shop/products/${slug}`);
-  return response.data;
-};
-
-export const getProductById = async (productId) => {
-  const response = await api.get(`/api/v1/shop/products/id/${productId}`);
   return response.data;
 };
 
@@ -34,7 +29,7 @@ export const getFeaturedProducts = async () => {
   return response.data;
 };
 
-export const getNewArrivals = async () => {
+export const getNewProducts = async () => {
   const response = await api.get('/api/v1/shop/products/new');
   return response.data;
 };
@@ -46,18 +41,12 @@ export const getCart = async () => {
 };
 
 export const addToCart = async (productId, quantity = 1) => {
-  const response = await api.post('/api/v1/shop/cart/add', {
-    product_id: productId,
-    quantity
-  });
+  const response = await api.post('/api/v1/shop/cart/add', { product_id: productId, quantity });
   return response.data;
 };
 
 export const updateCartItem = async (productId, quantity) => {
-  const response = await api.put('/api/v1/shop/cart/update', {
-    product_id: productId,
-    quantity
-  });
+  const response = await api.put('/api/v1/shop/cart/update', { product_id: productId, quantity });
   return response.data;
 };
 
@@ -83,7 +72,9 @@ export const getWishlist = async () => {
 };
 
 export const addToWishlist = async (productId) => {
-  const response = await api.post('/api/v1/shop/wishlists', { product_id: productId });
+  const response = await api.post('/api/v1/shop/wishlists', null, {
+    params: { product_id: productId }
+  });
   return response.data;
 };
 
@@ -92,19 +83,23 @@ export const removeFromWishlist = async (productId) => {
   return response.data;
 };
 
-export const moveWishlistToCart = async (productId) => {
-  const response = await api.post(`/api/v1/shop/wishlists/${productId}/move-to-cart`);
+export const moveWishlistToCart = async (productId, quantity = 1) => {
+  const response = await api.post('/api/v1/shop/wishlists/to-cart', {
+    product_id: productId,
+    quantity
+  });
   return response.data;
 };
 
 // Orders
-export const createOrder = async (orderData) => {
+export const placeOrder = async (orderData) => {
   const response = await api.post('/api/v1/shop/orders', orderData);
   return response.data;
 };
 
-export const getOrders = async (filters = {}) => {
-  const response = await api.get('/api/v1/shop/orders', { params: filters });
+export const getOrders = async (statusFilter = null) => {
+  const params = statusFilter ? { status_filter: statusFilter } : {};
+  const response = await api.get('/api/v1/shop/orders', { params });
   return response.data;
 };
 
@@ -128,14 +123,16 @@ export const trackOrder = async (orderId) => {
   return response.data;
 };
 
-// Product Reviews
+// Reviews
 export const createProductReview = async (productId, reviewData) => {
   const response = await api.post(`/api/v1/shop/products/${productId}/reviews`, reviewData);
   return response.data;
 };
 
-export const getProductReviews = async (productId, filters = {}) => {
-  const response = await api.get(`/api/v1/shop/products/${productId}/reviews`, { params: filters });
+export const getProductReviews = async (productId, limit = 10, offset = 0) => {
+  const response = await api.get(`/api/v1/shop/products/${productId}/reviews`, {
+    params: { limit, offset }
+  });
   return response.data;
 };
 
@@ -149,38 +146,45 @@ export const deleteProductReview = async (reviewId) => {
   return response.data;
 };
 
-// Shipping & Payment
+// Shipping
 export const getShippingMethods = async () => {
-  const response = await api.get('/api/v1/shop/shipping-methods');
+  const response = await api.get('/api/v1/shop/shipping/methods');
   return response.data;
 };
 
-export const calculateShipping = async (cartData, address) => {
+export const calculateShipping = async (address, items) => {
   const response = await api.post('/api/v1/shop/shipping/calculate', {
-    cart: cartData,
-    address
+    address,
+    items
   });
   return response.data;
 };
 
+// Payment
 export const getPaymentMethods = async () => {
-  const response = await api.get('/api/v1/shop/payment-methods');
+  const response = await api.get('/api/v1/shop/payment/methods');
   return response.data;
 };
 
-export const applyDiscountCode = async (code) => {
+export const processPayment = async (paymentData) => {
+  const response = await api.post('/api/v1/shop/payment/process', paymentData);
+  return response.data;
+};
+
+// Discounts
+export const applyDiscount = async (code) => {
   const response = await api.post('/api/v1/shop/discounts/apply', { code });
   return response.data;
 };
 
-export const removeDiscountCode = async () => {
+export const removeDiscount = async () => {
   const response = await api.delete('/api/v1/shop/discounts/remove');
   return response.data;
 };
 
 // Inventory
-export const checkProductStock = async (productId) => {
-  const response = await api.get(`/api/v1/shop/products/${productId}/stock`);
+export const checkInventory = async (productId) => {
+  const response = await api.get(`/api/v1/shop/products/${productId}/inventory`);
   return response.data;
 };
 
@@ -195,7 +199,7 @@ export const contactSupport = async (supportData) => {
   return response.data;
 };
 
-export const submitReturnRequest = async (returnData) => {
+export const createReturnRequest = async (returnData) => {
   const response = await api.post('/api/v1/shop/returns', returnData);
   return response.data;
 };

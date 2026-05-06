@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from router import router
 from routers.auth.auth import router as auth_router
 from routers.bookings.booking import router as booking_router
@@ -14,7 +15,9 @@ from routers.ml.ml.food import router as ml_food_router
 from routers.users.account import router as account_router
 from database import init_db
 from database import engine, Base
+from config.config import PROFILE_IMAGES_DIR, PROGRESS_PHOTOS_DIR
 import logging
+import os
 
 # Configure logging to print to terminal
 logging.basicConfig(
@@ -79,6 +82,15 @@ app.include_router(conversations_router)
 app.include_router(ml_workouts_router)
 app.include_router(ml_progress_router)
 app.include_router(ml_food_router)
+
+# Mount static directories for image serving
+if os.path.exists(PROFILE_IMAGES_DIR):
+    app.mount("/profile_images", StaticFiles(directory=PROFILE_IMAGES_DIR), name="profile_images")
+    logger.info(f"Mounted profile images directory: {PROFILE_IMAGES_DIR}")
+
+if os.path.exists(PROGRESS_PHOTOS_DIR):
+    app.mount("/progress_photos", StaticFiles(directory=PROGRESS_PHOTOS_DIR), name="progress_photos")
+    logger.info(f"Mounted progress photos directory: {PROGRESS_PHOTOS_DIR}")
 
 
 @app.get("startup")

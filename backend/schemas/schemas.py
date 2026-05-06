@@ -740,3 +740,13 @@ class BadgeCheckResponse(BaseModel):
     new_badges: List[BadgeResponse]
     total_badges: int
     message: str
+
+
+# ---------------------------------------------------------------------------
+# Profile Image Schemas
+# ---------------------------------------------------------------------------
+
+class ProfileImageResponse(BaseModel):
+    success: bool
+    message: str
+    avatar_url: Optional[str] = None

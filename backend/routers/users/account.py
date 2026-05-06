@@ -25,7 +25,8 @@ from schemas import (
     NutritionPlanResponse, NutritionGoalsRequest, NutritionGoalsResponse,
     ProgressAnalyticsResponse, ProgressComparisonResponse, ProgressSummaryResponse,
     ActivityDataCreate, ActivityDataResponse, ActivityDataListResponse,
-    AccountConversationRequest, AccountConversationResponse, AccountConversationHistoryResponse
+    AccountConversationRequest, AccountConversationResponse, AccountConversationHistoryResponse,
+    ProfileImageResponse
 )
 from auth_router import get_current_user
 from config.config import settings
@@ -3283,3 +3284,123 @@ async def get_conversation_history(
     except Exception as e:
         logger.error(f"Error getting conversation history: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get conversation history")
+
+
+# ============================================================
+# PROFILE IMAGE MANAGEMENT
+# ============================================================
+
+@router.post("/profile-image", response_model=ProfileImageResponse)
+async def upload_profile_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Upload profile picture for the current user"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Validate file type
+        allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type. Only JPEG, PNG, and WebP images are allowed"
+            )
+        
+        # Validate file size (max 5MB)
+        max_size = 5 * 1024 * 1024  # 5MB
+        file_content = await file.read()
+        if len(file_content) > max_size:
+            raise HTTPException(
+                status_code=400,
+                detail="File too large. Maximum size is 5MB"
+            )
+        
+        # Create profile images directory if it doesn't exist
+        profile_images_dir = settings.PROFILE_IMAGES_DIR
+        os.makedirs(profile_images_dir, exist_ok=True)
+        
+        # Generate unique filename
+        file_extension = file.content_type.split("/")[-1]
+        unique_filename = f"{user_id}_{uuid.uuid4().hex[:8]}.{file_extension}"
+        file_path = os.path.join(profile_images_dir, unique_filename)
+        
+        # Save file
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(file_content)
+        
+        # Create the URL for the uploaded image
+        avatar_url = f"/{profile_images_dir}/{unique_filename}"
+        
+        # Update user's avatar_url in database
+        stmt = update(User).where(User.id == user_id_bytes).values(avatar_url=avatar_url)
+        await db.execute(stmt)
+        await db.commit()
+        
+        logger.info(f"Profile image uploaded for user {user_id}: {avatar_url}")
+        
+        return ProfileImageResponse(
+            success=True,
+            message="Profile image uploaded successfully",
+            avatar_url=avatar_url
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading profile image: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to upload profile image")
+
+
+@router.delete("/profile-image", response_model=ProfileImageResponse)
+async def delete_profile_image(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Remove profile picture for the current user"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get current user to check if they have a profile image
+        user_result = await db.execute(select(User).where(User.id == user_id_bytes))
+        user = user_result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        if not user.avatar_url:
+            return ProfileImageResponse(
+                success=True,
+                message="No profile image to remove",
+                avatar_url=None
+            )
+        
+        # Delete the file if it exists
+        if user.avatar_url.startswith("/"):
+            file_path = user.avatar_url[1:]  # Remove leading slash
+            
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logger.info(f"Deleted profile image file: {file_path}")
+        
+        # Update user's avatar_url to null
+        stmt = update(User).where(User.id == user_id_bytes).values(avatar_url=None)
+        await db.execute(stmt)
+        await db.commit()
+        
+        logger.info(f"Profile image removed for user {user_id}")
+        
+        return ProfileImageResponse(
+            success=True,
+            message="Profile image removed successfully",
+            avatar_url=None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing profile image: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to remove profile image")

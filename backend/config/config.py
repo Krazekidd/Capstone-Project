@@ -49,6 +49,9 @@ class Settings(BaseSettings):
 
     # Progress Photos
     PROGRESS_PHOTOS_DIR: str = "progress_photos"
+    
+    # Profile Images
+    PROFILE_IMAGES_DIR: str = "profile_images"
 
     model_config = {
         "env_file": ".env",
@@ -94,3 +97,6 @@ DEBUG = settings.DEBUG
 
 # Progress Photos
 PROGRESS_PHOTOS_DIR = settings.PROGRESS_PHOTOS_DIR
+
+# Profile Images
+PROFILE_IMAGES_DIR = settings.PROFILE_IMAGES_DIR

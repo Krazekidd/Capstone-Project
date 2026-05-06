@@ -414,6 +414,33 @@ class Wishlist(Base):
 
 
 # =============================================================
+# PROGRESS PHOTOS
+# =============================================================
+
+class ProgressPhoto(Base):
+    __tablename__ = "progress_photos"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    filename = Column(String(255), nullable=False)
+    original_filename = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=False)  # in bytes
+    mime_type = Column(String(100), nullable=False)
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_progress_photos_user_id', 'user_id'),
+        Index('idx_progress_photos_created_at', 'created_at'),
+    )
+
+
+# =============================================================
 # CONVERSATIONS
 # =============================================================
 

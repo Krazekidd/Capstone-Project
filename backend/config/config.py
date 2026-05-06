@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
 
+    # Progress Photos
+    PROGRESS_PHOTOS_DIR: str = "progress_photos"
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

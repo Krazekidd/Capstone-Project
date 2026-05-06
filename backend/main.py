@@ -11,6 +11,7 @@ from routers.misc.conversations import router as conversations_router
 from routers.ml.ml.workouts import router as ml_workouts_router
 from routers.ml.ml.progress import router as ml_progress_router
 from routers.ml.ml.food import router as ml_food_router
+from routers.users.account import router as account_router
 from database import init_db
 from database import engine, Base
 import logging
@@ -69,6 +70,7 @@ app.add_middleware(
 # Include all routes
 app.include_router(router, tags=["api"])
 app.include_router(auth_router)
+app.include_router(account_router)
 app.include_router(booking_router)
 app.include_router(shop_router)
 app.include_router(membership_router)

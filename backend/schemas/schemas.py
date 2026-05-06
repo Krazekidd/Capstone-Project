@@ -359,6 +359,32 @@ class WishlistResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# ---------------------------------------------------------------------------
+# Progress Photos
+# ---------------------------------------------------------------------------
+
+class ProgressPhotoBase(BaseModel):
+    description: Optional[str] = None
+
+
+class ProgressPhotoCreate(ProgressPhotoBase):
+    pass
+
+
+class ProgressPhotoResponse(ProgressPhotoBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    filename: str
+    original_filename: str
+    file_path: str
+    file_size: int
+    mime_type: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class MLWorkoutEntry(BaseModel):
     week: int; actual_weight: float
 class MLUserProfile(BaseModel):

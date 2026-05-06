@@ -1,13 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func,desc, asc
 import uuid
 import json
 import logging
+import os
+import aiofiles
 from datetime import date, datetime
 from typing import Optional, List
 from database import get_user_db
-from models import User
+from models import User, ProgressPhoto
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -18,9 +20,10 @@ from schemas import (
     TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse,
     TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,OrderItemResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
-    DashboardStatsResponse
+    DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate
 )
 from auth_router import get_current_user
+from config.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/account", tags=["account"])
@@ -1669,3 +1672,149 @@ async def send_birthday_email_to_client(
         return APIResponse(success=True, message=f"Birthday wishes sent to {client.name}!")
     else:
         raise HTTPException(status_code=500, detail="Failed to send email")
+
+# ============================================================
+# PROGRESS PHOTOS ENDPOINTS
+# ============================================================
+
+@router.post("/progress-photos", response_model=ProgressPhotoResponse)
+async def upload_progress_photo(
+    file: UploadFile = File(...),
+    description: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Upload a progress photo"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Validate file type
+        if not file.content_type or not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Create user directory if it doesn't exist
+        user_dir = os.path.join(settings.PROGRESS_PHOTOS_DIR, str(user_id))
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # Generate unique filename
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        file_path = os.path.join(user_dir, unique_filename)
+        
+        # Save file
+        async with aiofiles.open(file_path, 'wb') as f:
+            content = await file.read()
+            await f.write(content)
+        
+        # Save to database
+        new_photo = ProgressPhoto(
+            user_id=user_id_bytes,
+            filename=unique_filename,
+            original_filename=file.filename,
+            file_path=file_path,
+            file_size=len(content),
+            mime_type=file.content_type,
+            description=description
+        )
+        
+        db.add(new_photo)
+        await db.commit()
+        await db.refresh(new_photo)
+        
+        return ProgressPhotoResponse(
+            id=new_photo.id,
+            user_id=user_id,
+            filename=new_photo.filename,
+            original_filename=new_photo.original_filename,
+            file_path=new_photo.file_path,
+            file_size=new_photo.file_size,
+            mime_type=new_photo.mime_type,
+            description=new_photo.description,
+            created_at=new_photo.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading progress photo: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to upload photo")
+
+@router.get("/progress-photos", response_model=List[ProgressPhotoResponse])
+async def get_progress_photos(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get user's progress photos"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(ProgressPhoto)
+            .where(ProgressPhoto.user_id == user_id_bytes)
+            .order_by(ProgressPhoto.created_at.desc())
+        )
+        photos = result.scalars().all()
+        
+        return [
+            ProgressPhotoResponse(
+                id=photo.id,
+                user_id=user_id,
+                filename=photo.filename,
+                original_filename=photo.original_filename,
+                file_path=photo.file_path,
+                file_size=photo.file_size,
+                mime_type=photo.mime_type,
+                description=photo.description,
+                created_at=photo.created_at
+            )
+            for photo in photos
+        ]
+        
+    except Exception as e:
+        logger.error(f"Error getting progress photos: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get photos")
+
+@router.delete("/progress-photos/{photo_id}", response_model=APIResponse)
+async def delete_progress_photo(
+    photo_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Delete a progress photo"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get photo
+        result = await db.execute(
+            select(ProgressPhoto)
+            .where(ProgressPhoto.id == photo_id.bytes)
+            .where(ProgressPhoto.user_id == user_id_bytes)
+        )
+        photo = result.scalar_one_or_none()
+        
+        if not photo:
+            raise HTTPException(status_code=404, detail="Photo not found")
+        
+        # Delete file from filesystem
+        try:
+            if os.path.exists(photo.file_path):
+                os.remove(photo.file_path)
+        except Exception as e:
+            logger.warning(f"Failed to delete file {photo.file_path}: {e}")
+        
+        # Delete from database
+        await db.delete(photo)
+        await db.commit()
+        
+        return APIResponse(success=True, message="Photo deleted successfully")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting progress photo: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to delete photo")

@@ -9,7 +9,7 @@ import aiofiles
 from datetime import date, datetime
 from typing import Optional, List
 from database import get_user_db
-from models import User, ProgressPhoto
+from models import User, ProgressPhoto, Attendance
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -20,7 +20,8 @@ from schemas import (
     TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse,
     TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,OrderItemResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
-    DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate
+    DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
+    AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse
 )
 from auth_router import get_current_user
 from config.config import settings
@@ -1818,3 +1819,266 @@ async def delete_progress_photo(
         logger.error(f"Error deleting progress photo: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete photo")
+
+# ============================================================
+# ATTENDANCE TRACKING ENDPOINTS
+# ============================================================
+
+@router.post("/attendance/check-in", response_model=AttendanceResponse)
+async def check_in_attendance(
+    check_in_data: AttendanceCheckIn,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Log gym attendance check-in"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Check if user already has an active session (checked in but not checked out)
+        result = await db.execute(
+            select(Attendance)
+            .where(Attendance.user_id == user_id_bytes)
+            .where(Attendance.check_out_time.is_(None))
+            .order_by(desc(Attendance.check_in_time))
+            .limit(1)
+        )
+        active_session = result.scalar_one_or_none()
+        
+        if active_session:
+            raise HTTPException(
+                status_code=400, 
+                detail="You already have an active session. Please check out first."
+            )
+        
+        # Create new attendance record
+        new_attendance = Attendance(
+            user_id=user_id_bytes,
+            notes=check_in_data.notes
+        )
+        
+        db.add(new_attendance)
+        await db.commit()
+        await db.refresh(new_attendance)
+        
+        return AttendanceResponse(
+            id=uuid.UUID(bytes=new_attendance.id),
+            user_id=user_id,
+            check_in_time=new_attendance.check_in_time,
+            check_out_time=new_attendance.check_out_time,
+            duration_minutes=new_attendance.duration_minutes,
+            notes=new_attendance.notes,
+            created_at=new_attendance.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking in attendance: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to check in")
+
+@router.post("/attendance/check-out", response_model=AttendanceResponse)
+async def check_out_attendance(
+    check_out_data: AttendanceCheckOut,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Log gym attendance check-out"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Find the most recent active session
+        result = await db.execute(
+            select(Attendance)
+            .where(Attendance.user_id == user_id_bytes)
+            .where(Attendance.check_out_time.is_(None))
+            .order_by(desc(Attendance.check_in_time))
+            .limit(1)
+        )
+        active_session = result.scalar_one_or_none()
+        
+        if not active_session:
+            raise HTTPException(
+                status_code=404, 
+                detail="No active session found. Please check in first."
+            )
+        
+        # Update the session with check-out time
+        check_out_time = datetime.utcnow()
+        duration_minutes = int((check_out_time - active_session.check_in_time).total_seconds() / 60)
+        
+        active_session.check_out_time = check_out_time
+        active_session.duration_minutes = duration_minutes
+        if check_out_data.notes:
+            active_session.notes = check_out_data.notes
+        
+        await db.commit()
+        await db.refresh(active_session)
+        
+        return AttendanceResponse(
+            id=uuid.UUID(bytes=active_session.id),
+            user_id=user_id,
+            check_in_time=active_session.check_in_time,
+            check_out_time=active_session.check_out_time,
+            duration_minutes=active_session.duration_minutes,
+            notes=active_session.notes,
+            created_at=active_session.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error checking out attendance: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to check out")
+
+@router.get("/attendance", response_model=AttendanceHistoryResponse)
+async def get_attendance_history(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get attendance history for the current user"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get total count
+        count_result = await db.execute(
+            select(func.count(Attendance.id))
+            .where(Attendance.user_id == user_id_bytes)
+        )
+        total_sessions = count_result.scalar()
+        
+        # Calculate pagination
+        offset = (page - 1) * page_size
+        total_pages = (total_sessions + page_size - 1) // page_size
+        
+        # Get attendance records
+        result = await db.execute(
+            select(Attendance)
+            .where(Attendance.user_id == user_id_bytes)
+            .order_by(desc(Attendance.check_in_time))
+            .offset(offset)
+            .limit(page_size)
+        )
+        attendances = result.scalars().all()
+        
+        attendance_responses = [
+            AttendanceResponse(
+                id=uuid.UUID(bytes=att.id),
+                user_id=user_id,
+                check_in_time=att.check_in_time,
+                check_out_time=att.check_out_time,
+                duration_minutes=att.duration_minutes,
+                notes=att.notes,
+                created_at=att.created_at
+            )
+            for att in attendances
+        ]
+        
+        return AttendanceHistoryResponse(
+            attendances=attendance_responses,
+            total_sessions=total_sessions,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting attendance history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get attendance history")
+
+@router.get("/session-stats", response_model=SessionStatsResponse)
+async def get_session_stats(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get session statistics for the current user"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get all attendance records for the user
+        result = await db.execute(
+            select(Attendance)
+            .where(Attendance.user_id == user_id_bytes)
+            .order_by(asc(Attendance.check_in_time))
+        )
+        all_sessions = result.scalars().all()
+        
+        if not all_sessions:
+            return SessionStatsResponse(
+                total_sessions=0,
+                current_streak=0,
+                longest_streak=0,
+                total_duration_minutes=0,
+                average_duration_minutes=0.0,
+                this_month_sessions=0,
+                last_month_sessions=0
+            )
+        
+        # Calculate basic stats
+        total_sessions = len(all_sessions)
+        completed_sessions = [s for s in all_sessions if s.duration_minutes is not None]
+        total_duration_minutes = sum(s.duration_minutes or 0 for s in completed_sessions)
+        average_duration_minutes = total_duration_minutes / len(completed_sessions) if completed_sessions else 0.0
+        
+        # Calculate current streak
+        current_streak = 0
+        today = datetime.utcnow().date()
+        
+        for session in reversed(all_sessions):
+            session_date = session.check_in_time.date()
+            if session_date == today - datetime.timedelta(days=current_streak):
+                current_streak += 1
+            else:
+                break
+        
+        # Calculate longest streak
+        longest_streak = 0
+        temp_streak = 1
+        dates = [s.check_in_time.date() for s in all_sessions]
+        
+        for i in range(1, len(dates)):
+            if dates[i] == dates[i-1] + datetime.timedelta(days=1):
+                temp_streak += 1
+                longest_streak = max(longest_streak, temp_streak)
+            else:
+                temp_streak = 1
+        
+        longest_streak = max(longest_streak, temp_streak) if dates else 0
+        
+        # Calculate monthly stats
+        now = datetime.utcnow()
+        this_month = now.month
+        last_month = this_month - 1 if this_month > 1 else 12
+        this_year = now.year
+        last_year = this_year - 1 if last_month == 12 else this_year
+        
+        this_month_sessions = len([
+            s for s in all_sessions 
+            if s.check_in_time.month == this_month and s.check_in_time.year == this_year
+        ])
+        
+        last_month_sessions = len([
+            s for s in all_sessions 
+            if s.check_in_time.month == last_month and s.check_in_time.year == last_year
+        ])
+        
+        return SessionStatsResponse(
+            total_sessions=total_sessions,
+            current_streak=current_streak,
+            longest_streak=longest_streak,
+            total_duration_minutes=total_duration_minutes,
+            average_duration_minutes=round(average_duration_minutes, 1),
+            this_month_sessions=this_month_sessions,
+            last_month_sessions=last_month_sessions
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting session stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get session stats")

@@ -406,3 +406,45 @@ class MLFoodItem(BaseModel):
     carbs_g: float; fiber_g: float; similarity_score: float
 class MLFoodResponse(BaseModel):
     goal: str; suggestions: list; note: str
+
+
+# ---------------------------------------------------------------------------
+# Attendance Tracking Schemas
+# ---------------------------------------------------------------------------
+
+class AttendanceCheckIn(BaseModel):
+    notes: Optional[str] = None
+
+
+class AttendanceCheckOut(BaseModel):
+    notes: Optional[str] = None
+
+
+class AttendanceResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    check_in_time: datetime
+    check_out_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    notes: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AttendanceHistoryResponse(BaseModel):
+    attendances: List[AttendanceResponse]
+    total_sessions: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class SessionStatsResponse(BaseModel):
+    total_sessions: int
+    current_streak: int
+    longest_streak: int
+    total_duration_minutes: int
+    average_duration_minutes: float
+    this_month_sessions: int
+    last_month_sessions: int

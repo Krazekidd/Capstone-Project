@@ -79,7 +79,8 @@ async def init_db():
         User, AuthToken, MembershipPlan, UserMembership, Coach,
         CoachAvailabilitySchedule, CoachAvailabilityOverride,
         ConsultationType, Booking, Product, Order, OrderItem,
-        ProductReview, Wishlist, SavedConversation, ConversationMessage
+        ProductReview, Wishlist, SavedConversation, ConversationMessage,
+        Attendance
     )  # noqa: F401
 
     async with engine.begin() as conn:

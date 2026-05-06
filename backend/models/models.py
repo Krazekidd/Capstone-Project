@@ -441,6 +441,32 @@ class ProgressPhoto(Base):
 
 
 # =============================================================
+# ATTENDANCE TRACKING
+# =============================================================
+
+class Attendance(Base):
+    __tablename__ = "attendance"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    check_in_time = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    check_out_time = Column(DateTime(timezone=True))
+    duration_minutes = Column(Integer)  # Calculated from check-in and check-out
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_attendance_user_id', 'user_id'),
+        Index('idx_attendance_check_in_time', 'check_in_time'),
+        Index('idx_attendance_date', func.date(check_in_time)),
+    )
+
+
+# =============================================================
 # CONVERSATIONS
 # =============================================================
 

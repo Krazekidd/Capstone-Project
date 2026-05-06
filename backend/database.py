@@ -71,9 +71,29 @@ async def get_user_db():
 
 
 # ---------------------------------------------------------------------------
+# Database connection check
+# ---------------------------------------------------------------------------
+async def check_db_connection():
+    """Check if database connection is working."""
+    try:
+        async with engine.begin() as conn:
+            result = await conn.execute(text("SELECT 1"))
+            logger.info("✅ Database connection successful")
+            return True
+    except Exception as e:
+        logger.error(f"❌ Database connection failed: {e}")
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Startup helper – creates tables if they don't already exist
 # ---------------------------------------------------------------------------
 async def init_db():
+    """Initialize database connection and create tables if they don't exist."""
+    # First check if we can connect to the database
+    if not await check_db_connection():
+        raise Exception("Database connection failed. Please check your database configuration.")
+    
     # Import models so SQLAlchemy registers them against Base.metadata
     from models import (
         User, AuthToken, MembershipPlan, UserMembership, Coach,
@@ -96,5 +116,6 @@ async def init_db():
         except Exception as e:
             logger.warning(f"⚠️  Could not create citext extension: {e}")
         
+        # Create all tables that don't exist yet
         await conn.run_sync(Base.metadata.create_all)
-        logger.info("✅ Database tables initialised")
+        logger.info("✅ Database tables initialized/checked")

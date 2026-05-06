@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -15,8 +16,7 @@ from routers.ml.ml.food import router as ml_food_router
 from routers.users.account import router as account_router
 from routers.users.user_profile import router as user_profile_router
 from routers.trainers.trainer_api import router as trainer_api_router
-from database import init_db
-from database import engine, Base
+from database import init_db, check_db_connection
 from config.config import PROFILE_IMAGES_DIR, PROGRESS_PHOTOS_DIR
 import logging
 import os
@@ -31,17 +31,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# Create tables (for development only - use Alembic for production)
-async def init_db1():
-    async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all)  # Uncomment to drop tables
-        await conn.run_sync(Base.metadata.create_all)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialise database tables on startup."""
+    """Initialize database connection and tables on startup."""
     logger.info("🚀 Starting application...")
+    
+    # Check database connection first
+    if not await check_db_connection():
+        logger.error("❌ Failed to connect to database. Application startup aborted.")
+        raise Exception("Database connection failed")
+    
+    # Initialize database tables
     await init_db()
     logger.info("✅ Application started successfully")
     yield
@@ -109,7 +109,13 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """Health check endpoint that also verifies database connection."""
+    db_status = "healthy" if await check_db_connection() else "unhealthy"
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 
 if __name__ == "__main__":

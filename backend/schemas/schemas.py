@@ -750,3 +750,332 @@ class ProfileImageResponse(BaseModel):
     success: bool
     message: str
     avatar_url: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Account Management Schemas
+# ---------------------------------------------------------------------------
+
+class ClientAccount(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: str
+    gender: Optional[str] = None
+    phone_number: Optional[str] = None
+    birthday: Optional[date] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    profile_image: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TrainerAccount(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: str
+    certification: Optional[str] = None
+    rating: Optional[float] = None
+    trainer_level: Optional[str] = None
+    is_senior: Optional[bool] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminAccount(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: str
+    phone_number: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateClientProfileRequest(BaseModel):
+    name: Optional[str] = None
+    gender: Optional[str] = None
+    phone_number: Optional[str] = None
+    birthday: Optional[date] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    profile_image: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    medical_conditions: Optional[str] = None
+    fitness_goals: Optional[str] = None
+
+
+class UpdateTrainerProfileRequest(BaseModel):
+    name: Optional[str] = None
+    certification: Optional[str] = None
+    specialties: Optional[List[str]] = None
+    bio: Optional[str] = None
+    experience_years: Optional[int] = None
+    hourly_rate: Optional[float] = None
+    profile_image: Optional[str] = None
+
+
+class UpdateAdminProfileRequest(BaseModel):
+    name: Optional[str] = None
+    phone_number: Optional[str] = None
+    department: Optional[str] = None
+    access_level: Optional[str] = None
+    profile_image: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Client Goals & Health Schemas
+# ---------------------------------------------------------------------------
+
+class ClientGoalsResponse(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    goal_type: str
+    target_value: Optional[float] = None
+    current_value: Optional[float] = None
+    target_date: Optional[date] = None
+    is_active: bool
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateClientGoalsRequest(BaseModel):
+    goal_type: Optional[str] = None
+    target_value: Optional[float] = None
+    current_value: Optional[float] = None
+    target_date: Optional[date] = None
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class HealthConditionResponse(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    condition_name: str
+    severity: Optional[str] = None
+    medications: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateHealthConditionsRequest(BaseModel):
+    condition_name: Optional[str] = None
+    severity: Optional[str] = None
+    medications: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class WaterIntakeResponse(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    date: date
+    amount_ml: int
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateWaterIntakeRequest(BaseModel):
+    date: Optional[date] = None
+    amount_ml: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class StrengthRecordResponse(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    exercise_name: str
+    weight_lbs: Optional[float] = None
+    reps: Optional[int] = None
+    sets: Optional[int] = None
+    one_rep_max: Optional[float] = None
+    notes: Optional[str] = None
+    recorded_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateStrengthRecordRequest(BaseModel):
+    exercise_name: Optional[str] = None
+    weight_lbs: Optional[float] = None
+    reps: Optional[int] = None
+    sets: Optional[int] = None
+    one_rep_max: Optional[float] = None
+    notes: Optional[str] = None
+    recorded_at: Optional[datetime] = None
+
+
+# ---------------------------------------------------------------------------
+# Trainer Rating Schemas
+# ---------------------------------------------------------------------------
+
+class TrainerRatingResponse(BaseModel):
+    id: uuid.UUID
+    trainer_id: uuid.UUID
+    client_id: uuid.UUID
+    rating: int
+    review: Optional[str] = None
+    session_date: Optional[date] = None
+    is_verified: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TrainerRatingsSummaryResponse(BaseModel):
+    trainer_id: uuid.UUID
+    average_rating: float
+    total_ratings: int
+    rating_distribution: dict  # {5: count, 4: count, ...}
+    recent_ratings: List[TrainerRatingResponse]
+
+
+class UpdateTrainerRatingRequest(BaseModel):
+    rating: int
+    review: Optional[str] = None
+    session_date: Optional[date] = None
+
+
+# ---------------------------------------------------------------------------
+# Client Status Schemas
+# ---------------------------------------------------------------------------
+
+class ClientStatusResponse(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    status: str
+    membership_type: Optional[str] = None
+    membership_expiry: Optional[date] = None
+    last_active_date: Optional[date] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ClientWithStatusResponse(BaseModel):
+    client: ClientAccount
+    status: ClientStatusResponse
+
+
+# ---------------------------------------------------------------------------
+# Shop Order Schemas
+# ---------------------------------------------------------------------------
+
+class OrderItemResponse(BaseModel):
+    id: uuid.UUID
+    order_id: uuid.UUID
+    product_id: uuid.UUID
+    product_name: str
+    quantity: int
+    unit_price: float
+    line_total: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminOrderResponse(BaseModel):
+    id: uuid.UUID
+    client_id: uuid.UUID
+    order_number: str
+    status: str
+    subtotal: float
+    tax_amount: float
+    shipping_amount: float
+    total_amount: float
+    currency: str
+    shipping_address: Optional[dict] = None
+    billing_address: Optional[dict] = None
+    notes: Optional[str] = None
+    shipped_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    items: List[OrderItemResponse] = []
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateOrderStatusRequest(BaseModel):
+    status: str
+    notes: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Dashboard Stats Schema
+# ---------------------------------------------------------------------------
+
+class DashboardStatsResponse(BaseModel):
+    total_clients: int
+    active_clients: int
+    total_trainers: int
+    active_trainers: int
+    total_orders: int
+    pending_orders: int
+    total_revenue: float
+    monthly_revenue: float
+    new_clients_this_month: int
+    new_orders_this_month: int
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Progress Photo Schemas
+# ---------------------------------------------------------------------------
+
+class ProgressPhotoResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    filename: str
+    original_filename: str
+    file_path: str
+    file_size: int
+    mime_type: str
+    description: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ProgressPhotoCreate(BaseModel):
+    description: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Badge Schemas
+# ---------------------------------------------------------------------------
+
+class BadgeResponse(BaseModel):
+    id: int
+    badge_name: str
+    awarded_date: date
+
+    model_config = {"from_attributes": True}
+
+
+class BadgeCheckResponse(BaseModel):
+    new_badges: List[BadgeResponse]
+    total_badges: int
+    message: str

@@ -30,6 +30,7 @@ def _utcnow() -> datetime:
 # ENUMS
 # =============================================================
 
+user_role_enum = Enum('client', 'trainer', 'admin', name='user_role')
 membership_tier_enum = Enum('basic', 'pro', 'elite', name='membership_tier')
 membership_status_enum = Enum('active', 'inactive', 'suspended', 'cancelled', name='membership_status')
 consultation_format_enum = Enum('in_person', 'video_call', name='consultation_format')
@@ -53,6 +54,7 @@ class User(Base):
     last_name = Column(String(100), nullable=False)
     phone = Column(String(30))
     avatar_url = Column(Text)
+    role = Column(user_role_enum, nullable=False, default='client')
     is_email_verified = Column(Boolean, nullable=False, default=False)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
@@ -65,6 +67,11 @@ class User(Base):
     orders = relationship("Order", back_populates="user", cascade="all, delete-orphan")
     product_reviews = relationship("ProductReview", back_populates="user", cascade="all, delete-orphan")
     wishlists = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
+    
+    # Role-specific relationships
+    client_profile = relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    trainer_profile = relationship("Trainer", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    admin_profile = relationship("Admin", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class AuthToken(Base):
@@ -89,6 +96,100 @@ class AuthToken(Base):
         Index('idx_auth_tokens_user_id', 'user_id'),
         Index('idx_auth_tokens_token_hash', 'token_hash'),
         Index('idx_auth_tokens_expires_at', 'expires_at'),
+    )
+
+
+# =============================================================
+# ROLE-SPECIFIC PROFILES
+# =============================================================
+
+class Client(Base):
+    __tablename__ = "clients"
+
+    id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    name = Column(String(200), nullable=False)
+    gender = Column(String(20))  # 'male', 'female', 'other'
+    phone_number = Column(String(30))
+    birthday = Column(Date)
+    height = Column(Float)  # in cm
+    weight = Column(Float)  # in kg
+    profile_image = Column(Text)
+    emergency_contact_name = Column(String(200))
+    emergency_contact_phone = Column(String(30))
+    medical_conditions = Column(Text)
+    fitness_goals = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="client_profile")
+    body_measurements = relationship("BodyMeasurement", back_populates="client", cascade="all, delete-orphan")
+    progress_photos = relationship("ProgressPhoto", back_populates="client", cascade="all, delete-orphan")
+    attendance_records = relationship("Attendance", back_populates="client", cascade="all, delete-orphan")
+    nutrition_plans = relationship("NutritionPlan", back_populates="client", cascade="all, delete-orphan")
+    nutrition_goals = relationship("NutritionGoals", back_populates="client", cascade="all, delete-orphan")
+    training_schedules = relationship("TrainingSchedule", back_populates="client", cascade="all, delete-orphan")
+    client_badges = relationship("ClientBadge", back_populates="client", cascade="all, delete-orphan")
+    activity_data = relationship("ActivityData", back_populates="client", cascade="all, delete-orphan")
+    saved_conversations = relationship("SavedConversation", back_populates="client", cascade="all, delete-orphan")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_clients_name', 'name'),
+        Index('idx_clients_created_at', 'created_at'),
+    )
+
+
+class Trainer(Base):
+    __tablename__ = "trainers"
+
+    id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    name = Column(String(200), nullable=False)
+    certification = Column(String(200))
+    rating = Column(Float, default=0.0)
+    trainer_level = Column(String(50), default='beginner')  # beginner, intermediate, advanced, expert
+    is_senior = Column(Boolean, default=False)
+    specialties = Column(ARRAY(String), default='{}')
+    bio = Column(Text)
+    experience_years = Column(Integer, default=0)
+    hourly_rate = Column(Numeric(10, 2))
+    profile_image = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="trainer_profile")
+    trainer_ratings = relationship("TrainerRating", back_populates="trainer", cascade="all, delete-orphan")
+    trainer_assessments = relationship("TrainerAssessment", back_populates="trainer", cascade="all, delete-orphan")
+    training_schedules = relationship("TrainingSchedule", back_populates="trainer", cascade="all, delete-orphan")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_trainers_name', 'name'),
+        Index('idx_trainers_rating', 'rating'),
+        Index('idx_trainers_level', 'trainer_level'),
+    )
+
+
+class Admin(Base):
+    __tablename__ = "admins"
+
+    id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    name = Column(String(200), nullable=False)
+    phone_number = Column(String(30))
+    department = Column(String(100))
+    access_level = Column(String(50), default='full')  # full, limited, read_only
+    profile_image = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="admin_profile")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_admins_name', 'name'),
+        Index('idx_admins_department', 'department'),
     )
 
 
@@ -450,12 +551,13 @@ class BodyMeasurement(Base):
 
     # Relationships
     user = relationship("User")
+    client = relationship("Client", back_populates="body_measurements")
 
     # Indexes
     __table_args__ = (
         Index('idx_body_measurements_user_id', 'user_id'),
         Index('idx_body_measurements_recorded_at', 'recorded_at'),
-        Index('idx_body_measurements_user_recorded', 'user_id', 'recorded_at'),
+        Index('idx_body_measurements_user_date', 'user_id', 'recorded_at'),
     )
 
 
@@ -478,6 +580,7 @@ class ProgressPhoto(Base):
 
     # Relationships
     user = relationship("User")
+    client = relationship("Client", back_populates="progress_photos")
 
     # Indexes
     __table_args__ = (
@@ -503,6 +606,7 @@ class Attendance(Base):
 
     # Relationships
     user = relationship("User")
+    client = relationship("Client", back_populates="attendance_records")
 
     # Indexes
     __table_args__ = (
@@ -532,6 +636,7 @@ class NutritionPlan(Base):
 
     # Relationships
     user = relationship("User")
+    client = relationship("Client", back_populates="nutrition_plans")
 
     # Indexes
     __table_args__ = (
@@ -557,6 +662,7 @@ class NutritionGoals(Base):
 
     # Relationships
     user = relationship("User")
+    client = relationship("Client", back_populates="nutrition_goals")
 
     # Indexes
     __table_args__ = (
@@ -572,6 +678,7 @@ class SavedConversation(Base):
     __tablename__ = "saved_conversations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     session_id = Column(String(255), nullable=False, index=True)
     title = Column(String(255), nullable=False, default="Untitled Chat")
     message_count = Column(Integer, nullable=False, default=0)
@@ -579,10 +686,13 @@ class SavedConversation(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
+    user = relationship("User")
+    client = relationship("Client", back_populates="saved_conversations")
     messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
+        Index('idx_saved_conversations_user_id', 'user_id'),
         Index('idx_saved_conversations_session_id', 'session_id'),
         Index('idx_saved_conversations_created_at', 'created_at'),
     )
@@ -634,6 +744,7 @@ class ActivityData(Base):
 
     # Relationships
     user = relationship("User")
+    client = relationship("Client", back_populates="activity_data")
 
     # Indexes
     __table_args__ = (
@@ -652,6 +763,7 @@ class TrainingSchedule(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
     day_of_week = Column(String(20), nullable=False)  # Monday, Tuesday, etc.
     day_number = Column(Integer, nullable=False)  # 1-7 for ordering
     workout_type = Column(String(100), nullable=False)  # Upper Body, Lower Body, Cardio, etc.
@@ -664,7 +776,9 @@ class TrainingSchedule(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[client_id])
+    client = relationship("Client", back_populates="training_schedules", foreign_keys=[client_id])
+    trainer = relationship("Trainer", back_populates="training_schedules", foreign_keys=[trainer_id])
 
     # Indexes
     __table_args__ = (
@@ -689,10 +803,313 @@ class ClientBadge(Base):
 
     # Relationships
     user = relationship("User")
+    client = relationship("Client", back_populates="client_badges")
 
     # Indexes
     __table_args__ = (
         Index('idx_client_badges_client_id', 'client_id'),
         Index('idx_client_badges_badge_name', 'badge_name'),
         Index('idx_client_badges_awarded_date', 'awarded_date'),
+    )
+
+
+# =============================================================
+# CLIENT GOALS & HEALTH
+# =============================================================
+
+class ClientGoal(Base):
+    __tablename__ = "client_goals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    goal_type = Column(String(50), nullable=False)  # weight_loss, muscle_gain, endurance, etc.
+    target_value = Column(Numeric(10, 2))
+    current_value = Column(Numeric(10, 2))
+    target_date = Column(Date)
+    is_active = Column(Boolean, nullable=False, default=True)
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+    client = relationship("Client")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_client_goals_client_id', 'client_id'),
+        Index('idx_client_goals_active', 'client_id', 'is_active'),
+    )
+
+
+class ClientHealthCondition(Base):
+    __tablename__ = "client_health_conditions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    condition_name = Column(String(100), nullable=False)
+    severity = Column(String(20))  # mild, moderate, severe
+    medications = Column(Text)
+    notes = Column(Text)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+    client = relationship("Client")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_client_health_conditions_client_id', 'client_id'),
+        Index('idx_client_health_conditions_active', 'client_id', 'is_active'),
+    )
+
+
+class ClientWaterIntake(Base):
+    __tablename__ = "client_water_intake"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    amount_ml = Column(Integer, nullable=False)  # Water intake in milliliters
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+    client = relationship("Client")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_client_water_intake_client_id', 'client_id'),
+        Index('idx_client_water_intake_date', 'client_id', 'date'),
+        Index('idx_client_water_intake_unique', 'client_id', 'date', unique=True),
+    )
+
+
+class ClientStrengthRecord(Base):
+    __tablename__ = "client_strength_records"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    exercise_name = Column(String(100), nullable=False)
+    weight_lbs = Column(Numeric(6, 2))  # Weight lifted in pounds
+    reps = Column(Integer)
+    sets = Column(Integer)
+    one_rep_max = Column(Numeric(6, 2))  # Calculated 1RM
+    notes = Column(Text)
+    recorded_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+    client = relationship("Client")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_client_strength_records_client_id', 'client_id'),
+        Index('idx_client_strength_records_exercise', 'client_id', 'exercise_name'),
+        Index('idx_client_strength_records_date', 'client_id', 'recorded_at'),
+    )
+
+
+# =============================================================
+# TRAINER RATINGS & ASSESSMENTS
+# =============================================================
+
+class TrainerRating(Base):
+    __tablename__ = "trainer_ratings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    rating = Column(Integer, nullable=False)  # 1-5 stars
+    review = Column(Text)
+    session_date = Column(Date)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    trainer_user = relationship("User", foreign_keys=[trainer_id])
+    client_user = relationship("User", foreign_keys=[client_id])
+    trainer = relationship("Trainer", back_populates="trainer_ratings", foreign_keys=[trainer_id])
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_trainer_ratings_trainer_id', 'trainer_id'),
+        Index('idx_trainer_ratings_client_id', 'client_id'),
+        Index('idx_trainer_ratings_unique', 'trainer_id', 'client_id', 'session_date', unique=True),
+        CheckConstraint('rating BETWEEN 1 AND 5', name='check_trainer_rating_range'),
+    )
+
+
+class TrainerAssessment(Base):
+    __tablename__ = "trainer_assessments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    assessor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))  # Admin who assessed
+    assessment_date = Column(Date, nullable=False)
+    technical_score = Column(Numeric(5, 2))  # 0-100
+    communication_score = Column(Numeric(5, 2))  # 0-100
+    professionalism_score = Column(Numeric(5, 2))  # 0-100
+    overall_score = Column(Numeric(5, 2))  # 0-100
+    strengths = Column(Text)
+    areas_for_improvement = Column(Text)
+    notes = Column(Text)
+    status = Column(String(20), nullable=False, default='completed')  # pending, completed, failed
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    trainer_user = relationship("User", foreign_keys=[trainer_id])
+    assessor_user = relationship("User", foreign_keys=[assessor_id])
+    trainer = relationship("Trainer", back_populates="trainer_assessments", foreign_keys=[trainer_id])
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_trainer_assessments_trainer_id', 'trainer_id'),
+        Index('idx_trainer_assessments_assessor_id', 'assessor_id'),
+        Index('idx_trainer_assessments_date', 'assessment_date'),
+    )
+
+
+# =============================================================
+# EXCURSIONS & EVENTS
+# =============================================================
+
+class Excursion(Base):
+    __tablename__ = "excursions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    location = Column(String(200))
+    start_date = Column(DateTime(timezone=True), nullable=False)
+    end_date = Column(DateTime(timezone=True), nullable=False)
+    max_participants = Column(Integer)
+    current_participants = Column(Integer, nullable=False, default=0)
+    price = Column(Numeric(10, 2), nullable=False, default=0)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_excursions_start_date', 'start_date'),
+        Index('idx_excursions_active', 'is_active'),
+    )
+
+
+class ExcursionBooking(Base):
+    __tablename__ = "excursion_bookings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    excursion_id = Column(UUID(as_uuid=True), ForeignKey("excursions.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    booking_date = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    status = Column(String(20), nullable=False, default='confirmed')  # confirmed, cancelled, completed
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    excursion = relationship("Excursion")
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_excursion_bookings_excursion_id', 'excursion_id'),
+        Index('idx_excursion_bookings_client_id', 'client_id'),
+        Index('idx_excursion_bookings_unique', 'excursion_id', 'client_id', unique=True),
+    )
+
+
+# =============================================================
+# CLIENT STATUS MANAGEMENT
+# =============================================================
+
+class ClientStatus(Base):
+    __tablename__ = "client_status"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    status = Column(String(50), nullable=False, default='active')  # active, inactive, suspended, trial
+    membership_type = Column(String(50))  # basic, premium, elite
+    membership_expiry = Column(Date)
+    last_active_date = Column(Date)
+    notes = Column(Text)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_client_status_client_id', 'client_id'),
+        Index('idx_client_status_status', 'status'),
+    )
+
+
+# =============================================================
+# SHOP ORDERS (Enhanced)
+# =============================================================
+
+class ShopOrder(Base):
+    __tablename__ = "shop_orders"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    order_number = Column(String(50), nullable=False, unique=True)
+    status = Column(String(50), nullable=False, default='pending')  # pending, processing, shipped, delivered, cancelled
+    subtotal = Column(Numeric(10, 2), nullable=False)
+    tax_amount = Column(Numeric(10, 2), nullable=False, default=0)
+    shipping_amount = Column(Numeric(10, 2), nullable=False, default=0)
+    total_amount = Column(Numeric(10, 2), nullable=False)
+    currency = Column(String(10), nullable=False, default='JMD')
+    shipping_address = Column(JSONB)
+    billing_address = Column(JSONB)
+    notes = Column(Text)
+    shipped_at = Column(DateTime(timezone=True))
+    delivered_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+    shop_order_items = relationship("ShopOrderItem", back_populates="shop_order", cascade="all, delete-orphan")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_shop_orders_client_id', 'client_id'),
+        Index('idx_shop_orders_status', 'status'),
+        Index('idx_shop_orders_created_at', 'created_at'),
+    )
+
+
+class ShopOrderItem(Base):
+    __tablename__ = "shop_order_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    shop_order_id = Column(UUID(as_uuid=True), ForeignKey("shop_orders.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    product_name = Column(String(200), nullable=False)  # Denormalized for order history
+    quantity = Column(Integer, nullable=False)
+    unit_price = Column(Numeric(10, 2), nullable=False)
+    line_total = Column(Numeric(10, 2), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    # Relationships
+    shop_order = relationship("ShopOrder", back_populates="shop_order_items")
+    product = relationship("Product")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_shop_order_items_order_id', 'shop_order_id'),
+        Index('idx_shop_order_items_product_id', 'product_id'),
     )

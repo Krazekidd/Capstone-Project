@@ -9,7 +9,7 @@ import aiofiles
 from datetime import date, datetime, timedelta
 from typing import Optional, List
 from database import get_user_db
-from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, BodyMeasurement, ClientBadge, TrainingSchedule
+from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, BodyMeasurement, ClientBadge, TrainingSchedule, SavedConversation, ConversationMessage
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -24,7 +24,8 @@ from schemas import (
     AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse,
     NutritionPlanResponse, NutritionGoalsRequest, NutritionGoalsResponse,
     ProgressAnalyticsResponse, ProgressComparisonResponse, ProgressSummaryResponse,
-    ActivityDataCreate, ActivityDataResponse, ActivityDataListResponse
+    ActivityDataCreate, ActivityDataResponse, ActivityDataListResponse,
+    AccountConversationRequest, AccountConversationResponse, AccountConversationHistoryResponse
 )
 from auth_router import get_current_user
 from config.config import settings
@@ -3162,3 +3163,123 @@ async def update_nutrition_goals(
         logger.error(f"Error updating nutrition goals: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update nutrition goals")
+
+# ============================================================
+# CONVERSATION ENDPOINTS
+# ============================================================
+
+@router.post("/conversations", response_model=AccountConversationResponse, status_code=201)
+async def save_support_conversation(
+    conversation_data: AccountConversationRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Save support chat conversation for the current user"""
+    try:
+        user_id = current_user["user_id"]
+        session_id = conversation_data.session_id
+        title = conversation_data.title or "Support Chat"
+        messages = conversation_data.messages
+
+        if not messages:
+            raise HTTPException(
+                status_code=400,
+                detail="Conversation must contain at least one message"
+            )
+
+        # Create new conversation
+        conversation = SavedConversation(
+            session_id=session_id,
+            title=title,
+            message_count=len(messages)
+        )
+        db.add(conversation)
+        await db.flush()  # Get conversation.id
+
+        # Add all messages
+        for i, msg in enumerate(messages):
+            if not isinstance(msg, dict) or 'role' not in msg or 'content' not in msg:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid message format at index {i}. Each message must have 'role' and 'content' fields"
+                )
+            
+            db.add(
+                ConversationMessage(
+                    conversation_id=conversation.id,
+                    role=msg["role"],
+                    content=msg["content"],
+                    sequence_order=i,
+                )
+            )
+
+        await db.commit()
+        await db.refresh(conversation)
+
+        logger.info(f"Saved support conversation '{conversation.title}' (id={conversation.id}) for user {user_id}")
+        
+        return AccountConversationResponse(
+            id=conversation.id,
+            session_id=conversation.session_id,
+            title=conversation.title,
+            message_count=conversation.message_count,
+            created_at=conversation.created_at,
+            updated_at=conversation.updated_at
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving conversation: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save conversation")
+
+
+@router.get("/conversations", response_model=AccountConversationHistoryResponse)
+async def get_conversation_history(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get chat history for the current user"""
+    try:
+        user_id = current_user["user_id"]
+        
+        # Get total count
+        count_result = await db.execute(
+            select(func.count(SavedConversation.id))
+        )
+        total_count = count_result.scalar() or 0
+
+        # Get conversations with pagination
+        result = await db.execute(
+            select(SavedConversation)
+            .order_by(SavedConversation.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        conversations = result.scalars().all()
+
+        conversation_responses = [
+            AccountConversationResponse(
+                id=conv.id,
+                session_id=conv.session_id,
+                title=conv.title,
+                message_count=conv.message_count,
+                created_at=conv.created_at,
+                updated_at=conv.updated_at
+            )
+            for conv in conversations
+        ]
+
+        logger.info(f"Retrieved {len(conversation_responses)} conversations for user {user_id}")
+        
+        return AccountConversationHistoryResponse(
+            conversations=conversation_responses,
+            total_count=total_count
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting conversation history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get conversation history")

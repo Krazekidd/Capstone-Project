@@ -95,6 +95,31 @@ class ConversationDetailOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Account Conversation Schemas
+# ---------------------------------------------------------------------------
+
+class AccountConversationRequest(BaseModel):
+    session_id: str
+    title: Optional[str] = "Support Chat"
+    messages: List[dict]  # List of message objects with role and content
+
+
+class AccountConversationResponse(BaseModel):
+    id: uuid.UUID
+    session_id: str
+    title: str
+    message_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AccountConversationHistoryResponse(BaseModel):
+    conversations: List[AccountConversationResponse]
+    total_count: int
+
+# ---------------------------------------------------------------------------
 # Authentication Schemas
 # ---------------------------------------------------------------------------
 

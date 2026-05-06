@@ -9,7 +9,7 @@ import aiofiles
 from datetime import date, datetime
 from typing import Optional, List
 from database import get_user_db
-from models import User, ProgressPhoto, Attendance
+from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -21,7 +21,8 @@ from schemas import (
     TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,OrderItemResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
     DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
-    AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse
+    AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse,
+    NutritionPlanResponse, NutritionGoalsRequest, NutritionGoalsResponse
 )
 from auth_router import get_current_user
 from config.config import settings
@@ -2082,3 +2083,181 @@ async def get_session_stats(
     except Exception as e:
         logger.error(f"Error getting session stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get session stats")
+
+# ============================================================
+# NUTRITION PLAN ENDPOINTS
+# ============================================================
+
+@router.get("/nutrition-plan", response_model=NutritionPlanResponse)
+async def get_nutrition_plan(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get personalized nutrition plan for the current user"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get the most recent nutrition plan
+        result = await db.execute(
+            select(NutritionPlan)
+            .where(NutritionPlan.user_id == user_id_bytes)
+            .order_by(desc(NutritionPlan.created_at))
+            .limit(1)
+        )
+        plan = result.scalar_one_or_none()
+        
+        if not plan:
+            # Generate a default nutrition plan based on user goals
+            from models import ClientGoal, Client
+            
+            # Get client goals and basic info
+            client_result = await db.execute(
+                select(Client, ClientGoal).join(ClientGoal, Client.id == ClientGoal.client_id, isouter=True)
+                .where(Client.id == user_id_bytes)
+            )
+            client_data = client_result.first()
+            
+            if not client_data:
+                raise HTTPException(status_code=404, detail="Client profile not found")
+            
+            client, goals = client_data
+            
+            # Default macros (can be enhanced with actual calculation logic)
+            daily_calories = 2000
+            daily_protein_g = 150
+            daily_carbs_g = 250
+            daily_fat_g = 65
+            
+            # Adjust based on goals if available
+            if goals:
+                if goals.goal_type == "Cut Down":
+                    daily_calories = 1800
+                    daily_protein_g = 160
+                elif goals.goal_type == "Bulk Up":
+                    daily_calories = 2500
+                    daily_protein_g = 180
+            
+            # Create default meals
+            default_meals = [
+                {
+                    "meal_type": "breakfast",
+                    "food_items": ["Oatmeal with berries", "Greek yogurt", "Banana"],
+                    "calories": 450,
+                    "protein_g": 30,
+                    "carbs_g": 60,
+                    "fat_g": 10
+                },
+                {
+                    "meal_type": "lunch",
+                    "food_items": ["Grilled chicken breast", "Brown rice", "Steamed vegetables"],
+                    "calories": 550,
+                    "protein_g": 45,
+                    "carbs_g": 80,
+                    "fat_g": 15
+                },
+                {
+                    "meal_type": "dinner",
+                    "food_items": ["Salmon", "Sweet potato", "Green salad"],
+                    "calories": 600,
+                    "protein_g": 50,
+                    "carbs_g": 70,
+                    "fat_g": 20
+                },
+                {
+                    "meal_type": "snack",
+                    "food_items": ["Protein shake", "Apple", "Almonds"],
+                    "calories": 400,
+                    "protein_g": 25,
+                    "carbs_g": 40,
+                    "fat_g": 20
+                }
+            ]
+            
+            # Create new nutrition plan
+            new_plan = NutritionPlan(
+                user_id=user_id_bytes,
+                daily_calories=daily_calories,
+                daily_protein_g=daily_protein_g,
+                daily_carbs_g=daily_carbs_g,
+                daily_fat_g=daily_fat_g,
+                meals=default_meals
+            )
+            
+            db.add(new_plan)
+            await db.commit()
+            await db.refresh(new_plan)
+            
+            plan = new_plan
+        
+        return NutritionPlanResponse(
+            id=uuid.UUID(bytes=plan.id),
+            user_id=user_id,
+            daily_calories=float(plan.daily_calories),
+            daily_protein_g=float(plan.daily_protein_g),
+            daily_carbs_g=float(plan.daily_carbs_g),
+            daily_fat_g=float(plan.daily_fat_g),
+            daily_fiber_g=float(plan.daily_fiber_g) if plan.daily_fiber_g else None,
+            meals=plan.meals,
+            created_at=plan.created_at,
+            updated_at=plan.updated_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting nutrition plan: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get nutrition plan")
+
+@router.put("/nutrition-goals", response_model=APIResponse)
+async def update_nutrition_goals(
+    goals_data: NutritionGoalsRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update nutrition goals for the current user"""
+    try:
+        from models import NutritionGoals
+        
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Check if goals exist
+        result = await db.execute(
+            select(NutritionGoals).where(NutritionGoals.user_id == user_id_bytes)
+        )
+        existing_goals = result.scalar_one_or_none()
+        
+        # Filter out None values
+        update_values = {k: v for k, v in goals_data.dict().items() if v is not None}
+        
+        if existing_goals:
+            # Update existing goals
+            for key, value in update_values.items():
+                if hasattr(existing_goals, key):
+                    setattr(existing_goals, key, value)
+        else:
+            # Create new goals with defaults for missing values
+            new_goals = NutritionGoals(
+                user_id=user_id_bytes,
+                daily_calories=update_values.get('daily_calories', 2000),
+                daily_protein_g=update_values.get('daily_protein_g', 150),
+                daily_carbs_g=update_values.get('daily_carbs_g', 250),
+                daily_fat_g=update_values.get('daily_fat_g', 65),
+                daily_fiber_g=update_values.get('daily_fiber_g', 25),
+                dietary_restrictions=update_values.get('dietary_restrictions', []),
+                allergies=update_values.get('allergies', []),
+                goal_type=update_values.get('goal_type', 'maintain')
+            )
+            db.add(new_goals)
+        
+        await db.commit()
+        
+        return APIResponse(success=True, message="Nutrition goals updated successfully")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating nutrition goals: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update nutrition goals")

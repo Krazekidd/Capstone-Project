@@ -467,6 +467,58 @@ class Attendance(Base):
 
 
 # =============================================================
+# NUTRITION PLANS
+# =============================================================
+
+class NutritionPlan(Base):
+    __tablename__ = "nutrition_plans"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    daily_calories = Column(Numeric(8, 2), nullable=False)
+    daily_protein_g = Column(Numeric(6, 2), nullable=False)
+    daily_carbs_g = Column(Numeric(6, 2), nullable=False)
+    daily_fat_g = Column(Numeric(6, 2), nullable=False)
+    daily_fiber_g = Column(Numeric(6, 2))
+    meals = Column(JSONB, nullable=False, default='[]')
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_nutrition_plans_user_id', 'user_id'),
+    )
+
+
+class NutritionGoals(Base):
+    __tablename__ = "nutrition_goals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    daily_calories = Column(Numeric(8, 2), nullable=False)
+    daily_protein_g = Column(Numeric(6, 2), nullable=False)
+    daily_carbs_g = Column(Numeric(6, 2), nullable=False)
+    daily_fat_g = Column(Numeric(6, 2), nullable=False)
+    daily_fiber_g = Column(Numeric(6, 2))
+    dietary_restrictions = Column(ARRAY(String), nullable=False, default='{}')
+    allergies = Column(ARRAY(String), nullable=False, default='{}')
+    goal_type = Column(String(50), nullable=False, default='maintain')
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_nutrition_goals_user_id', 'user_id'),
+    )
+
+
+# =============================================================
 # CONVERSATIONS
 # =============================================================
 

@@ -448,3 +448,60 @@ class SessionStatsResponse(BaseModel):
     average_duration_minutes: float
     this_month_sessions: int
     last_month_sessions: int
+
+
+# ---------------------------------------------------------------------------
+# Nutrition Plan Schemas
+# ---------------------------------------------------------------------------
+
+class NutritionPlanMeal(BaseModel):
+    meal_type: str  # breakfast, lunch, dinner, snack
+    food_items: List[str]
+    calories: float
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    fiber_g: Optional[float] = None
+
+
+class NutritionPlanResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    daily_calories: float
+    daily_protein_g: float
+    daily_carbs_g: float
+    daily_fat_g: float
+    daily_fiber_g: Optional[float] = None
+    meals: List[NutritionPlanMeal]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class NutritionGoalsRequest(BaseModel):
+    daily_calories: Optional[float] = None
+    daily_protein_g: Optional[float] = None
+    daily_carbs_g: Optional[float] = None
+    daily_fat_g: Optional[float] = None
+    daily_fiber_g: Optional[float] = None
+    dietary_restrictions: Optional[List[str]] = None
+    allergies: Optional[List[str]] = None
+    goal_type: Optional[str] = None  # lose_weight, gain_muscle, maintain
+
+
+class NutritionGoalsResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    daily_calories: float
+    daily_protein_g: float
+    daily_carbs_g: float
+    daily_fat_g: float
+    daily_fiber_g: Optional[float] = None
+    dietary_restrictions: List[str]
+    allergies: List[str]
+    goal_type: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

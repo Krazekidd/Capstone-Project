@@ -505,3 +505,35 @@ class NutritionGoalsResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
+# Training Schedule Schemas
+# ---------------------------------------------------------------------------
+
+class TrainingScheduleResponse(BaseModel):
+    id: int
+    client_id: uuid.UUID
+    day_of_week: str
+    day_number: int
+    workout_type: str
+    exercises: List[str]
+    duration_minutes: int
+    intensity_level: str
+    notes: Optional[str] = None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class UpdateTrainingScheduleRequest(BaseModel):
+    day_of_week: Optional[str] = None
+    day_number: Optional[int] = None
+    workout_type: Optional[str] = None
+    exercises: Optional[List[str]] = None
+    duration_minutes: Optional[int] = None
+    intensity_level: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None

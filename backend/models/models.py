@@ -560,3 +560,34 @@ class ConversationMessage(Base):
         Index('idx_conversation_messages_conversation_id', 'conversation_id'),
         Index('idx_conversation_messages_order', 'conversation_id', 'sequence_order'),
     )
+
+
+# =============================================================
+# TRAINING SCHEDULE
+# =============================================================
+
+class TrainingSchedule(Base):
+    __tablename__ = "training_schedule"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    day_of_week = Column(String(20), nullable=False)  # Monday, Tuesday, etc.
+    day_number = Column(Integer, nullable=False)  # 1-7 for ordering
+    workout_type = Column(String(100), nullable=False)  # Upper Body, Lower Body, Cardio, etc.
+    exercises = Column(Text, nullable=False)  # JSON string of exercises
+    duration_minutes = Column(Integer, nullable=False)
+    intensity_level = Column(String(20), nullable=False)  # Low, Medium, High
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_training_schedule_client_id', 'client_id'),
+        Index('idx_training_schedule_day_number', 'client_id', 'day_number'),
+        Index('idx_training_schedule_active', 'client_id', 'is_active'),
+    )

@@ -880,9 +880,10 @@ async def get_my_badges(
         )
         for b in badges
     ]
-
-# ============================================================
 # TRAINING SCHEDULE ENDPOINTS
+# ============================================================
+# 
+# Endpoints for managing client training schedules
 # ============================================================
 
 @router.get("/training-schedule", response_model=List[TrainingScheduleResponse])
@@ -892,6 +893,7 @@ async def get_training_schedule(
 ):
     """Get current user's training schedule"""
     from models import TrainingSchedule
+    import json
     
     user_id = current_user["user_id"]
     user_id_bytes = user_id.bytes
@@ -899,6 +901,7 @@ async def get_training_schedule(
     result = await db.execute(
         select(TrainingSchedule)
         .where(TrainingSchedule.client_id == user_id_bytes)
+        .where(TrainingSchedule.is_active == True)
         .order_by(TrainingSchedule.day_number)
     )
     schedule = result.scalars().all()
@@ -906,47 +909,141 @@ async def get_training_schedule(
     return [
         TrainingScheduleResponse(
             id=s.id,
+            client_id=uuid.UUID(bytes=s.client_id),
             day_of_week=s.day_of_week,
             day_number=s.day_number,
-            session_name=s.session_name,
-            session_time=s.session_time.strftime("%H:%M:%S") if s.session_time else None,
-            has_session=s.has_session,
-            is_today=s.is_today
+            workout_type=s.workout_type,
+            exercises=json.loads(s.exercises) if s.exercises else [],
+            duration_minutes=s.duration_minutes,
+            intensity_level=s.intensity_level,
+            notes=s.notes,
+            is_active=s.is_active,
+            created_at=s.created_at,
+            updated_at=s.updated_at
         )
         for s in schedule
     ]
 
-@router.put("/training-schedule/{schedule_id}")
+@router.put("/training-schedule/{schedule_id}", response_model=TrainingScheduleResponse)
 async def update_training_schedule(
     schedule_id: int,
     request: UpdateTrainingScheduleRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Update a training schedule entry"""
+    """Update a training schedule entry with enhanced validation and error handling"""
     from models import TrainingSchedule
+    import json
     
     user_id = current_user["user_id"]
     user_id_bytes = user_id.bytes
     
-    result = await db.execute(
-        select(TrainingSchedule)
-        .where(TrainingSchedule.id == schedule_id)
-        .where(TrainingSchedule.client_id == user_id_bytes)
-    )
-    schedule = result.scalar_one_or_none()
+    # Only clients can update their own training schedule
+    if current_user["role"] != "client":
+        raise HTTPException(status_code=403, detail="Only clients can update their training schedule")
     
-    if not schedule:
-        raise HTTPException(status_code=404, detail="Schedule entry not found")
-    
-    update_values = {k: v for k, v in request.dict().items() if v is not None}
-    
-    if update_values:
+    try:
+        # Find the schedule entry
+        result = await db.execute(
+            select(TrainingSchedule)
+            .where(TrainingSchedule.id == schedule_id)
+            .where(TrainingSchedule.client_id == user_id_bytes)
+        )
+        schedule = result.scalar_one_or_none()
+        
+        if not schedule:
+            raise HTTPException(status_code=404, detail="Schedule entry not found")
+        
+        # Prepare update values with validation
+        update_values = {k: v for k, v in request.dict().items() if v is not None}
+        
+        if not update_values:
+            raise HTTPException(status_code=400, detail="No valid updates provided")
+        
+        # Validate day_of_week if provided
+        if "day_of_week" in update_values:
+            valid_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+            if update_values["day_of_week"] not in valid_days:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid day_of_week. Must be one of: {', '.join(valid_days)}"
+                )
+        
+        # Validate day_number if provided
+        if "day_number" in update_values:
+            if not (1 <= update_values["day_number"] <= 7):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid day_number. Must be between 1 and 7"
+                )
+        
+        # Validate intensity_level if provided
+        if "intensity_level" in update_values:
+            valid_intensities = ["Low", "Medium", "High"]
+            if update_values["intensity_level"] not in valid_intensities:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid intensity_level. Must be one of: {', '.join(valid_intensities)}"
+                )
+        
+        # Validate duration_minutes if provided
+        if "duration_minutes" in update_values:
+            if not (5 <= update_values["duration_minutes"] <= 480):  # 5 min to 8 hours
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid duration_minutes. Must be between 5 and 480 minutes"
+                )
+        
+        # Handle exercises list - convert to JSON string if provided
+        if "exercises" in update_values:
+            if not isinstance(update_values["exercises"], list):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Exercises must be provided as a list"
+                )
+            if not update_values["exercises"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Exercises list cannot be empty"
+                )
+            # Convert list to JSON string for database storage
+            update_values["exercises"] = json.dumps(update_values["exercises"])
+        
+        # Update the schedule entry
         stmt = update(TrainingSchedule).where(TrainingSchedule.id == schedule_id).values(**update_values)
         await db.execute(stmt)
         await db.commit()
-    
-    return {"message": "Training schedule updated"}
+        
+        # Fetch the updated schedule entry
+        updated_result = await db.execute(
+            select(TrainingSchedule).where(TrainingSchedule.id == schedule_id)
+        )
+        updated_schedule = updated_result.scalar_one()
+        
+        # Parse exercises from JSON to list for response
+        exercises_list = json.loads(updated_schedule.exercises) if updated_schedule.exercises else []
+        
+        return TrainingScheduleResponse(
+            id=updated_schedule.id,
+            client_id=uuid.UUID(bytes=updated_schedule.client_id),
+            day_of_week=updated_schedule.day_of_week,
+            day_number=updated_schedule.day_number,
+            workout_type=updated_schedule.workout_type,
+            exercises=exercises_list,
+            duration_minutes=updated_schedule.duration_minutes,
+            intensity_level=updated_schedule.intensity_level,
+            notes=updated_schedule.notes,
+            is_active=updated_schedule.is_active,
+            created_at=updated_schedule.created_at,
+            updated_at=updated_schedule.updated_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating training schedule: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error while updating training schedule")
 
 # ============================================================
 # GET ALL CLIENTS (Admin & Trainers only)

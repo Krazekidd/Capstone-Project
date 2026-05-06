@@ -13,6 +13,8 @@ from routers.ml.ml.workouts import router as ml_workouts_router
 from routers.ml.ml.progress import router as ml_progress_router
 from routers.ml.ml.food import router as ml_food_router
 from routers.users.account import router as account_router
+from routers.users.user_profile import router as user_profile_router
+from routers.trainers.trainer_api import router as trainer_api_router
 from database import init_db
 from database import engine, Base
 from config.config import PROFILE_IMAGES_DIR, PROGRESS_PHOTOS_DIR
@@ -74,6 +76,8 @@ app.add_middleware(
 app.include_router(router, tags=["api"])
 app.include_router(auth_router)
 app.include_router(account_router)
+app.include_router(user_profile_router)
+app.include_router(trainer_api_router)
 app.include_router(booking_router)
 app.include_router(shop_router)
 app.include_router(membership_router)

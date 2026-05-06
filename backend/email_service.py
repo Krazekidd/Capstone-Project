@@ -612,3 +612,12 @@ async def send_birthday_email(email: str, name: str, message: str):
     except Exception as e:
         logger.error(f"Failed to send birthday email to {email}: {e}")
         return False
+    
+#     import resend
+
+# r = resend.Emails.send({
+#   "from": "onboarding@resend.dev",
+#   "to": "candacehendricks1000@gmail.com",
+#   "subject": "Hello World",
+#   "html": "<p>Congrats on sending your <strong>first email</strong>!</p>"
+# })

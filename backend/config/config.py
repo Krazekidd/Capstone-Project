@@ -63,3 +63,34 @@ SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = settings.ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
+DATABASE_URL = settings.DATABASE_URL
+
+# OpenRouter API
+OPENROUTER_API_KEY = settings.OPENROUTER_API_KEY
+OPENROUTER_URL = settings.OPENROUTER_URL
+AI_MODEL = settings.AI_MODEL
+
+# Server configuration
+HOST = settings.HOST
+PORT = settings.PORT
+
+# Chatbot context window configuration
+MAX_CONTEXT_MESSAGES = settings.MAX_CONTEXT_MESSAGES
+
+# CORS
+ALLOWED_ORIGINS = settings.ALLOWED_ORIGINS
+
+# Email Settings
+RESEND_API_KEY = settings.RESEND_API_KEY
+FROM_EMAIL = settings.FROM_EMAIL
+FROM_NAME = settings.FROM_NAME
+
+# Frontend
+FRONTEND_URL = settings.FRONTEND_URL
+
+# Environment
+ENVIRONMENT = settings.ENVIRONMENT
+DEBUG = settings.DEBUG
+
+# Progress Photos
+PROGRESS_PHOTOS_DIR = settings.PROGRESS_PHOTOS_DIR

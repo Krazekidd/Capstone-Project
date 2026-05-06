@@ -609,6 +609,41 @@ class ConversationMessage(Base):
 
 
 # =============================================================
+# ACTIVITY/WEARABLE DATA
+# =============================================================
+
+class ActivityData(Base):
+    __tablename__ = "activity_data"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    steps = Column(Integer, default=0)
+    heart_rate_avg = Column(Integer)  # Average heart rate in BPM
+    heart_rate_max = Column(Integer)  # Maximum heart rate in BPM
+    calories_burned = Column(Integer, default=0)  # Total calories burned
+    active_minutes = Column(Integer, default=0)  # Minutes of activity
+    sleep_hours = Column(Float)  # Hours of sleep
+    sleep_quality = Column(Integer)  # Sleep quality score 1-100
+    distance_km = Column(Float, default=0.0)  # Distance traveled in kilometers
+    floors_climbed = Column(Integer, default=0)  # Number of floors climbed
+    source = Column(String(100))  # Source device/app (e.g., "Fitbit", "Apple Watch")
+    raw_data = Column(JSONB)  # Raw data from wearable device
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_activity_data_user_id', 'user_id'),
+        Index('idx_activity_data_date', 'date'),
+        Index('idx_activity_data_user_date', 'user_id', 'date'),
+    )
+
+
+# =============================================================
 # TRAINING SCHEDULE
 # =============================================================
 

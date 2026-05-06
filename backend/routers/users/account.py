@@ -23,7 +23,8 @@ from schemas import (
     DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
     AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse,
     NutritionPlanResponse, NutritionGoalsRequest, NutritionGoalsResponse,
-    ProgressAnalyticsResponse, ProgressComparisonResponse, ProgressSummaryResponse
+    ProgressAnalyticsResponse, ProgressComparisonResponse, ProgressSummaryResponse,
+    ActivityDataCreate, ActivityDataResponse, ActivityDataListResponse
 )
 from auth_router import get_current_user
 from config.config import settings
@@ -2717,6 +2718,146 @@ async def get_nutrition_plan(
     except Exception as e:
         logger.error(f"Error getting nutrition plan: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to get nutrition plan")
+
+# ============================================================
+# ACTIVITY/WEARABLE DATA ENDPOINTS
+# ============================================================
+
+@router.get("/activity", response_model=ActivityDataListResponse)
+async def get_activity_data(
+    start_date: Optional[date] = Query(None, description="Start date for activity data"),
+    end_date: Optional[date] = Query(None, description="End date for activity data"),
+    page: int = Query(1, ge=1, description="Page number"),
+    per_page: int = Query(30, ge=1, le=100, description="Items per page"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get activity data for the current user"""
+    try:
+        from models import ActivityData
+        
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Build query
+        query = select(ActivityData).where(ActivityData.user_id == user_id_bytes)
+        
+        # Apply date filters
+        if start_date:
+            query = query.where(ActivityData.date >= start_date)
+        if end_date:
+            query = query.where(ActivityData.date <= end_date)
+        
+        # Get total count
+        count_query = select(func.count()).select_from(query.subquery())
+        total_count = await db.scalar(count_query)
+        
+        # Apply pagination and ordering
+        query = query.order_by(desc(ActivityData.date)).offset((page - 1) * per_page).limit(per_page)
+        
+        result = await db.execute(query)
+        activities = result.scalars().all()
+        
+        activity_responses = [
+            ActivityDataResponse(
+                id=uuid.UUID(bytes=activity.id),
+                user_id=user_id,
+                date=activity.date,
+                steps=activity.steps,
+                heart_rate_avg=activity.heart_rate_avg,
+                heart_rate_max=activity.heart_rate_max,
+                calories_burned=activity.calories_burned,
+                active_minutes=activity.active_minutes,
+                sleep_hours=activity.sleep_hours,
+                sleep_quality=activity.sleep_quality,
+                distance_km=activity.distance_km,
+                floors_climbed=activity.floors_climbed,
+                source=activity.source,
+                raw_data=activity.raw_data,
+                created_at=activity.created_at,
+                updated_at=activity.updated_at
+            )
+            for activity in activities
+        ]
+        
+        return ActivityDataListResponse(
+            activities=activity_responses,
+            total_count=total_count,
+            page=page,
+            per_page=per_page
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting activity data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get activity data")
+
+
+@router.put("/activity", response_model=ActivityDataResponse)
+async def update_activity_data(
+    activity_data: ActivityDataCreate,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update or create activity data for a specific date"""
+    try:
+        from models import ActivityData
+        
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Check if activity data exists for this date
+        result = await db.execute(
+            select(ActivityData).where(
+                ActivityData.user_id == user_id_bytes,
+                ActivityData.date == activity_data.date
+            )
+        )
+        existing_activity = result.scalar_one_or_none()
+        
+        if existing_activity:
+            # Update existing activity data
+            for key, value in activity_data.dict().items():
+                if hasattr(existing_activity, key) and value is not None:
+                    setattr(existing_activity, key, value)
+            existing_activity.updated_at = _utcnow()
+            activity_obj = existing_activity
+        else:
+            # Create new activity data
+            activity_obj = ActivityData(
+                user_id=user_id_bytes,
+                **activity_data.dict()
+            )
+            db.add(activity_obj)
+        
+        await db.commit()
+        await db.refresh(activity_obj)
+        
+        return ActivityDataResponse(
+            id=uuid.UUID(bytes=activity_obj.id),
+            user_id=user_id,
+            date=activity_obj.date,
+            steps=activity_obj.steps,
+            heart_rate_avg=activity_obj.heart_rate_avg,
+            heart_rate_max=activity_obj.heart_rate_max,
+            calories_burned=activity_obj.calories_burned,
+            active_minutes=activity_obj.active_minutes,
+            sleep_hours=activity_obj.sleep_hours,
+            sleep_quality=activity_obj.sleep_quality,
+            distance_km=activity_obj.distance_km,
+            floors_climbed=activity_obj.floors_climbed,
+            source=activity_obj.source,
+            raw_data=activity_obj.raw_data,
+            created_at=activity_obj.created_at,
+            updated_at=activity_obj.updated_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating activity data: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to update activity data")
 
 @router.put("/nutrition-goals", response_model=APIResponse)
 async def update_nutrition_goals(

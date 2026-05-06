@@ -627,3 +627,73 @@ class ProgressSummaryResponse(BaseModel):
     achievements: List[dict]
     next_milestones: List[dict]
     streak_data: dict
+
+
+# ---------------------------------------------------------------------------
+# Activity/Wearable Data Schemas
+# ---------------------------------------------------------------------------
+
+class ActivityDataBase(BaseModel):
+    date: date
+    steps: int = 0
+    heart_rate_avg: Optional[int] = None
+    heart_rate_max: Optional[int] = None
+    calories_burned: int = 0
+    active_minutes: int = 0
+    sleep_hours: Optional[float] = None
+    sleep_quality: Optional[int] = None
+    distance_km: float = 0.0
+    floors_climbed: int = 0
+    source: Optional[str] = None
+    raw_data: Optional[dict] = None
+
+
+class ActivityDataCreate(ActivityDataBase):
+    pass
+
+
+class ActivityDataUpdate(BaseModel):
+    steps: Optional[int] = None
+    heart_rate_avg: Optional[int] = None
+    heart_rate_max: Optional[int] = None
+    calories_burned: Optional[int] = None
+    active_minutes: Optional[int] = None
+    sleep_hours: Optional[float] = None
+    sleep_quality: Optional[int] = None
+    distance_km: Optional[float] = None
+    floors_climbed: Optional[int] = None
+    source: Optional[str] = None
+    raw_data: Optional[dict] = None
+
+
+class ActivityDataResponse(ActivityDataBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ActivityDataListResponse(BaseModel):
+    activities: List[ActivityDataResponse]
+    total_count: int
+    page: int
+    per_page: int
+
+
+class ActivityStatsResponse(BaseModel):
+    user_id: uuid.UUID
+    period: str  # "week", "month", "quarter", "year"
+    start_date: date
+    end_date: date
+    total_steps: int
+    avg_daily_steps: float
+    total_calories: int
+    avg_daily_calories: float
+    total_active_minutes: int
+    avg_sleep_hours: float
+    avg_heart_rate: Optional[float]
+    best_day: dict  # Best day for steps
+    consistency_score: float  # How consistent with activity goals
+    achievements: List[str]

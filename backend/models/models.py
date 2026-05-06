@@ -672,3 +672,27 @@ class TrainingSchedule(Base):
         Index('idx_training_schedule_day_number', 'client_id', 'day_number'),
         Index('idx_training_schedule_active', 'client_id', 'is_active'),
     )
+
+
+# =============================================================
+# CLIENT BADGES
+# =============================================================
+
+class ClientBadge(Base):
+    __tablename__ = "client_badges"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    badge_name = Column(String(100), nullable=False)
+    awarded_date = Column(Date, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_client_badges_client_id', 'client_id'),
+        Index('idx_client_badges_badge_name', 'badge_name'),
+        Index('idx_client_badges_awarded_date', 'awarded_date'),
+    )

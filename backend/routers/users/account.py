@@ -9,7 +9,7 @@ import aiofiles
 from datetime import date, datetime, timedelta
 from typing import Optional, List
 from database import get_user_db
-from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, BodyMeasurement
+from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, BodyMeasurement, ClientBadge, TrainingSchedule
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -17,7 +17,7 @@ from schemas import (
     ProgressRequest, BodyMeasurements, ProgressTrackingResponse, ClientGoalsResponse, UpdateClientGoalsRequest,
     HealthConditionResponse, UpdateHealthConditionsRequest,WaterIntakeResponse,UpdateWaterIntakeRequest,
     StrengthRecordResponse, UpdateStrengthRecordRequest,TrainerRatingResponse,TrainerRatingsSummaryResponse,
-    TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse,
+    TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse, BadgeCheckResponse,
     TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,OrderItemResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
     DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
@@ -1270,7 +1270,6 @@ async def get_my_badges(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Get current user's badges"""
-    from models import ClientBadge
     
     user_id = current_user["user_id"]
     user_id_bytes = user_id.bytes
@@ -1293,6 +1292,258 @@ async def get_my_badges(
         )
         for b in badges
     ]
+
+@router.post("/badges/check", response_model=BadgeCheckResponse)
+async def check_and_award_badges(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Check and award new badges based on user activity"""
+    user_id = current_user["user_id"]
+    user_id_bytes = user_id.bytes
+    
+    if current_user["role"] != "client":
+        raise HTTPException(status_code=400, detail="Badges only available for clients")
+    
+    try:
+        # Get existing badges to avoid duplicates
+        existing_badges_result = await db.execute(
+            select(ClientBadge)
+            .where(ClientBadge.client_id == user_id_bytes)
+        )
+        existing_badges = {b.badge_name for b in existing_badges_result.scalars().all()}
+        
+        new_badges = []
+        today = datetime.utcnow().date()
+        
+        # Check workout consistency badges
+        workout_badges = await _check_workout_badges(db, user_id_bytes, existing_badges, today)
+        new_badges.extend(workout_badges)
+        
+        # Check strength badges
+        strength_badges = await _check_strength_badges(db, user_id_bytes, existing_badges, today)
+        new_badges.extend(strength_badges)
+        
+        # Check progress badges
+        progress_badges = await _check_progress_badges(db, user_id_bytes, existing_badges, today)
+        new_badges.extend(progress_badges)
+        
+        # Check attendance badges
+        attendance_badges = await _check_attendance_badges(db, user_id_bytes, existing_badges, today)
+        new_badges.extend(attendance_badges)
+        
+        # Check streak badges
+        streak_badges = await _check_streak_badges(db, user_id_bytes, existing_badges, today)
+        new_badges.extend(streak_badges)
+        
+        # Commit all new badges to database
+        if new_badges:
+            await db.commit()
+        
+        # Get total badge count
+        total_badges_result = await db.execute(
+            select(func.count(ClientBadge.id))
+            .where(ClientBadge.client_id == user_id_bytes)
+        )
+        total_badges = total_badges_result.scalar() or 0
+        
+        # Create response
+        badge_responses = [
+            BadgeResponse(
+                id=badge.id,
+                badge_name=badge.badge_name,
+                awarded_date=badge.awarded_date
+            )
+            for badge in new_badges
+        ]
+        
+        message = f"Awarded {len(new_badges)} new badge(s)!" if new_badges else "No new badges earned at this time."
+        
+        return BadgeCheckResponse(
+            new_badges=badge_responses,
+            total_badges=total_badges + len(new_badges),
+            message=message
+        )
+        
+    except Exception as e:
+        logger.error(f"Error checking badges: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to check badges")
+
+
+async def _check_workout_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+    """Check workout-related badges"""
+    new_badges = []
+    
+    # Check total workout sessions (using training_schedule as proxy)
+    schedule_result = await db.execute(
+        select(func.count(TrainingSchedule.id))
+        .where(TrainingSchedule.client_id == user_id_bytes)
+        .where(TrainingSchedule.is_active == True)
+    )
+    total_workouts = schedule_result.scalar() or 0
+    
+    workout_thresholds = [
+        (10, "10 Workouts"),
+        (25, "25 Workouts"),
+        (50, "50 Workouts"),
+        (100, "100 Workouts"),
+        (200, "200 Workouts")
+    ]
+    
+    for threshold, badge_name in workout_thresholds:
+        if total_workouts >= threshold and badge_name not in existing_badges:
+            new_badge = ClientBadge(
+                client_id=user_id_bytes,
+                badge_name=badge_name,
+                awarded_date=today
+            )
+            db.add(new_badge)
+            new_badges.append(new_badge)
+    
+    return new_badges
+
+
+async def _check_strength_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+    """Check strength-related badges"""
+    new_badges = []
+    
+    # Check strength records (using ClientStrengthRecord if it exists, otherwise skip)
+    try:
+        strength_result = await db.execute(
+            select(func.count(TrainingSchedule.id))
+            .where(TrainingSchedule.client_id == user_id_bytes)
+            .where(TrainingSchedule.workout_type.ilike('%strength%'))
+        )
+        strength_workouts = strength_result.scalar() or 0
+        
+        if strength_workouts >= 20 and "Strength Champion" not in existing_badges:
+            new_badge = ClientBadge(
+                client_id=user_id_bytes,
+                badge_name="Strength Champion",
+                awarded_date=today
+            )
+            db.add(new_badge)
+            new_badges.append(new_badge)
+    except:
+        pass  # Skip if strength records don't exist
+    
+    return new_badges
+
+
+async def _check_progress_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+    """Check progress-related badges"""
+    new_badges = []
+    
+    # Check body measurements count
+    measurements_result = await db.execute(
+        select(func.count(BodyMeasurement.id))
+        .where(BodyMeasurement.user_id == user_id_bytes)
+    )
+    total_measurements = measurements_result.scalar() or 0
+    
+    if total_measurements >= 5 and "Consistency Award" not in existing_badges:
+        new_badge = ClientBadge(
+            client_id=user_id_bytes,
+            badge_name="Consistency Award",
+            awarded_date=today
+        )
+        db.add(new_badge)
+        new_badges.append(new_badge)
+    
+    # Check progress photos count
+    photos_result = await db.execute(
+        select(func.count(ProgressPhoto.id))
+        .where(ProgressPhoto.user_id == user_id_bytes)
+    )
+    total_photos = photos_result.scalar() or 0
+    
+    if total_photos >= 10 and "Photo Pro" not in existing_badges:
+        new_badge = ClientBadge(
+            client_id=user_id_bytes,
+            badge_name="Photo Pro",
+            awarded_date=today
+        )
+        db.add(new_badge)
+        new_badges.append(new_badge)
+    
+    return new_badges
+
+
+async def _check_attendance_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+    """Check attendance-related badges"""
+    new_badges = []
+    
+    # Check attendance records
+    try:
+        attendance_result = await db.execute(
+            select(func.count(Attendance.id))
+            .where(Attendance.user_id == user_id_bytes)
+        )
+        total_attendance = attendance_result.scalar() or 0
+        
+        attendance_thresholds = [
+            (10, "Regular Attendee"),
+            (50, "Dedicated Member"),
+            (100, "Elite Member")
+        ]
+        
+        for threshold, badge_name in attendance_thresholds:
+            if total_attendance >= threshold and badge_name not in existing_badges:
+                new_badge = ClientBadge(
+                    client_id=user_id_bytes,
+                    badge_name=badge_name,
+                    awarded_date=today
+                )
+                db.add(new_badge)
+                new_badges.append(new_badge)
+    except:
+        pass  # Skip if attendance doesn't exist
+    
+    return new_badges
+
+
+async def _check_streak_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+    """Check streak-related badges"""
+    new_badges = []
+    
+    # Check consecutive days with activity (using measurements as proxy)
+    measurements_result = await db.execute(
+        select(BodyMeasurement.recorded_at)
+        .where(BodyMeasurement.user_id == user_id_bytes)
+        .order_by(desc(BodyMeasurement.recorded_at))
+        .limit(30)  # Check last 30 measurements
+    )
+    measurement_dates = [m.recorded_at.date() for m in measurements_result.scalars().all()]
+    
+    # Calculate streak (simplified version)
+    streak = 0
+    current_date = today
+    for measurement_date in measurement_dates:
+        if measurement_date == current_date or measurement_date == current_date - timedelta(days=1):
+            streak += 1
+            current_date = measurement_date
+        else:
+            break
+    
+    streak_badges = [
+        (4, "4-Week Streak"),
+        (8, "8-Week Streak"),
+        (12, "12-Week Streak")
+    ]
+    
+    for weeks, badge_name in streak_badges:
+        if streak >= (weeks * 7) and badge_name not in existing_badges:
+            new_badge = ClientBadge(
+                client_id=user_id_bytes,
+                badge_name=badge_name,
+                awarded_date=today
+            )
+            db.add(new_badge)
+            new_badges.append(new_badge)
+    
+    return new_badges
+
+
 # TRAINING SCHEDULE ENDPOINTS
 # ============================================================
 # 

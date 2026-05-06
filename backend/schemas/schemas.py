@@ -697,3 +697,21 @@ class ActivityStatsResponse(BaseModel):
     best_day: dict  # Best day for steps
     consistency_score: float  # How consistent with activity goals
     achievements: List[str]
+
+
+# ---------------------------------------------------------------------------
+# Badge Schemas
+# ---------------------------------------------------------------------------
+
+class BadgeResponse(BaseModel):
+    id: int
+    badge_name: str
+    awarded_date: date
+
+    model_config = {"from_attributes": True}
+
+
+class BadgeCheckResponse(BaseModel):
+    new_badges: List[BadgeResponse]
+    total_badges: int
+    message: str

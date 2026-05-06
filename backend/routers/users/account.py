@@ -9,7 +9,12 @@ import aiofiles
 from datetime import date, datetime, timedelta
 from typing import Optional, List
 from database import get_user_db
-from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, BodyMeasurement, ClientBadge, TrainingSchedule, SavedConversation, ConversationMessage
+from models import (
+    User, Client, Trainer, Admin, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, 
+    BodyMeasurement, ClientBadge, TrainingSchedule, SavedConversation, ConversationMessage,
+    ClientGoal, ClientHealthCondition, ClientWaterIntake, ClientStrengthRecord, 
+    TrainerRating, ActivityData
+)
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -3404,3 +3409,711 @@ async def delete_profile_image(
     except Exception as e:
         logger.error(f"Error removing profile image: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to remove profile image")
+
+# ============================================================
+# GOALS MANAGEMENT ENDPOINTS
+# ============================================================
+@router.get("/goals", response_model=ClientGoalsResponse)
+async def get_goals(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get client goals"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(ClientGoal).where(ClientGoal.client_id == user_id_bytes)
+        )
+        goals = result.scalars().all()
+        
+        return ClientGoalsResponse(
+            goals=[
+                {
+                    "id": str(goal.id),
+                    "goal_type": goal.goal_type,
+                    "target_value": float(goal.target_value) if goal.target_value else None,
+                    "current_value": float(goal.current_value) if goal.current_value else None,
+                    "target_date": goal.target_date,
+                    "is_active": goal.is_active,
+                    "notes": goal.notes
+                }
+                for goal in goals
+            ]
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting goals: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get goals")
+
+@router.put("/goals", response_model=APIResponse)
+async def update_goals(
+    goals_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update client goals"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Delete existing goals
+        await db.execute(delete(ClientGoal).where(ClientGoal.client_id == user_id_bytes))
+        
+        # Create new goals from the data
+        for goal_type, target_value in goals_data.items():
+            if target_value is not None:
+                new_goal = ClientGoal(
+                    client_id=user_id_bytes,
+                    goal_type=goal_type,
+                    target_value=float(target_value),
+                    is_active=True
+                )
+                db.add(new_goal)
+        
+        await db.commit()
+        
+        return APIResponse(success=True, message="Goals updated successfully", data=None)
+        
+    except Exception as e:
+        logger.error(f"Error updating goals: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update goals")
+
+# ============================================================
+# HEALTH CONDITIONS ENDPOINTS
+# ============================================================
+@router.get("/health-conditions", response_model=List[HealthConditionResponse])
+async def get_health_conditions(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get client health conditions"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id_bytes)
+        )
+        conditions = result.scalars().all()
+        
+        return [
+            HealthConditionResponse(
+                id=str(condition.id),
+                condition_name=condition.condition_name,
+                severity=condition.severity,
+                medications=condition.medications,
+                notes=condition.notes,
+                is_active=condition.is_active
+            )
+            for condition in conditions
+        ]
+        
+    except Exception as e:
+        logger.error(f"Error getting health conditions: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get health conditions")
+
+@router.put("/health-conditions", response_model=APIResponse)
+async def update_health_conditions(
+    conditions_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update client health conditions"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Delete existing conditions
+        await db.execute(delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id_bytes))
+        
+        # Create new conditions
+        if "conditions" in conditions_data:
+            for condition_name in conditions_data["conditions"]:
+                new_condition = ClientHealthCondition(
+                    client_id=user_id_bytes,
+                    condition_name=condition_name,
+                    is_active=True
+                )
+                db.add(new_condition)
+        
+        await db.commit()
+        
+        return APIResponse(success=True, message="Health conditions updated successfully", data=None)
+        
+    except Exception as e:
+        logger.error(f"Error updating health conditions: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update health conditions")
+
+# ============================================================
+# WATER INTAKE ENDPOINTS
+# ============================================================
+@router.get("/water-intake", response_model=WaterIntakeResponse)
+async def get_water_intake(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get today's water intake"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        today = date.today()
+        
+        result = await db.execute(
+            select(ClientWaterIntake).where(
+                ClientWaterIntake.client_id == user_id_bytes,
+                ClientWaterIntake.date == today
+            )
+        )
+        intake = result.scalar_one_or_none()
+        
+        return WaterIntakeResponse(
+            cups_consumed=intake.amount_ml // 250 if intake else 0,  # Convert ml to cups (250ml per cup)
+            date=today
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting water intake: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get water intake")
+
+@router.post("/water-intake/log", response_model=APIResponse)
+async def log_water_intake(
+    intake_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Log water intake"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        today = date.today()
+        cups = intake_data.get("cups_consumed", 0)
+        
+        # Check if entry exists for today
+        result = await db.execute(
+            select(ClientWaterIntake).where(
+                ClientWaterIntake.client_id == user_id_bytes,
+                ClientWaterIntake.date == today
+            )
+        )
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            # Update existing
+            existing.amount_ml = cups * 250  # Convert cups to ml
+        else:
+            # Create new
+            new_intake = ClientWaterIntake(
+                client_id=user_id_bytes,
+                date=today,
+                amount_ml=cups * 250
+            )
+            db.add(new_intake)
+        
+        await db.commit()
+        
+        return APIResponse(success=True, message="Water intake logged successfully", data=None)
+        
+    except Exception as e:
+        logger.error(f"Error logging water intake: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to log water intake")
+
+# ============================================================
+# STRENGTH RECORDS ENDPOINTS
+# ============================================================
+@router.get("/strength-records", response_model=List[StrengthRecordResponse])
+async def get_strength_records(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get client strength records"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(ClientStrengthRecord).where(ClientStrengthRecord.client_id == user_id_bytes)
+            .order_by(desc(ClientStrengthRecord.recorded_at))
+        )
+        records = result.scalars().all()
+        
+        return [
+            StrengthRecordResponse(
+                id=str(record.id),
+                exercise_name=record.exercise_name,
+                weight_lbs=float(record.weight_lbs) if record.weight_lbs else None,
+                reps=record.reps,
+                sets=record.sets,
+                one_rep_max=float(record.one_rep_max) if record.one_rep_max else None,
+                notes=record.notes,
+                recorded_at=record.recorded_at
+            )
+            for record in records
+        ]
+        
+    except Exception as e:
+        logger.error(f"Error getting strength records: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get strength records")
+
+@router.put("/strength-records/{exercise_name}", response_model=APIResponse)
+async def update_strength_record(
+    exercise_name: str,
+    record_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update strength record for exercise"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Check if record exists
+        result = await db.execute(
+            select(ClientStrengthRecord).where(
+                ClientStrengthRecord.client_id == user_id_bytes,
+                ClientStrengthRecord.exercise_name == exercise_name
+            )
+        )
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            # Update existing
+            for key, value in record_data.items():
+                if hasattr(existing, key) and value is not None:
+                    setattr(existing, key, value)
+        else:
+            # Create new
+            new_record = ClientStrengthRecord(
+                client_id=user_id_bytes,
+                exercise_name=exercise_name,
+                **record_data
+            )
+            db.add(new_record)
+        
+        await db.commit()
+        
+        return APIResponse(success=True, message="Strength record updated successfully", data=None)
+        
+    except Exception as e:
+        logger.error(f"Error updating strength record: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to update strength record")
+
+# ============================================================
+# TRAINER RATINGS ENDPOINTS
+# ============================================================
+@router.get("/trainer-ratings", response_model=TrainerRatingsSummaryResponse)
+async def get_trainer_ratings(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get client's trainer ratings"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(TrainerRating).where(TrainerRating.client_id == user_id_bytes)
+            .order_by(desc(TrainerRating.created_at))
+        )
+        ratings = result.scalars().all()
+        
+        # Calculate average rating
+        avg_rating = sum(rating.rating for rating in ratings) / len(ratings) if ratings else 0
+        
+        return TrainerRatingsSummaryResponse(
+            ratings=[
+                TrainerRatingResponse(
+                    id=str(rating.id),
+                    trainer_id=str(rating.trainer_id),
+                    rating=rating.rating,
+                    review=rating.review,
+                    session_date=rating.session_date,
+                    is_verified=rating.is_verified,
+                    created_at=rating.created_at
+                )
+                for rating in ratings
+            ],
+            average_rating=round(avg_rating, 1),
+            total_ratings=len(ratings)
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting trainer ratings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get trainer ratings")
+
+@router.post("/trainer-ratings", response_model=APIResponse)
+async def rate_trainer(
+    rating_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Rate a trainer"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        new_rating = TrainerRating(
+            trainer_id=uuid.UUID(rating_data["trainer_name"]),
+            client_id=user_id_bytes,
+            rating=rating_data["rating"],
+            review=rating_data.get("comment", ""),
+            session_date=date.today()
+        )
+        db.add(new_rating)
+        await db.commit()
+        
+        return APIResponse(success=True, message="Trainer rated successfully", data=None)
+        
+    except Exception as e:
+        logger.error(f"Error rating trainer: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to rate trainer")
+
+# ============================================================
+# BADGES ENDPOINTS
+# ============================================================
+@router.get("/badges", response_model=List[BadgeResponse])
+async def get_badges(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get client badges"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(ClientBadge).where(ClientBadge.client_id == user_id_bytes)
+            .order_by(desc(ClientBadge.awarded_date))
+        )
+        badges = result.scalars().all()
+        
+        return [
+            BadgeResponse(
+                id=str(badge.id),
+                badge_name=badge.badge_name,
+                awarded_date=badge.awarded_date
+            )
+            for badge in badges
+        ]
+        
+    except Exception as e:
+        logger.error(f"Error getting badges: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get badges")
+
+# ============================================================
+# TRAINING SCHEDULE ENDPOINTS
+# ============================================================
+@router.get("/training-schedule", response_model=List[TrainingScheduleResponse])
+async def get_training_schedule(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get client training schedule"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(TrainingSchedule).where(TrainingSchedule.client_id == user_id_bytes)
+            .where(TrainingSchedule.is_active == True)
+            .order_by(asc(TrainingSchedule.day_number))
+        )
+        schedules = result.scalars().all()
+        
+        return [
+            TrainingScheduleResponse(
+                id=str(schedule.id),
+                day_of_week=schedule.day_of_week,
+                day_number=schedule.day_number,
+                workout_type=schedule.workout_type,
+                exercises=json.loads(schedule.exercises) if schedule.exercises else [],
+                duration_minutes=schedule.duration_minutes,
+                intensity_level=schedule.intensity_level,
+                notes=schedule.notes,
+                is_active=schedule.is_active
+            )
+            for schedule in schedules
+        ]
+        
+    except Exception as e:
+        logger.error(f"Error getting training schedule: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get training schedule")
+
+# ============================================================
+# ATTENDANCE ENDPOINTS
+# ============================================================
+@router.get("/attendance", response_model=AttendanceHistoryResponse)
+async def get_attendance_history(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get attendance history"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(Attendance).where(Attendance.user_id == user_id_bytes)
+            .order_by(desc(Attendance.check_in_time))
+        )
+        attendance = result.scalars().all()
+        
+        # Format for frontend calendar
+        attended_days = {}
+        for record in attendance:
+            date_key = record.check_in_time.date().isoformat()
+            if date_key not in attended_days:
+                attended_days[date_key] = {}
+            
+            # Determine session type based on time
+            hour = record.check_in_time.hour
+            if hour < 12:
+                attended_days[date_key]["am"] = True
+            else:
+                attended_days[date_key]["pm"] = True
+        
+        return AttendanceHistoryResponse(
+            attended_days=attended_days,
+            total_sessions=len(attendance),
+            current_streak=0  # TODO: Calculate actual streak
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting attendance history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get attendance history")
+
+@router.post("/attendance", response_model=APIResponse)
+async def log_attendance(
+    attendance_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Log attendance"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        new_attendance = Attendance(
+            user_id=user_id_bytes,
+            check_in_time=datetime.utcnow(),
+            notes=attendance_data.get("notes", "")
+        )
+        db.add(new_attendance)
+        await db.commit()
+        
+        return APIResponse(success=True, message="Attendance logged successfully", data=None)
+        
+    except Exception as e:
+        logger.error(f"Error logging attendance: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to log attendance")
+
+# ============================================================
+# PROGRESS PHOTOS ENDPOINTS
+# ============================================================
+@router.post("/progress-photos", response_model=ProgressPhotoResponse)
+async def upload_progress_photo(
+    photo: UploadFile = File(...),
+    date: str = Form(...),
+    category: str = Form("front"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Upload progress photo"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Validate file
+        if not photo.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Generate filename
+        file_extension = photo.filename.split('.')[-1]
+        filename = f"{user_id}_{date}_{category}.{file_extension}"
+        file_path = f"progress_photos/{filename}"
+        
+        # Save file
+        os.makedirs("progress_photos", exist_ok=True)
+        async with aiofiles.open(file_path, 'wb') as f:
+            content = await photo.read()
+            await f.write(content)
+        
+        # Create database record
+        new_photo = ProgressPhoto(
+            user_id=user_id_bytes,
+            filename=filename,
+            original_filename=photo.filename,
+            file_path=file_path,
+            file_size=len(content),
+            mime_type=photo.content_type,
+            description=f"Progress photo - {category}"
+        )
+        db.add(new_photo)
+        await db.commit()
+        
+        return ProgressPhotoResponse(
+            id=str(new_photo.id),
+            user_id=user_id,
+            filename=filename,
+            original_filename=photo.filename,
+            file_path=file_path,
+            file_size=len(content),
+            mime_type=photo.content_type,
+            description=f"Progress photo - {category}",
+            created_at=new_photo.created_at
+        )
+        
+    except Exception as e:
+        logger.error(f"Error uploading progress photo: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to upload progress photo")
+
+# ============================================================
+# SESSION STATS ENDPOINTS
+# ============================================================
+@router.get("/session-stats", response_model=SessionStatsResponse)
+async def get_session_stats(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get session statistics"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get total sessions
+        attendance_result = await db.execute(
+            select(func.count(Attendance.id)).where(Attendance.user_id == user_id_bytes)
+        )
+        total_sessions = attendance_result.scalar() or 0
+        
+        # Get attended days for calendar
+        attendance_result = await db.execute(
+            select(Attendance).where(Attendance.user_id == user_id_bytes)
+            .order_by(desc(Attendance.check_in_time))
+        )
+        attendance = attendance_result.scalars().all()
+        
+        attended_days = {}
+        for record in attendance:
+            date_key = record.check_in_time.date().isoformat()
+            if date_key not in attended_days:
+                attended_days[date_key] = {}
+            
+            hour = record.check_in_time.hour
+            if hour < 12:
+                attended_days[date_key]["am"] = True
+            else:
+                attended_days[date_key]["pm"] = True
+        
+        return SessionStatsResponse(
+            total_sessions=total_sessions,
+            current_streak=0,  # TODO: Calculate actual streak
+            attended_days=attended_days
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting session stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get session stats")
+
+# ============================================================
+# NUTRITION PLAN ENDPOINTS
+# ============================================================
+@router.get("/nutrition-plan", response_model=NutritionPlanResponse)
+async def get_nutrition_plan(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get nutrition plan"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        result = await db.execute(
+            select(NutritionPlan).where(NutritionPlan.user_id == user_id_bytes)
+            .order_by(desc(NutritionPlan.created_at))
+            .limit(1)
+        )
+        plan = result.scalar_one_or_none()
+        
+        if not plan:
+            raise HTTPException(status_code=404, detail="No nutrition plan found")
+        
+        return NutritionPlanResponse(
+            id=str(plan.id),
+            daily_calories=float(plan.daily_calories),
+            daily_protein_g=float(plan.daily_protein_g),
+            daily_carbs_g=float(plan.daily_carbs_g),
+            daily_fat_g=float(plan.daily_fat_g),
+            daily_fiber_g=float(plan.daily_fiber_g) if plan.daily_fiber_g else None,
+            meals=json.loads(plan.meals) if plan.meals else [],
+            created_at=plan.created_at,
+            updated_at=plan.updated_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting nutrition plan: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get nutrition plan")
+
+# ============================================================
+# ACTIVITY DATA ENDPOINTS
+# ============================================================
+@router.post("/activity-data", response_model=ActivityDataResponse)
+async def create_activity_data(
+    activity_data: ActivityDataCreate,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Create activity data entry"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        new_activity = ActivityData(
+            user_id=user_id_bytes,
+            date=activity_data.date,
+            steps=activity_data.steps,
+            heart_rate_avg=activity_data.heart_rate_avg,
+            heart_rate_max=activity_data.heart_rate_max,
+            calories_burned=activity_data.calories_burned,
+            active_minutes=activity_data.active_minutes,
+            sleep_hours=activity_data.sleep_hours,
+            sleep_quality=activity_data.sleep_quality,
+            distance_km=activity_data.distance_km,
+            floors_climbed=activity_data.floors_climbed,
+            source=activity_data.source,
+            raw_data=activity_data.raw_data
+        )
+        db.add(new_activity)
+        await db.commit()
+        
+        return ActivityDataResponse(
+            id=str(new_activity.id),
+            user_id=user_id,
+            date=new_activity.date,
+            steps=new_activity.steps,
+            heart_rate_avg=new_activity.heart_rate_avg,
+            heart_rate_max=new_activity.heart_rate_max,
+            calories_burned=new_activity.calories_burned,
+            active_minutes=new_activity.active_minutes,
+            sleep_hours=new_activity.sleep_hours,
+            sleep_quality=new_activity.sleep_quality,
+            distance_km=new_activity.distance_km,
+            floors_climbed=new_activity.floors_climbed,
+            source=new_activity.source,
+            created_at=new_activity.created_at
+        )
+        
+    except Exception as e:
+        logger.error(f"Error creating activity data: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to create activity data")

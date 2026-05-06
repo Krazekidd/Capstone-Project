@@ -1,21 +1,20 @@
 from datetime import datetime, date
 import logging
-import os
 import resend
+from config.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize Resend with API key from environment
-resend.api_key = os.getenv("RESEND_API_KEY")
+# Initialize Resend with API key from settings
+if settings.RESEND_API_KEY:
+    resend.api_key = settings.RESEND_API_KEY
+else:
+    logger.warning("RESEND_API_KEY not found in settings. Email functionality will not work.")
 
-# Legacy fastapi_mail imports (kept for reference)
-# from fastapi_mail import FastMail, MessageSchema, MessageType
-# from config import SMTP_CONFIG
-# fastmail = FastMail(SMTP_CONFIG)
 
 async def send_password_reset_email(email: str, token: str, name: str):
     """Send password reset email to user using Resend"""
-    reset_link = f"http://localhost:3000/reset-password?token={token}"
+    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
     
     html_content = f"""
     <!DOCTYPE html>
@@ -56,7 +55,7 @@ async def send_password_reset_email(email: str, token: str, name: str):
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [email],
             "subject": "Password Reset - GymPRO",
             "html": html_content
@@ -100,7 +99,7 @@ async def send_welcome_email(email: str, name: str):
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="http://localhost:3000/dashboard" 
+                <a href="{settings.FRONTEND_URL}/dashboard" 
                    style="background-color: #ff6900; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
                     Get Started →
@@ -118,7 +117,7 @@ async def send_welcome_email(email: str, name: str):
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [email],
             "subject": "Welcome to GymPRO! 🎉",
             "html": html_content
@@ -220,7 +219,7 @@ async def send_booking_confirmation_email(
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="http://localhost:3000/excursions" 
+                <a href="{settings.FRONTEND_URL}/excursions" 
                    style="background-color: #ff6900; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
                     View My Bookings
@@ -238,7 +237,7 @@ async def send_booking_confirmation_email(
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [booked_for_email],
             "subject": f"Booking Confirmed: {excursion_name} - B.A.D People Fitness",
             "html": html_content
@@ -311,7 +310,7 @@ async def send_booking_cancellation_email(
             {refund_html}
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="http://localhost:3000/excursions" 
+                <a href="{settings.FRONTEND_URL}/excursions" 
                    style="background-color: #ff6900; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
                     Browse More Excursions
@@ -329,7 +328,7 @@ async def send_booking_cancellation_email(
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [booked_for_email],
             "subject": f"Booking Cancelled: {excursion_name} - B.A.D People Fitness",
             "html": html_content
@@ -407,7 +406,7 @@ async def send_consultation_confirmation_email(
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="http://localhost:3000/consultations" 
+                <a href="{settings.FRONTEND_URL}/consultations" 
                    style="background-color: #ff6900; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
                     View My Bookings
@@ -425,7 +424,7 @@ async def send_consultation_confirmation_email(
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [client_email],
             "subject": f"Consultation Confirmed: {consultation_title} - GymVault",
             "html": html_content
@@ -491,7 +490,7 @@ async def send_consultation_cancellation_email(
             {refund_html}
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="http://localhost:3000/consultations" 
+                <a href="{settings.FRONTEND_URL}/consultations" 
                    style="background-color: #ff6900; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
                     Book Another Consultation
@@ -509,7 +508,7 @@ async def send_consultation_cancellation_email(
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [client_email],
             "subject": f"Consultation Cancelled: {consultation_title} - GymVault",
             "html": html_content
@@ -602,7 +601,7 @@ async def send_order_confirmation_email(
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [email],
             "subject": f"Order Confirmed: {order_reference} - B.A.D People Fitness",
             "html": html_content
@@ -656,7 +655,7 @@ async def send_birthday_email(email: str, name: str, message: str):
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="http://localhost:3000/account" 
+                <a href="{settings.FRONTEND_URL}/account" 
                    style="background-color: #ff6900; color: white; padding: 12px 30px; 
                           text-decoration: none; border-radius: 5px; display: inline-block;">
                     Claim Your Gift →
@@ -674,7 +673,7 @@ async def send_birthday_email(email: str, name: str, message: str):
     
     try:
         params = {
-            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
             "to": [email],
             "subject": f"🎂 Happy Birthday, {name}! - GymPro",
             "html": html_content

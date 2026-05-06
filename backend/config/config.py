@@ -1,58 +1,25 @@
-import os
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import Optional
-from fastapi_mail import ConnectionConfig
 
 load_dotenv()
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-AI_MODEL = "qwen/qwen3-vl-30b-a3b-thinking"
-# "google/gemma-3n-e2b-it:free"  liquid/lfm-2.5-1.2b-thinking:free qwen/qwen3-vl-30b-a3b-thinking
 
-# PostgreSQL connection (async driver)
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/Accounts"
-)
-
-# Server configuration
-HOST = os.getenv("HOST", "127.0.0.1")
-PORT = int(os.getenv("PORT", "8000"))
-
-# Chatbot context window configuration
-MAX_CONTEXT_MESSAGES = int(os.getenv("MAX_CONTEXT_MESSAGES", "8"))
-
-
-# SMTP Configuration - Only create if email settings are available
-def get_smtp_config():
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    from_email = os.getenv("FROM_EMAIL")
-    
-    if smtp_user and smtp_password and from_email:
-        return ConnectionConfig(
-            MAIL_USERNAME=smtp_user,
-            MAIL_PASSWORD=smtp_password,
-            MAIL_FROM=from_email,
-            MAIL_FROM_NAME=os.getenv("FROM_NAME", "GymPRO"),
-            MAIL_PORT=int(os.getenv("SMTP_PORT", 587)),
-            MAIL_SERVER=os.getenv("SMTP_HOST", "smtp.gmail.com"),
-            MAIL_STARTTLS=True,  # TLS encryption [citation:7]
-            MAIL_SSL_TLS=False,
-            USE_CREDENTIALS=True,
-            VALIDATE_CERTS=True,
-        )
-    return None
-
-SMTP_CONFIG = get_smtp_config()
-
-
-# User database config
 class Settings(BaseSettings):
+    # OpenRouter API
+    OPENROUTER_API_KEY: Optional[str] = None
+    OPENROUTER_URL: str = "https://openrouter.ai/api/v1/chat/completions"
+    AI_MODEL: str = "qwen/qwen3-vl-30b-a3b-thinking"
+    
     # Database
-    # DATABASE_URL: str = "mysql+aiomysql://root:31senku61@localhost:3306/Accounts"
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/Accounts"
+    
+    # Server configuration
+    HOST: str = "127.0.0.1"
+    PORT: int = 8000
+    
+    # Chatbot context window configuration
+    MAX_CONTEXT_MESSAGES: int = 8
 
     # JWT
     SECRET_KEY: str = (
@@ -68,14 +35,7 @@ class Settings(BaseSettings):
         "http://localhost:5173",
     ]
 
-    # Email Settings
-    # SMTP Settings (legacy)
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
-    SMTP_USER: Optional[str] = None
-    SMTP_PASSWORD: Optional[str] = None
-    
-    # Resend Settings (new)
+    # Email Settings - Resend Only
     RESEND_API_KEY: Optional[str] = None
     FROM_EMAIL: Optional[str] = None
     FROM_NAME: str = "GymPRO"

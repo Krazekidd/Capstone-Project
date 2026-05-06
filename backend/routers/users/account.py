@@ -6,10 +6,10 @@ import json
 import logging
 import os
 import aiofiles
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional, List
 from database import get_user_db
-from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals
+from models import User, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, BodyMeasurement
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
@@ -22,7 +22,8 @@ from schemas import (
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
     DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
     AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse,
-    NutritionPlanResponse, NutritionGoalsRequest, NutritionGoalsResponse
+    NutritionPlanResponse, NutritionGoalsRequest, NutritionGoalsResponse,
+    ProgressAnalyticsResponse, ProgressComparisonResponse, ProgressSummaryResponse
 )
 from auth_router import get_current_user
 from config.config import settings
@@ -376,64 +377,92 @@ async def save_progress(
     return {
         "message": "Progress saved successfully",
         "id": str(uuid.UUID(bytes=new_measurement.id))
-    }@router.get("/progress/history", response_model=list[ProgressTrackingResponse])
+    }
+
+@router.get("/progress/history", response_model=list[ProgressTrackingResponse])
 async def get_progress_history(
     limit: int = Query(12, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Get progress history for the current user from body_measurements table"""
+    """Get enhanced progress history with integrated photos for the current user"""
     try:
         user_id = current_user["user_id"]
         user_id_bytes = user_id.bytes
         
-        logger.info(f"Fetching progress history for user: {user_id}")
+        logger.info(f"Fetching enhanced progress history for user: {user_id}")
         
-        # Query from body_measurements table instead of progress_tracking
-        from models import BodyMeasurement
-        
-        result = await db.execute(
+        # Get body measurements
+        measurements_result = await db.execute(
             select(BodyMeasurement)
             .where(BodyMeasurement.user_id == user_id_bytes)
             .order_by(asc(BodyMeasurement.recorded_at))
             .limit(limit)
         )
-        entries = result.scalars().all()
+        measurements = measurements_result.scalars().all()
         
-        logger.info(f"Found {len(entries)} body measurement entries")
+        # Get progress photos for the same period
+        photos_result = await db.execute(
+            select(ProgressPhoto)
+            .where(ProgressPhoto.user_id == user_id_bytes)
+            .order_by(desc(ProgressPhoto.created_at))
+            .limit(limit * 2)  # Get more photos to match with measurements
+        )
+        photos = photos_result.scalars().all()
+        
+        logger.info(f"Found {len(measurements)} measurements and {len(photos)} photos")
         
         response = []
-        for entry in entries:
+        for measurement in measurements:
             # Create measurements object from the individual fields
             measurements_dict = {
-                "weight": entry.weight,
-                "height": entry.height,
-                "body_fat": entry.body_fat,
-                "chest": entry.chest,
-                "waist": entry.waist,
-                "shoulders": entry.shoulders,
-                "arm_left": entry.arm_left,
-                "arm_right": entry.arm_right,
-                "neck": entry.neck,
-                "hips": entry.hips,
-                "thigh_left": entry.thigh_left,
-                "thigh_right": entry.thigh_right,
-                "calf_left": entry.calf_left,
-                "calf_right": entry.calf_right,
-                "glutes": entry.glutes,
+                "weight": float(measurement.weight) if measurement.weight else None,
+                "height": float(measurement.height) if measurement.height else None,
+                "body_fat": float(measurement.body_fat) if measurement.body_fat else None,
+                "chest": float(measurement.chest) if measurement.chest else None,
+                "waist": float(measurement.waist) if measurement.waist else None,
+                "shoulders": float(measurement.shoulders) if measurement.shoulders else None,
+                "arm_left": float(measurement.arm_left) if measurement.arm_left else None,
+                "arm_right": float(measurement.arm_right) if measurement.arm_right else None,
+                "neck": float(measurement.neck) if measurement.neck else None,
+                "hips": float(measurement.hips) if measurement.hips else None,
+                "thigh_left": float(measurement.thigh_left) if measurement.thigh_left else None,
+                "thigh_right": float(measurement.thigh_right) if measurement.thigh_right else None,
+                "calf_left": float(measurement.calf_left) if measurement.calf_left else None,
+                "calf_right": float(measurement.calf_right) if measurement.calf_right else None,
+                "glutes": float(measurement.glutes) if measurement.glutes else None,
             }
             # Remove None values
             measurements_dict = {k: v for k, v in measurements_dict.items() if v is not None}
             
+            # Find photos taken within 24 hours of this measurement
+            measurement_date = measurement.recorded_at.date()
+            related_photos = [
+                ProgressPhotoResponse(
+                    id=photo.id,
+                    user_id=user_id,
+                    filename=photo.filename,
+                    original_filename=photo.original_filename,
+                    file_path=photo.file_path,
+                    file_size=photo.file_size,
+                    mime_type=photo.mime_type,
+                    description=photo.description,
+                    created_at=photo.created_at
+                )
+                for photo in photos
+                if abs((photo.created_at.date() - measurement_date).days) <= 1
+            ]
+            
             response.append(
                 ProgressTrackingResponse(
-                    id=uuid.UUID(bytes=entry.id),
-                    user_id=uuid.UUID(bytes=entry.user_id),
-                    weight=entry.weight,
-                    height=entry.height,
+                    id=uuid.UUID(bytes=measurement.id),
+                    user_id=user_id,
+                    weight=float(measurement.weight) if measurement.weight else None,
+                    height=float(measurement.height) if measurement.height else None,
                     measurements=BodyMeasurements(**measurements_dict) if measurements_dict else None,
-                    recorded_at=entry.recorded_at,
-                    created_at=entry.created_at
+                    recorded_at=measurement.recorded_at,
+                    created_at=measurement.created_at,
+                    progress_photos=related_photos
                 )
             )
         
@@ -443,37 +472,420 @@ async def get_progress_history(
         logger.error(f"Error getting progress history: {e}", exc_info=True)
         # Return empty list instead of throwing error
         return []
+
 @router.get("/progress/latest", response_model=ProgressTrackingResponse)
 async def get_latest_progress(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Get the most recent progress entry"""
-    user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
-    
-    result = await db.execute(
-        select(ProgressTracking)
-        .where(ProgressTracking.user_id == user_id_bytes)
-        .order_by(desc(ProgressTracking.recorded_at))
-        .limit(1)
-    )
-    entry = result.scalar_one_or_none()
-    
-    if not entry:
-        raise HTTPException(status_code=404, detail="No progress data found")
-    
-    measurements_data = json.loads(entry.measurements) if entry.measurements else {}
-    
-    return ProgressTrackingResponse(
-        id=uuid.UUID(bytes=entry.id),
-        user_id=uuid.UUID(bytes=entry.user_id),
-        weight=entry.weight,
-        height=entry.height,
-        measurements=BodyMeasurements(**measurements_data) if measurements_data else None,
-        recorded_at=entry.recorded_at,
-        created_at=entry.created_at
-    )
+    """Get most recent progress entry with photos"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get latest measurement
+        result = await db.execute(
+            select(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id_bytes)
+            .order_by(desc(BodyMeasurement.recorded_at))
+            .limit(1)
+        )
+        entry = result.scalar_one_or_none()
+        
+        if not entry:
+            raise HTTPException(status_code=404, detail="No progress data found")
+        
+        # Get photos from the last 2 days
+        photos_result = await db.execute(
+            select(ProgressPhoto)
+            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.created_at >= entry.recorded_at - timedelta(days=2))
+            .order_by(desc(ProgressPhoto.created_at))
+        )
+        recent_photos = photos_result.scalars().all()
+        
+        # Create measurements object
+        measurements_dict = {
+            "weight": float(entry.weight) if entry.weight else None,
+            "height": float(entry.height) if entry.height else None,
+            "body_fat": float(entry.body_fat) if entry.body_fat else None,
+            "chest": float(entry.chest) if entry.chest else None,
+            "waist": float(entry.waist) if entry.waist else None,
+            "shoulders": float(entry.shoulders) if entry.shoulders else None,
+            "arm_left": float(entry.arm_left) if entry.arm_left else None,
+            "arm_right": float(entry.arm_right) if entry.arm_right else None,
+            "neck": float(entry.neck) if entry.neck else None,
+            "hips": float(entry.hips) if entry.hips else None,
+            "thigh_left": float(entry.thigh_left) if entry.thigh_left else None,
+            "thigh_right": float(entry.thigh_right) if entry.thigh_right else None,
+            "calf_left": float(entry.calf_left) if entry.calf_left else None,
+            "calf_right": float(entry.calf_right) if entry.calf_right else None,
+            "glutes": float(entry.glutes) if entry.glutes else None,
+        }
+        # Remove None values
+        measurements_dict = {k: v for k, v in measurements_dict.items() if v is not None}
+        
+        # Build photo responses
+        photo_responses = [
+            ProgressPhotoResponse(
+                id=photo.id,
+                user_id=user_id,
+                filename=photo.filename,
+                original_filename=photo.original_filename,
+                file_path=photo.file_path,
+                file_size=photo.file_size,
+                mime_type=photo.mime_type,
+                description=photo.description,
+                created_at=photo.created_at
+            )
+            for photo in recent_photos
+        ]
+        
+        return ProgressTrackingResponse(
+            id=uuid.UUID(bytes=entry.id),
+            user_id=user_id,
+            weight=float(entry.weight) if entry.weight else None,
+            height=float(entry.height) if entry.height else None,
+            measurements=BodyMeasurements(**measurements_dict) if measurements_dict else None,
+            recorded_at=entry.recorded_at,
+            created_at=entry.created_at,
+            progress_photos=photo_responses
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting latest progress: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get latest progress")
+
+# ============================================================
+# ENHANCED PROGRESS ANALYTICS ENDPOINTS
+# ============================================================
+
+@router.get("/progress/analytics", response_model=ProgressAnalyticsResponse)
+async def get_progress_analytics(
+    period: str = Query("month", regex="^(week|month|quarter|year)$"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get detailed progress analytics for specified period"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Calculate date range based on period
+        end_date = datetime.utcnow().date()
+        if period == "week":
+            start_date = end_date - timedelta(days=7)
+        elif period == "month":
+            start_date = end_date - timedelta(days=30)
+        elif period == "quarter":
+            start_date = end_date - timedelta(days=90)
+        else:  # year
+            start_date = end_date - timedelta(days=365)
+        
+        # Get measurements in period
+        measurements_result = await db.execute(
+            select(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id_bytes)
+            .where(BodyMeasurement.recorded_at >= start_date)
+            .where(BodyMeasurement.recorded_at <= end_date)
+            .order_by(asc(BodyMeasurement.recorded_at))
+        )
+        measurements = measurements_result.scalars().all()
+        
+        # Get photos count in period
+        photos_count_result = await db.execute(
+            select(func.count(ProgressPhoto.id))
+            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.created_at >= start_date)
+            .where(ProgressPhoto.created_at <= end_date)
+        )
+        photos_count = photos_count_result.scalar() or 0
+        
+        # Calculate weight statistics
+        weights = [float(m.weight) for m in measurements if m.weight]
+        weight_stats = {}
+        if weights:
+            weight_stats = {
+                "current": weights[-1] if weights else None,
+                "start": weights[0] if weights else None,
+                "change": weights[-1] - weights[0] if len(weights) > 1 else 0,
+                "change_percentage": ((weights[-1] - weights[0]) / weights[0] * 100) if len(weights) > 1 and weights[0] != 0 else 0,
+                "average": sum(weights) / len(weights),
+                "min": min(weights),
+                "max": max(weights)
+            }
+        
+        # Calculate measurement changes
+        measurement_changes = {}
+        if len(measurements) >= 2:
+            first_meas = measurements[0]
+            last_meas = measurements[-1]
+            
+            for field in ['chest', 'waist', 'shoulders', 'arm_left', 'arm_right', 'neck', 'hips', 'thigh_left', 'thigh_right', 'calf_left', 'calf_right', 'glutes', 'body_fat']:
+                first_val = float(getattr(first_meas, field)) if getattr(first_meas, field) else None
+                last_val = float(getattr(last_meas, field)) if getattr(last_meas, field) else None
+                if first_val and last_val:
+                    measurement_changes[field] = {
+                        "start": first_val,
+                        "current": last_val,
+                        "change": last_val - first_val,
+                        "change_percentage": ((last_val - first_val) / first_val * 100) if first_val != 0 else 0
+                    }
+        
+        # Calculate consistency score (based on frequency of measurements)
+        days_in_period = (end_date - start_date).days
+        expected_measurements = max(1, days_in_period // 7)  # Expect weekly measurements
+        consistency_score = min(100, (len(measurements) / expected_measurements) * 100) if expected_measurements > 0 else 0
+        
+        # Generate achievements
+        achievements = []
+        if weight_stats.get("change", 0) < 0 and abs(weight_stats["change"]) >= 2:
+            achievements.append({"type": "weight_loss", "description": f"Lost {abs(weight_stats['change']):.1f} lbs"})
+        if photos_count >= 4:
+            achievements.append({"type": "photo_consistency", "description": f"Added {photos_count} progress photos"})
+        if consistency_score >= 80:
+            achievements.append({"type": "measurement_consistency", "description": "Consistent tracking"})
+        
+        # Generate recommendations
+        recommendations = []
+        if len(measurements) < 2:
+            recommendations.append("Try to take measurements at least weekly for better progress tracking")
+        if photos_count < 2:
+            recommendations.append("Add progress photos to visualize your transformation")
+        if consistency_score < 50:
+            recommendations.append("Be more consistent with your measurements for better insights")
+        
+        return ProgressAnalyticsResponse(
+            user_id=user_id,
+            period=period,
+            start_date=start_date,
+            end_date=end_date,
+            weight_stats=weight_stats,
+            measurement_changes=measurement_changes,
+            progress_photos_count=photos_count,
+            consistency_score=round(consistency_score, 1),
+            achievements=achievements,
+            recommendations=recommendations
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting progress analytics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get progress analytics")
+
+@router.get("/progress/summary", response_model=ProgressSummaryResponse)
+async def get_progress_summary(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get comprehensive progress summary with timeline and photos"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Get latest measurements
+        latest_result = await db.execute(
+            select(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id_bytes)
+            .order_by(desc(BodyMeasurement.recorded_at))
+            .limit(1)
+        )
+        latest_measurement = latest_result.scalar_one_or_none()
+        
+        # Get progress timeline (last 6 measurements)
+        timeline_result = await db.execute(
+            select(BodyMeasurement)
+            .where(BodyMeasurement.user_id == user_id_bytes)
+            .order_by(desc(BodyMeasurement.recorded_at))
+            .limit(6)
+        )
+        timeline_measurements = timeline_result.scalars().all()
+        
+        # Get recent photos
+        photos_result = await db.execute(
+            select(ProgressPhoto)
+            .where(ProgressPhoto.user_id == user_id_bytes)
+            .order_by(desc(ProgressPhoto.created_at))
+            .limit(6)
+        )
+        recent_photos = photos_result.scalars().all()
+        
+        # Build current stats
+        current_stats = {}
+        if latest_measurement:
+            current_stats = {
+                "weight": float(latest_measurement.weight) if latest_measurement.weight else None,
+                "height": float(latest_measurement.height) if latest_measurement.height else None,
+                "body_fat": float(latest_measurement.body_fat) if latest_measurement.body_fat else None,
+                "chest": float(latest_measurement.chest) if latest_measurement.chest else None,
+                "waist": float(latest_measurement.waist) if latest_measurement.waist else None,
+                "last_updated": latest_measurement.recorded_at.isoformat()
+            }
+        
+        # Build timeline
+        progress_timeline = []
+        for meas in reversed(timeline_measurements):  # Reverse to show chronological
+            timeline_entry = {
+                "date": meas.recorded_at.date().isoformat(),
+                "weight": float(meas.weight) if meas.weight else None,
+                "body_fat": float(meas.body_fat) if meas.body_fat else None
+            }
+            progress_timeline.append(timeline_entry)
+        
+        # Build photo responses
+        photo_responses = [
+            ProgressPhotoResponse(
+                id=photo.id,
+                user_id=user_id,
+                filename=photo.filename,
+                original_filename=photo.original_filename,
+                file_path=photo.file_path,
+                file_size=photo.file_size,
+                mime_type=photo.mime_type,
+                description=photo.description,
+                created_at=photo.created_at
+            )
+            for photo in recent_photos
+        ]
+        
+        # Generate achievements based on data
+        achievements = []
+        total_measurements = len(timeline_measurements)
+        if total_measurements >= 5:
+            achievements.append({"type": "consistent_tracker", "description": f"Logged {total_measurements} measurements"})
+        if len(recent_photos) >= 3:
+            achievements.append({"type": "visual_progress", "description": f"Added {len(recent_photos)} progress photos"})
+        
+        # Generate next milestones
+        next_milestones = []
+        if latest_measurement and latest_measurement.weight:
+            current_weight = float(latest_measurement.weight)
+            if current_weight > 150:
+                next_milestones.append({"type": "weight_goal", "description": "Reach 150 lbs", "target": 150})
+            elif current_weight > 140:
+                next_milestones.append({"type": "weight_goal", "description": "Reach 140 lbs", "target": 140})
+        
+        # Calculate streak data
+        streak_data = {
+            "current_streak": 0,  # Could be enhanced with actual streak logic
+            "longest_streak": 0,
+            "total_days_tracked": total_measurements
+        }
+        
+        return ProgressSummaryResponse(
+            user_id=user_id,
+            current_stats=current_stats,
+            progress_timeline=progress_timeline,
+            recent_photos=photo_responses,
+            achievements=achievements,
+            next_milestones=next_milestones,
+            streak_data=streak_data
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting progress summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to get progress summary")
+
+@router.get("/progress/compare", response_model=ProgressComparisonResponse)
+async def compare_progress_periods(
+    period1: str = Query("current_month", description="First period (current_month, last_month, current_quarter, etc.)"),
+    period2: str = Query("last_month", description="Second period to compare against"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Compare progress between two different time periods"""
+    try:
+        user_id = current_user["user_id"]
+        user_id_bytes = user_id.bytes
+        
+        # Helper function to get date range for period
+        def get_date_range(period_name):
+            end_date = datetime.utcnow().date()
+            if period_name == "current_month":
+                start_date = end_date.replace(day=1)
+                return start_date, end_date
+            elif period_name == "last_month":
+                if end_date.month == 1:
+                    start_date = end_date.replace(year=end_date.year-1, month=12, day=1)
+                    period_end = end_date.replace(year=end_date.year-1, month=12, day=31)
+                else:
+                    start_date = end_date.replace(month=end_date.month-1, day=1)
+                    period_end = end_date.replace(day=1) - timedelta(days=1)
+                return start_date, period_end
+            elif period_name == "current_quarter":
+                quarter = (end_date.month - 1) // 3 + 1
+                start_date = end_date.replace(month=(quarter-1)*3+1, day=1)
+                return start_date, end_date
+            else:
+                # Default to last 30 days
+                start_date = end_date - timedelta(days=30)
+                return start_date, end_date
+        
+        # Get measurements for both periods
+        start1, end1 = get_date_range(period1)
+        start2, end2 = get_date_range(period2)
+        
+        async def get_period_stats(start_date, end_date):
+            result = await db.execute(
+                select(BodyMeasurement)
+                .where(BodyMeasurement.user_id == user_id_bytes)
+                .where(BodyMeasurement.recorded_at >= start_date)
+                .where(BodyMeasurement.recorded_at <= end_date)
+                .order_by(asc(BodyMeasurement.recorded_at))
+            )
+            measurements = result.scalars().all()
+            
+            weights = [float(m.weight) for m in measurements if m.weight]
+            if not weights:
+                return {"measurements_count": 0}
+            
+            return {
+                "measurements_count": len(measurements),
+                "avg_weight": sum(weights) / len(weights),
+                "start_weight": weights[0],
+                "end_weight": weights[-1],
+                "weight_change": weights[-1] - weights[0] if len(weights) > 1 else 0
+            }
+        
+        period1_stats = await get_period_stats(start1, end1)
+        period2_stats = await get_period_stats(start2, end2)
+        
+        # Calculate changes between periods
+        changes = {}
+        if period1_stats.get("avg_weight") and period2_stats.get("avg_weight"):
+            weight_diff = period1_stats["avg_weight"] - period2_stats["avg_weight"]
+            changes["weight"] = {
+                "absolute_change": weight_diff,
+                "percentage_change": (weight_diff / period2_stats["avg_weight"] * 100) if period2_stats["avg_weight"] != 0 else 0
+            }
+        
+        # Generate improvement areas and achievements
+        improvement_areas = []
+        achievements = []
+        
+        if changes.get("weight", {}).get("absolute_change", 0) < 0:
+            achievements.append("Weight loss improvement")
+        elif changes.get("weight", {}).get("absolute_change", 0) > 0:
+            improvement_areas.append("Weight management focus needed")
+        
+        if period1_stats.get("measurements_count", 0) > period2_stats.get("measurements_count", 0):
+            achievements.append("More consistent tracking")
+        else:
+            improvement_areas.append("Increase measurement frequency")
+        
+        return ProgressComparisonResponse(
+            period_1={"name": period1, "stats": period1_stats, "date_range": {"start": start1.isoformat(), "end": end1.isoformat()}},
+            period_2={"name": period2, "stats": period2_stats, "date_range": {"start": start2.isoformat(), "end": end2.isoformat()}},
+            changes=changes,
+            improvement_areas=improvement_areas,
+            achievements=achievements
+        )
+        
+    except Exception as e:
+        logger.error(f"Error comparing progress periods: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to compare progress periods")
+
 # ============================================================
 # CLIENT GOALS ENDPOINTS
 # ============================================================

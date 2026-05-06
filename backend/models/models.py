@@ -414,6 +414,52 @@ class Wishlist(Base):
 
 
 # =============================================================
+# BODY MEASUREMENTS
+# =============================================================
+
+class BodyMeasurement(Base):
+    __tablename__ = "body_measurements"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    recorded_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    
+    # Body basics
+    weight = Column(Numeric(6, 2))
+    height = Column(Numeric(6, 2))
+    body_fat = Column(Numeric(5, 2))
+    
+    # Upper body
+    chest = Column(Numeric(6, 2))
+    waist = Column(Numeric(6, 2))
+    shoulders = Column(Numeric(6, 2))
+    arm_left = Column(Numeric(6, 2))
+    arm_right = Column(Numeric(6, 2))
+    neck = Column(Numeric(6, 2))
+    
+    # Lower body
+    hips = Column(Numeric(6, 2))
+    thigh_left = Column(Numeric(6, 2))
+    thigh_right = Column(Numeric(6, 2))
+    calf_left = Column(Numeric(6, 2))
+    calf_right = Column(Numeric(6, 2))
+    glutes = Column(Numeric(6, 2))
+    
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_body_measurements_user_id', 'user_id'),
+        Index('idx_body_measurements_recorded_at', 'recorded_at'),
+        Index('idx_body_measurements_user_recorded', 'user_id', 'recorded_at'),
+    )
+
+
+# =============================================================
 # PROGRESS PHOTOS
 # =============================================================
 

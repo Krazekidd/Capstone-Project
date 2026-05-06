@@ -537,3 +537,93 @@ class UpdateTrainingScheduleRequest(BaseModel):
     intensity_level: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+# ---------------------------------------------------------------------------
+# Progress Tracking Schemas
+# ---------------------------------------------------------------------------
+
+class BodyMeasurements(BaseModel):
+    weight: Optional[float] = None
+    height: Optional[float] = None
+    body_fat: Optional[float] = None
+    chest: Optional[float] = None
+    waist: Optional[float] = None
+    shoulders: Optional[float] = None
+    arm_left: Optional[float] = None
+    arm_right: Optional[float] = None
+    neck: Optional[float] = None
+    hips: Optional[float] = None
+    thigh_left: Optional[float] = None
+    thigh_right: Optional[float] = None
+    calf_left: Optional[float] = None
+    calf_right: Optional[float] = None
+    glutes: Optional[float] = None
+
+
+class ProgressRequest(BaseModel):
+    measurements: BodyMeasurements
+    notes: Optional[str] = None
+    progress_photos: Optional[List[uuid.UUID]] = None  # Link to existing photos
+
+
+class ProgressTrackingResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    weight: Optional[float] = None
+    height: Optional[float] = None
+    measurements: Optional[BodyMeasurements] = None
+    recorded_at: datetime
+    created_at: datetime
+    progress_photos: List[ProgressPhotoResponse] = []
+    notes: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class UserProgressResponse(BaseModel):
+    user_id: uuid.UUID
+    current_weight: Optional[float] = None
+    current_height: Optional[float] = None
+    weight_change: Optional[float] = None  # Change from previous measurement
+    weight_change_percentage: Optional[float] = None
+    latest_measurements: Optional[BodyMeasurements] = None
+    progress_photos_count: int
+    total_measurements: int
+    first_measurement_date: Optional[datetime] = None
+    latest_measurement_date: Optional[datetime] = None
+    days_tracked: int
+    average_weight: Optional[float] = None
+    weight_trend: str  # "losing", "gaining", "stable"
+    goal_progress: Optional[dict] = None  # Progress towards goals
+
+
+class ProgressAnalyticsResponse(BaseModel):
+    user_id: uuid.UUID
+    period: str  # "week", "month", "quarter", "year"
+    start_date: date
+    end_date: date
+    weight_stats: dict
+    measurement_changes: dict
+    progress_photos_count: int
+    consistency_score: float  # How consistent with measurements
+    achievements: List[dict]
+    recommendations: List[str]
+
+
+class ProgressComparisonResponse(BaseModel):
+    period_1: dict
+    period_2: dict
+    changes: dict
+    improvement_areas: List[str]
+    achievements: List[str]
+
+
+class ProgressSummaryResponse(BaseModel):
+    user_id: uuid.UUID
+    current_stats: dict
+    progress_timeline: List[dict]
+    recent_photos: List[ProgressPhotoResponse]
+    achievements: List[dict]
+    next_milestones: List[dict]
+    streak_data: dict

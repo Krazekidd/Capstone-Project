@@ -1,14 +1,20 @@
 from datetime import datetime, date
 import logging
+import os
+import resend
 
 logger = logging.getLogger(__name__)
-# Temporarily disable email service for testing
+
+# Initialize Resend with API key from environment
+resend.api_key = os.getenv("RESEND_API_KEY")
+
+# Legacy fastapi_mail imports (kept for reference)
 # from fastapi_mail import FastMail, MessageSchema, MessageType
 # from config import SMTP_CONFIG
 # fastmail = FastMail(SMTP_CONFIG)
 
 async def send_password_reset_email(email: str, token: str, name: str):
-    """Send password reset email to user (disabled for testing)"""
+    """Send password reset email to user using Resend"""
     reset_link = f"http://localhost:3000/reset-password?token={token}"
     
     html_content = f"""
@@ -48,14 +54,82 @@ async def send_password_reset_email(email: str, token: str, name: str):
     </html>
     """
     
-    logger.info(f"Password reset email would be sent to {email} (disabled for testing)")
-    return True
+    try:
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [email],
+            "subject": "Password Reset - GymPRO",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Password reset email sent to {email}: {result}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send password reset email to {email}: {e}")
+        return False
 
 
 async def send_welcome_email(email: str, name: str):
-    """Send welcome email after registration (disabled for testing)"""
-    logger.info(f"Welcome email would be sent to {email} (disabled for testing)")
-    return True
+    """Send welcome email after registration using Resend"""
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Welcome to GymPRO!</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #ff6900; padding: 20px; text-align: center;">
+            <h1 style="color: white;">GymPRO</h1>
+            <p style="color: white; font-size: 18px;">Welcome to the Family! 🎉</p>
+        </div>
+        
+        <div style="padding: 30px;">
+            <h2>Welcome, {name}!</h2>
+            <p>We're thrilled to have you join GymPRO! Your fitness journey starts now.</p>
+            
+            <div style="background-color: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #ff6900;">What's Next?</h3>
+                <ul>
+                    <li>✅ Complete your profile</li>
+                    <li>🏋️ Browse our training programs</li>
+                    <li>📅 Book your first session</li>
+                    <li>💪 Join our community</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="http://localhost:3000/dashboard" 
+                   style="background-color: #ff6900; color: white; padding: 12px 30px; 
+                          text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Get Started →
+                </a>
+            </div>
+            
+            <hr style="margin: 30px 0;">
+            <p style="color: #666; font-size: 12px;">
+                Need help? Contact us at <a href="mailto:support@gympro.com">support@gympro.com</a>
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    try:
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [email],
+            "subject": "Welcome to GymPRO! 🎉",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Welcome email sent to {email}: {result}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send welcome email to {email}: {e}")
+        return False
 
 async def send_booking_confirmation_email(
     booked_for_email: str,
@@ -162,16 +236,16 @@ async def send_booking_confirmation_email(
     </html>
     """
     
-    message = MessageSchema(
-        subject=f"Booking Confirmed: {excursion_name} - B.A.D People Fitness",
-        recipients=[booked_for_email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-    
     try:
-        await fastmail.send_message(message)
-        logger.info(f"Booking confirmation email sent to {booked_for_email} for {excursion_name}")
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [booked_for_email],
+            "subject": f"Booking Confirmed: {excursion_name} - B.A.D People Fitness",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Booking confirmation email sent to {booked_for_email} for {excursion_name}: {result}")
         return True
     except Exception as e:
         logger.error(f"Failed to send booking confirmation email to {booked_for_email}: {e}")
@@ -253,16 +327,16 @@ async def send_booking_cancellation_email(
     </html>
     """
     
-    message = MessageSchema(
-        subject=f"Booking Cancelled: {excursion_name} - B.A.D People Fitness",
-        recipients=[booked_for_email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-    
     try:
-        await fastmail.send_message(message)
-        logger.info(f"Booking cancellation email sent to {booked_for_email} for {excursion_name}")
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [booked_for_email],
+            "subject": f"Booking Cancelled: {excursion_name} - B.A.D People Fitness",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Booking cancellation email sent to {booked_for_email} for {excursion_name}: {result}")
         return True
     except Exception as e:
         logger.error(f"Failed to send cancellation email to {booked_for_email}: {e}")
@@ -349,16 +423,16 @@ async def send_consultation_confirmation_email(
     </html>
     """
     
-    message = MessageSchema(
-        subject=f"Consultation Confirmed: {consultation_title} - GymVault",
-        recipients=[client_email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-    
     try:
-        await fastmail.send_message(message)
-        logger.info(f"Consultation confirmation email sent to {client_email}")
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [client_email],
+            "subject": f"Consultation Confirmed: {consultation_title} - GymVault",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Consultation confirmation email sent to {client_email}: {result}")
         return True
     except Exception as e:
         logger.error(f"Failed to send consultation confirmation email: {e}")
@@ -433,16 +507,16 @@ async def send_consultation_cancellation_email(
     </html>
     """
     
-    message = MessageSchema(
-        subject=f"Consultation Cancelled: {consultation_title} - GymVault",
-        recipients=[client_email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-    
     try:
-        await fastmail.send_message(message)
-        logger.info(f"Consultation cancellation email sent to {client_email}")
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [client_email],
+            "subject": f"Consultation Cancelled: {consultation_title} - GymVault",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Consultation cancellation email sent to {client_email}: {result}")
         return True
     except Exception as e:
         logger.error(f"Failed to send consultation cancellation email: {e}")
@@ -526,16 +600,16 @@ async def send_order_confirmation_email(
     </html>
     """
     
-    message = MessageSchema(
-        subject=f"Order Confirmed: {order_reference} - B.A.D People Fitness",
-        recipients=[email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-    
     try:
-        await fastmail.send_message(message)
-        logger.info(f"Order confirmation email sent to {email}")
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [email],
+            "subject": f"Order Confirmed: {order_reference} - B.A.D People Fitness",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Order confirmation email sent to {email}: {result}")
         return True
     except Exception as e:
         logger.error(f"Failed to send order confirmation email: {e}")
@@ -598,26 +672,18 @@ async def send_birthday_email(email: str, name: str, message: str):
     </html>
     """
     
-    message_obj = MessageSchema(
-        subject=f"🎂 Happy Birthday, {name}! - GymPro",
-        recipients=[email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-    
     try:
-        await fastmail.send_message(message_obj)
-        logger.info(f"Birthday email sent to {email}")
+        params = {
+            "from": os.getenv("FROM_EMAIL", "onboarding@resend.dev"),
+            "to": [email],
+            "subject": f"🎂 Happy Birthday, {name}! - GymPro",
+            "html": html_content
+        }
+        
+        result = resend.Emails.send(params)
+        logger.info(f"Birthday email sent to {email}: {result}")
         return True
     except Exception as e:
         logger.error(f"Failed to send birthday email to {email}: {e}")
         return False
     
-#     import resend
-
-# r = resend.Emails.send({
-#   "from": "onboarding@resend.dev",
-#   "to": "candacehendricks1000@gmail.com",
-#   "subject": "Hello World",
-#   "html": "<p>Congrats on sending your <strong>first email</strong>!</p>"
-# })

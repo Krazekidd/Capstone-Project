@@ -68,11 +68,15 @@ class Settings(BaseSettings):
         "http://localhost:5173",
     ]
 
-    # Email SMTP Settings
+    # Email Settings
+    # SMTP Settings (legacy)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
+    
+    # Resend Settings (new)
+    RESEND_API_KEY: Optional[str] = None
     FROM_EMAIL: Optional[str] = None
     FROM_NAME: str = "GymPRO"
 

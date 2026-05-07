@@ -522,7 +522,7 @@ class BodyMeasurement(Base):
     __tablename__ = "body_measurements"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     recorded_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     
     # Body basics
@@ -550,14 +550,13 @@ class BodyMeasurement(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="body_measurements")
 
     # Indexes
     __table_args__ = (
-        Index('idx_body_measurements_user_id', 'user_id'),
+        Index('idx_body_measurements_client_id', 'client_id'),
         Index('idx_body_measurements_recorded_at', 'recorded_at'),
-        Index('idx_body_measurements_user_date', 'user_id', 'recorded_at'),
+        Index('idx_body_measurements_client_date', 'client_id', 'recorded_at'),
     )
 
 

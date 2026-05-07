@@ -36,8 +36,8 @@ class Settings(BaseSettings):
         "http://localhost:5173",
     ]
 
-    # Email Settings - Resend Only
-    RESEND_API_KEY: Optional[str] = None
+    # Email Settings - Brevo API
+    BREVO_API_KEY: Optional[str] = None
     FROM_EMAIL: Optional[str] = None
     FROM_NAME: str = "GymPRO"
 
@@ -86,7 +86,7 @@ MAX_CONTEXT_MESSAGES = settings.MAX_CONTEXT_MESSAGES
 ALLOWED_ORIGINS = settings.ALLOWED_ORIGINS
 
 # Email Settings
-RESEND_API_KEY = settings.RESEND_API_KEY
+BREVO_API_KEY = settings.BREVO_API_KEY
 FROM_EMAIL = settings.FROM_EMAIL
 FROM_NAME = settings.FROM_NAME
 

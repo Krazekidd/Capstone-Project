@@ -1,19 +1,38 @@
 from datetime import datetime, date
 import logging
-import resend
+import json
+from brevo import Brevo
+from brevo.transactional_emails import (
+    SendTransacEmailRequestSender,
+    SendTransacEmailRequestToItem,
+)
 from config.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Initialize Resend with API key from settings
-if settings.RESEND_API_KEY:
-    resend.api_key = settings.RESEND_API_KEY
+# Initialize Brevo client with API key from settings
+if settings.BREVO_API_KEY:
+    client = Brevo(
+        api_key=settings.BREVO_API_KEY,
+        timeout=30.0,
+    )
 else:
-    logger.warning("RESEND_API_KEY not found in settings. Email functionality will not work.")
+    logger.warning("BREVO_API_KEY not found in settings. Email functionality will not work.")
+    client = None
+
+# Default sender information
+DEFAULT_SENDER = SendTransacEmailRequestSender(
+    name=settings.FROM_NAME,
+    email=settings.FROM_EMAIL or "hello@brevo.com",
+)
 
 
 async def send_password_reset_email(email: str, token: str, name: str):
-    """Send password reset email to user using Resend"""
+    """Send password reset email to user using Brevo"""
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send password reset email.")
+        return False
+        
     reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
     
     html_content = f"""
@@ -54,23 +73,45 @@ async def send_password_reset_email(email: str, token: str, name: str):
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [email],
-            "subject": "Password Reset - GymPRO",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Password reset email sent to {email}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject="Password Reset - GymPRO",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=email,
+                    name=name,
+                )
+            ],
+        )
+        logger.info(
+            f"PASSWORD_RESET_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {name} | "
+            f"Message ID: {result.message_id} | "
+            f"Reset Link: {reset_link} | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send password reset email to {email}: {e}")
+        logger.error(
+            f"PASSWORD_RESET_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {name} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
 
 
 async def send_welcome_email(email: str, name: str):
-    """Send welcome email after registration using Resend"""
+    """Send welcome email after registration using Brevo"""
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send welcome email.")
+        return False
+        
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -116,19 +157,38 @@ async def send_welcome_email(email: str, name: str):
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [email],
-            "subject": "Welcome to GymPRO! 🎉",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Welcome email sent to {email}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject="Welcome to GymPRO! 🎉",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=email,
+                    name=name,
+                )
+            ],
+        )
+        logger.info(
+            f"WELCOME_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {name} | "
+            f"Message ID: {result.message_id} | "
+            f"Dashboard URL: {settings.FRONTEND_URL}/dashboard | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send welcome email to {email}: {e}")
+        logger.error(
+            f"WELCOME_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {name} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
+
 
 async def send_booking_confirmation_email(
     booked_for_email: str,
@@ -145,7 +205,10 @@ async def send_booking_confirmation_email(
     payment_method: str
 ):
     """Send booking confirmation email to user"""
-    
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send booking confirmation email.")
+        return False
+        
     date_str = excursion_date.strftime("%A, %B %d, %Y")
     
     what_to_bring_html = "".join([f"<li>{item}</li>" for item in what_to_bring])
@@ -236,18 +299,45 @@ async def send_booking_confirmation_email(
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [booked_for_email],
-            "subject": f"Booking Confirmed: {excursion_name} - B.A.D People Fitness",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Booking confirmation email sent to {booked_for_email} for {excursion_name}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject=f"Booking Confirmed: {excursion_name} - B.A.D People Fitness",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=booked_for_email,
+                    name=booked_for_name,
+                )
+            ],
+        )
+        logger.info(
+            f"BOOKING_CONFIRMATION_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {booked_for_email} | "
+            f"Name: {booked_for_name} | "
+            f"Excursion: {excursion_name} | "
+            f"Date: {date_str} | "
+            f"Time: {excursion_time} | "
+            f"Location: {location} | "
+            f"Guide: {guide} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Total Amount: ${total_amount:.2f} JMD | "
+            f"Payment Method: {payment_method} | "
+            f"Message ID: {result.message_id} | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send booking confirmation email to {booked_for_email}: {e}")
+        logger.error(
+            f"BOOKING_CONFIRMATION_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {booked_for_email} | "
+            f"Name: {booked_for_name} | "
+            f"Excursion: {excursion_name} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
 
 
@@ -260,7 +350,10 @@ async def send_booking_cancellation_email(
     refund_amount: float = None
 ):
     """Send booking cancellation email to user"""
-    
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send booking cancellation email.")
+        return False
+        
     date_str = excursion_date.strftime("%A, %B %d, %Y")
     
     refund_html = ""
@@ -327,18 +420,41 @@ async def send_booking_cancellation_email(
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [booked_for_email],
-            "subject": f"Booking Cancelled: {excursion_name} - B.A.D People Fitness",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Booking cancellation email sent to {booked_for_email} for {excursion_name}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject=f"Booking Cancelled: {excursion_name} - B.A.D People Fitness",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=booked_for_email,
+                    name=booked_for_name,
+                )
+            ],
+        )
+        logger.info(
+            f"BOOKING_CANCELLATION_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {booked_for_email} | "
+            f"Name: {booked_for_name} | "
+            f"Excursion: {excursion_name} | "
+            f"Date: {date_str} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Refund Amount: {'${:.2f} JMD'.format(refund_amount) if refund_amount else 'None'} | "
+            f"Message ID: {result.message_id} | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send cancellation email to {booked_for_email}: {e}")
+        logger.error(
+            f"BOOKING_CANCELLATION_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {booked_for_email} | "
+            f"Name: {booked_for_name} | "
+            f"Excursion: {excursion_name} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
 
 
@@ -354,7 +470,10 @@ async def send_consultation_confirmation_email(
     coach_description: str
 ):
     """Send consultation booking confirmation email"""
-    
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send consultation confirmation email.")
+        return False
+        
     date_str = booking_date.strftime("%A, %B %d, %Y")
     time_str = datetime.strptime(booking_time, "%H:%M:%S").strftime("%I:%M %p")
     
@@ -423,19 +542,46 @@ async def send_consultation_confirmation_email(
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [client_email],
-            "subject": f"Consultation Confirmed: {consultation_title} - GymVault",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Consultation confirmation email sent to {client_email}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject=f"Consultation Confirmed: {consultation_title} - GymVault",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=client_email,
+                    name=client_name,
+                )
+            ],
+        )
+        logger.info(
+            f"CONSULTATION_CONFIRMATION_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {client_email} | "
+            f"Name: {client_name} | "
+            f"Consultation: {consultation_title} | "
+            f"Date: {date_str} | "
+            f"Time: {time_str} | "
+            f"Duration: {duration_minutes} minutes | "
+            f"Format: {format_display} | "
+            f"Coach: {coach_description} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Message ID: {result.message_id} | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send consultation confirmation email: {e}")
+        logger.error(
+            f"CONSULTATION_CONFIRMATION_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {client_email} | "
+            f"Name: {client_name} | "
+            f"Consultation: {consultation_title} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
+
 
 async def send_consultation_cancellation_email(
     client_email: str,
@@ -447,7 +593,10 @@ async def send_consultation_cancellation_email(
     refund_amount: float = None
 ):
     """Send consultation cancellation email"""
-    
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send consultation cancellation email.")
+        return False
+        
     date_str = booking_date.strftime("%A, %B %d, %Y")
     time_str = datetime.strptime(booking_time, "%H:%M:%S").strftime("%I:%M %p")
     
@@ -507,19 +656,44 @@ async def send_consultation_cancellation_email(
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [client_email],
-            "subject": f"Consultation Cancelled: {consultation_title} - GymVault",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Consultation cancellation email sent to {client_email}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject=f"Consultation Cancelled: {consultation_title} - GymVault",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=client_email,
+                    name=client_name,
+                )
+            ],
+        )
+        logger.info(
+            f"CONSULTATION_CANCELLATION_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {client_email} | "
+            f"Name: {client_name} | "
+            f"Consultation: {consultation_title} | "
+            f"Date: {date_str} | "
+            f"Time: {time_str} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Refund Amount: {'${:.2f}'.format(refund_amount) if refund_amount else 'None'} | "
+            f"Message ID: {result.message_id} | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send consultation cancellation email: {e}")
+        logger.error(
+            f"CONSULTATION_CANCELLATION_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {client_email} | "
+            f"Name: {client_name} | "
+            f"Consultation: {consultation_title} | "
+            f"Booking Reference: {booking_reference} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
+
 
 async def send_order_confirmation_email(
     email: str,
@@ -534,7 +708,10 @@ async def send_order_confirmation_email(
     city: str
 ):
     """Send order confirmation email"""
-    
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send order confirmation email.")
+        return False
+        
     items_html = ""
     for item in items:
         items_html += f"""
@@ -600,23 +777,52 @@ async def send_order_confirmation_email(
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [email],
-            "subject": f"Order Confirmed: {order_reference} - B.A.D People Fitness",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Order confirmation email sent to {email}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject=f"Order Confirmed: {order_reference} - B.A.D People Fitness",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=email,
+                    name=customer_name,
+                )
+            ],
+        )
+        logger.info(
+            f"ORDER_CONFIRMATION_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {customer_name} | "
+            f"Order Reference: {order_reference} | "
+            f"Items Count: {len(items)} | "
+            f"Subtotal: ${subtotal:.2f} JMD | "
+            f"Tax: ${tax:.2f} JMD | "
+            f"Shipping: {'Free' if shipping_cost == 0 else '${:.2f} JMD'.format(shipping_cost)} | "
+            f"Total: ${total:.2f} JMD | "
+            f"Shipping Address: {shipping_address}, {city} | "
+            f"Message ID: {result.message_id} | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send order confirmation email: {e}")
+        logger.error(
+            f"ORDER_CONFIRMATION_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {customer_name} | "
+            f"Order Reference: {order_reference} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
+
 
 async def send_birthday_email(email: str, name: str, message: str):
     """Send birthday email to client"""
-    
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send birthday email.")
+        return False
+        
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -672,17 +878,35 @@ async def send_birthday_email(email: str, name: str, message: str):
     """
     
     try:
-        params = {
-            "from": settings.FROM_EMAIL or "onboarding@resend.dev",
-            "to": [email],
-            "subject": f"🎂 Happy Birthday, {name}! - GymPro",
-            "html": html_content
-        }
-        
-        result = resend.Emails.send(params)
-        logger.info(f"Birthday email sent to {email}: {result}")
+        result = client.transactional_emails.send_transac_email(
+            subject=f"🎂 Happy Birthday, {name}! - GymPro",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=email,
+                    name=name,
+                )
+            ],
+        )
+        logger.info(
+            f"BIRTHDAY_EMAIL_SENT | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {name} | "
+            f"Message Length: {len(message)} characters | "
+            f"Account URL: {settings.FRONTEND_URL}/account | "
+            f"Message ID: {result.message_id} | "
+            f"Sender: {DEFAULT_SENDER.email}"
+        )
         return True
     except Exception as e:
-        logger.error(f"Failed to send birthday email to {email}: {e}")
+        logger.error(
+            f"BIRTHDAY_EMAIL_FAILED | "
+            f"Timestamp: {datetime.now().isoformat()} | "
+            f"Recipient: {email} | "
+            f"Name: {name} | "
+            f"Error: {str(e)} | "
+            f"Error Type: {type(e).__name__}"
+        )
         return False
-    

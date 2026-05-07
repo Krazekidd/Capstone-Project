@@ -12,6 +12,7 @@ import Excursions from './pages/Excursions/Excursions';
 import TrainerPage from './pages/Trainer/Traineracc'
 import Admin from './pages/Admin/Admin'
 import STrainer from './pages/STrainer/STrainer'
+import ResetPassword from './pages/ResetPassword/ResetPassword'
 
 function App() {
   return (
@@ -19,6 +20,8 @@ function App() {
       <Routes>
         {/* Login page – no Layout (no universal navbar) */}
         <Route path="/login" element={<Login />} />
+        {/* Reset Password page – no Layout (no universal navbar) */}
+        <Route path="/reset-password" element={<ResetPassword />} />
         {/* Wrapping all routes that need the navbar/footer */}
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />

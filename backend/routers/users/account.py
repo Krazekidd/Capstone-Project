@@ -23,7 +23,7 @@ from schemas import (
     HealthConditionResponse, UpdateHealthConditionsRequest,WaterIntakeResponse,UpdateWaterIntakeRequest,
     StrengthRecordResponse, UpdateStrengthRecordRequest,TrainerRatingResponse,TrainerRatingsSummaryResponse,
     TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse, BadgeCheckResponse,
-    TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,OrderItemResponse,AdminOrderResponse,
+    TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,ShopOrderItemResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
     DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
     AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse,
@@ -2247,10 +2247,10 @@ async def admin_get_orders(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    query = select(ShopOrder).order_by(ShopOrder.placed_at.desc())
+    query = select(ShopOrder).order_by(ShopOrder.created_at.desc())
     
     if status:
-        query = query.where(ShopOrder.order_status == status)
+        query = query.where(ShopOrder.status == status)
     
     result = await db.execute(query)
     orders = result.scalars().all()
@@ -2259,31 +2259,32 @@ async def admin_get_orders(
     for order in orders:
         # Get items for this order
         items_result = await db.execute(
-            select(ShopOrderItem).where(ShopOrderItem.order_id == order.id)
+            select(ShopOrderItem).where(ShopOrderItem.shop_order_id == order.id)
         )
         items = items_result.scalars().all()
         
         order_list.append({
             "id": str(uuid.UUID(bytes=order.id)),
-            "order_reference": order.order_reference,
-            "client_name": order.customer_name,
-            "client_email": order.email,
-            "client_phone": order.phone,
+            "order_reference": order.order_number,
+            "client_name": "",  # TODO: Get from user relationship
+            "client_email": "",  # TODO: Get from user relationship
+            "client_phone": "",  # TODO: Get from user relationship
             "shipping_address": order.shipping_address,
-            "city": order.city,
-            "items": [{"name": i.product_name, "quantity": i.quantity, "price": float(i.product_price)} for i in items],
+            "city": "",  # TODO: Extract from shipping_address
+            "items": [{"name": i.product_name, "quantity": i.quantity, "price": float(i.unit_price)} for i in items],
             "subtotal": float(order.subtotal),
-            "tax": float(order.tax),
-            "shipping_cost": float(order.shipping_cost),
-            "total": float(order.total),
-            "order_status": order.order_status,
-            "payment_status": order.payment_status,
-            "payment_method": order.payment_method,
-            "placed_at": order.placed_at.isoformat(),
+            "tax": float(order.tax_amount),
+            "shipping_cost": float(order.shipping_amount),
+            "total": float(order.total_amount),
+            "order_status": order.status,
+            "payment_status": "",  # TODO: Add payment_status field to ShopOrder
+            "payment_method": "",  # TODO: Add payment_method field to ShopOrder
+            "placed_at": order.created_at.isoformat(),
             "pickup_notes": getattr(order, "pickup_notes", None)
         })
     
     return order_list
+
 @router.put("/admin/orders/{order_id}/status", response_model=APIResponse)
 async def admin_update_order_status(
     order_id: uuid.UUID,
@@ -2307,12 +2308,9 @@ async def admin_update_order_status(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if "order_status" in status_data:
-        order.order_status = status_data["order_status"]
-    if "payment_status" in status_data:
-        order.payment_status = status_data["payment_status"]
-    if "pickup_notes" in status_data:
-        order.pickup_notes = status_data["pickup_notes"]
+    if "status" in status_data:
+        order.status = status_data["status"]
+    # TODO: Add payment_status and pickup_notes fields to ShopOrder
     
     await db.commit()
     
@@ -2354,7 +2352,7 @@ async def get_dashboard_stats(
     # Pending orders
     pending_orders_result = await db.execute(
         select(func.count()).select_from(ShopOrder)
-        .where(ShopOrder.order_status.in_(["pending", "processing"]))
+        .where(ShopOrder.status.in_(["pending", "processing"]))
     )
     pending_orders = pending_orders_result.scalar() or 0
     

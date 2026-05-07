@@ -76,6 +76,20 @@ async def get_user_db():
 async def check_db_connection():
     """Check if database connection is working."""
     try:
+        # Parse database URL to extract connection info
+        db_url = settings.DATABASE_URL
+        if "postgresql" in db_url:
+            # Extract database info from postgresql URL
+            # Format: postgresql+asyncpg://user:password@host:port/database
+            if "@" in db_url and "/" in db_url.split("@")[-1]:
+                host_port = db_url.split("@")[1].split("/")[0]
+                db_name = db_url.split("@")[1].split("/")[1]
+                logger.info(f"🔗 Connecting to PostgreSQL database: {db_name} at {host_port}")
+            else:
+                logger.info(f"🔗 Connecting to PostgreSQL database: {db_url}")
+        else:
+            logger.info(f"🔗 Connecting to database: {db_url}")
+        
         async with engine.begin() as conn:
             result = await conn.execute(text("SELECT 1"))
             logger.info("✅ Database connection successful")
@@ -94,8 +108,8 @@ async def init_db():
     from models import (
         User, AuthToken, MembershipPlan, UserMembership, Coach,
         CoachAvailabilitySchedule, CoachAvailabilityOverride,
-        ConsultationType, Booking, Product, Order, OrderItem,
-        ProductReview, Wishlist, SavedConversation, ConversationMessage,
+        ConsultationType, Booking, Product, ProductReview, 
+        Wishlist, SavedConversation, ConversationMessage,
         Attendance, BodyMeasurement, ProgressPhoto, NutritionPlan, 
         NutritionGoals, ActivityData, TrainingSchedule, ClientBadge,
         Client, Trainer, Admin, ClientGoal, ClientHealthCondition,

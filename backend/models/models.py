@@ -64,9 +64,11 @@ class User(Base):
     auth_tokens = relationship("AuthToken", back_populates="user", cascade="all, delete-orphan")
     user_memberships = relationship("UserMembership", back_populates="user", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="user", cascade="all, delete-orphan")
-    orders = relationship("Order", back_populates="user", cascade="all, delete-orphan")
+    shop_orders = relationship("ShopOrder", back_populates="user", cascade="all, delete-orphan")
     product_reviews = relationship("ProductReview", back_populates="user", cascade="all, delete-orphan")
     wishlists = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
+    
+    excursion_bookings = relationship("ExcursionBooking", back_populates="user", cascade="all, delete-orphan")
     
     # Role-specific relationships
     client_profile = relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -132,6 +134,11 @@ class Client(Base):
     client_badges = relationship("ClientBadge", back_populates="client", cascade="all, delete-orphan")
     activity_data = relationship("ActivityData", back_populates="client", cascade="all, delete-orphan")
     saved_conversations = relationship("SavedConversation", back_populates="client", cascade="all, delete-orphan")
+    goals = relationship("ClientGoal", back_populates="client", cascade="all, delete-orphan")
+    health_conditions = relationship("ClientHealthCondition", back_populates="client", cascade="all, delete-orphan")
+    water_intake_records = relationship("ClientWaterIntake", back_populates="client", cascade="all, delete-orphan")
+    strength_records = relationship("ClientStrengthRecord", back_populates="client", cascade="all, delete-orphan")
+    client_status = relationship("ClientStatus", back_populates="client", uselist=False, cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
@@ -404,7 +411,7 @@ class Product(Base):
 
     # Relationships
     product_reviews = relationship("ProductReview", back_populates="product", cascade="all, delete-orphan")
-    order_items = relationship("OrderItem", back_populates="product")
+    shop_order_items = relationship("ShopOrderItem", back_populates="product")
     wishlists = relationship("Wishlist", back_populates="product", cascade="all, delete-orphan")
 
     # Indexes
@@ -414,55 +421,8 @@ class Product(Base):
     )
 
 
-class Order(Base):
-    __tablename__ = "orders"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    reference = Column(String(20), nullable=False, unique=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    status = Column(order_status_enum, nullable=False, default='pending')
-    subtotal = Column(Numeric(10, 2), nullable=False)
-    shipping_fee = Column(Numeric(10, 2), nullable=False, default=0)
-    discount = Column(Numeric(10, 2), nullable=False, default=0)
-    total = Column(Numeric(10, 2), nullable=False)
-    currency = Column(String(10), nullable=False, default='JMD')
-    shipping_address = Column(JSONB)
-    notes = Column(Text)
-    placed_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    paid_at = Column(DateTime(timezone=True))
-    shipped_at = Column(DateTime(timezone=True))
-    delivered_at = Column(DateTime(timezone=True))
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
-
-    # Relationships
-    user = relationship("User", back_populates="orders")
-    order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
-
-    # Indexes
-    __table_args__ = (
-        Index('idx_orders_user_id', 'user_id'),
-        Index('idx_orders_status', 'status'),
-    )
 
 
-class OrderItem(Base):
-    __tablename__ = "order_items"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, nullable=False)
-    unit_price = Column(Numeric(10, 2), nullable=False)
-    line_total = Column(Numeric(10, 2), nullable=False)
-
-    # Relationships
-    order = relationship("Order", back_populates="order_items")
-    product = relationship("Product", back_populates="order_items")
-
-    # Indexes
-    __table_args__ = (
-        Index('idx_order_items_order_id', 'order_id'),
-    )
 
 
 # =============================================================
@@ -545,8 +505,6 @@ class BodyMeasurement(Base):
     calf_left = Column(Numeric(6, 2))
     calf_right = Column(Numeric(6, 2))
     glutes = Column(Numeric(6, 2))
-    
-    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
@@ -555,7 +513,6 @@ class BodyMeasurement(Base):
     # Indexes
     __table_args__ = (
         Index('idx_body_measurements_client_id', 'client_id'),
-        Index('idx_body_measurements_recorded_at', 'recorded_at'),
         Index('idx_body_measurements_client_date', 'client_id', 'recorded_at'),
     )
 
@@ -568,7 +525,7 @@ class ProgressPhoto(Base):
     __tablename__ = "progress_photos"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     filename = Column(String(255), nullable=False)
     original_filename = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
@@ -578,12 +535,11 @@ class ProgressPhoto(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="progress_photos")
 
     # Indexes
     __table_args__ = (
-        Index('idx_progress_photos_user_id', 'user_id'),
+        Index('idx_progress_photos_client_id', 'client_id'),
         Index('idx_progress_photos_created_at', 'created_at'),
     )
 
@@ -596,7 +552,7 @@ class Attendance(Base):
     __tablename__ = "attendance"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     check_in_time = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     check_out_time = Column(DateTime(timezone=True))
     duration_minutes = Column(Integer)  # Calculated from check-in and check-out
@@ -604,12 +560,11 @@ class Attendance(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="attendance_records")
 
     # Indexes
     __table_args__ = (
-        Index('idx_attendance_user_id', 'user_id'),
+        Index('idx_attendance_client_id', 'client_id'),
         Index('idx_attendance_check_in_time', 'check_in_time'),
     )
 
@@ -622,7 +577,7 @@ class NutritionPlan(Base):
     __tablename__ = "nutrition_plans"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     daily_calories = Column(Numeric(8, 2), nullable=False)
     daily_protein_g = Column(Numeric(6, 2), nullable=False)
     daily_carbs_g = Column(Numeric(6, 2), nullable=False)
@@ -633,12 +588,11 @@ class NutritionPlan(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="nutrition_plans")
 
     # Indexes
     __table_args__ = (
-        Index('idx_nutrition_plans_user_id', 'user_id'),
+        Index('idx_nutrition_plans_client_id', 'client_id'),
     )
 
 
@@ -646,7 +600,7 @@ class NutritionGoals(Base):
     __tablename__ = "nutrition_goals"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, unique=True)
     daily_calories = Column(Numeric(8, 2), nullable=False)
     daily_protein_g = Column(Numeric(6, 2), nullable=False)
     daily_carbs_g = Column(Numeric(6, 2), nullable=False)
@@ -659,12 +613,11 @@ class NutritionGoals(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="nutrition_goals")
 
     # Indexes
     __table_args__ = (
-        Index('idx_nutrition_goals_user_id', 'user_id'),
+        Index('idx_nutrition_goals_client_id', 'client_id'),
     )
 
 
@@ -676,7 +629,7 @@ class SavedConversation(Base):
     __tablename__ = "saved_conversations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     session_id = Column(String(255), nullable=False, index=True)
     title = Column(String(255), nullable=False, default="Untitled Chat")
     message_count = Column(Integer, nullable=False, default=0)
@@ -684,13 +637,12 @@ class SavedConversation(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="saved_conversations")
     messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
-        Index('idx_saved_conversations_user_id', 'user_id'),
+        Index('idx_saved_conversations_client_id', 'client_id'),
         Index('idx_saved_conversations_session_id', 'session_id'),
         Index('idx_saved_conversations_created_at', 'created_at'),
     )
@@ -724,7 +676,7 @@ class ActivityData(Base):
     __tablename__ = "activity_data"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     date = Column(Date, nullable=False)
     steps = Column(Integer, default=0)
     heart_rate_avg = Column(Integer)  # Average heart rate in BPM
@@ -741,14 +693,13 @@ class ActivityData(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="activity_data")
 
     # Indexes
     __table_args__ = (
-        Index('idx_activity_data_user_id', 'user_id'),
+        Index('idx_activity_data_client_id', 'client_id'),
         Index('idx_activity_data_date', 'date'),
-        Index('idx_activity_data_user_date', 'user_id', 'date'),
+        Index('idx_activity_data_client_date', 'client_id', 'date'),
     )
 
 
@@ -760,8 +711,8 @@ class TrainingSchedule(Base):
     __tablename__ = "training_schedule"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    trainer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("trainers.id", ondelete="SET NULL"))
     day_of_week = Column(String(20), nullable=False)  # Monday, Tuesday, etc.
     day_number = Column(Integer, nullable=False)  # 1-7 for ordering
     workout_type = Column(String(100), nullable=False)  # Upper Body, Lower Body, Cardio, etc.
@@ -774,7 +725,6 @@ class TrainingSchedule(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User", foreign_keys=[client_id])
     client = relationship("Client", back_populates="training_schedules", foreign_keys=[client_id])
     trainer = relationship("Trainer", back_populates="training_schedules", foreign_keys=[trainer_id])
 
@@ -794,13 +744,12 @@ class ClientBadge(Base):
     __tablename__ = "client_badges"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     badge_name = Column(String(100), nullable=False)
     awarded_date = Column(Date, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     # Relationships
-    user = relationship("User")
     client = relationship("Client", back_populates="client_badges")
 
     # Indexes
@@ -819,7 +768,7 @@ class ClientGoal(Base):
     __tablename__ = "client_goals"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     goal_type = Column(String(50), nullable=False)  # weight_loss, muscle_gain, endurance, etc.
     target_value = Column(Numeric(10, 2))
     current_value = Column(Numeric(10, 2))
@@ -830,8 +779,7 @@ class ClientGoal(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
-    client = relationship("Client")
+    client = relationship("Client", back_populates="goals")
 
     # Indexes
     __table_args__ = (
@@ -844,7 +792,7 @@ class ClientHealthCondition(Base):
     __tablename__ = "client_health_conditions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     condition_name = Column(String(100), nullable=False)
     severity = Column(String(20))  # mild, moderate, severe
     medications = Column(Text)
@@ -854,8 +802,7 @@ class ClientHealthCondition(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
-    client = relationship("Client")
+    client = relationship("Client", back_populates="health_conditions")
 
     # Indexes
     __table_args__ = (
@@ -868,7 +815,7 @@ class ClientWaterIntake(Base):
     __tablename__ = "client_water_intake"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     date = Column(Date, nullable=False)
     amount_ml = Column(Integer, nullable=False)  # Water intake in milliliters
     notes = Column(Text)
@@ -876,8 +823,7 @@ class ClientWaterIntake(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
-    client = relationship("Client")
+    client = relationship("Client", back_populates="water_intake_records")
 
     # Indexes
     __table_args__ = (
@@ -891,7 +837,7 @@ class ClientStrengthRecord(Base):
     __tablename__ = "client_strength_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     exercise_name = Column(String(100), nullable=False)
     weight_lbs = Column(Numeric(6, 2))  # Weight lifted in pounds
     reps = Column(Integer)
@@ -903,8 +849,7 @@ class ClientStrengthRecord(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
-    client = relationship("Client")
+    client = relationship("Client", back_populates="strength_records")
 
     # Indexes
     __table_args__ = (
@@ -922,8 +867,8 @@ class TrainerRating(Base):
     __tablename__ = "trainer_ratings"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    trainer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("trainers.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     rating = Column(Integer, nullable=False)  # 1-5 stars
     review = Column(Text)
     session_date = Column(Date)
@@ -932,15 +877,14 @@ class TrainerRating(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    trainer_user = relationship("User", foreign_keys=[trainer_id])
-    client_user = relationship("User", foreign_keys=[client_id])
-    trainer = relationship("Trainer", back_populates="trainer_ratings", foreign_keys=[trainer_id])
+    client_user = relationship("User", foreign_keys=[user_id])
+    trainer = relationship("Trainer", back_populates="trainer_ratings")
 
     # Indexes
     __table_args__ = (
         Index('idx_trainer_ratings_trainer_id', 'trainer_id'),
-        Index('idx_trainer_ratings_client_id', 'client_id'),
-        Index('idx_trainer_ratings_unique', 'trainer_id', 'client_id', 'session_date', unique=True),
+        Index('idx_trainer_ratings_user_id', 'user_id'),
+        Index('idx_trainer_ratings_unique', 'trainer_id', 'user_id', 'session_date', unique=True),
         CheckConstraint('rating BETWEEN 1 AND 5', name='check_trainer_rating_range'),
     )
 
@@ -949,7 +893,7 @@ class TrainerAssessment(Base):
     __tablename__ = "trainer_assessments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    trainer_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("trainers.id", ondelete="CASCADE"), nullable=False)
     assessor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))  # Admin who assessed
     assessment_date = Column(Date, nullable=False)
     technical_score = Column(Numeric(5, 2))  # 0-100
@@ -964,9 +908,8 @@ class TrainerAssessment(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    trainer_user = relationship("User", foreign_keys=[trainer_id])
     assessor_user = relationship("User", foreign_keys=[assessor_id])
-    trainer = relationship("Trainer", back_populates="trainer_assessments", foreign_keys=[trainer_id])
+    trainer = relationship("Trainer", back_populates="trainer_assessments")
 
     # Indexes
     __table_args__ = (
@@ -1008,7 +951,7 @@ class ExcursionBooking(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     excursion_id = Column(UUID(as_uuid=True), ForeignKey("excursions.id", ondelete="CASCADE"), nullable=False)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     booking_date = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     status = Column(String(20), nullable=False, default='confirmed')  # confirmed, cancelled, completed
     notes = Column(Text)
@@ -1017,13 +960,13 @@ class ExcursionBooking(Base):
 
     # Relationships
     excursion = relationship("Excursion")
-    user = relationship("User")
+    user = relationship("User", back_populates="excursion_bookings")
 
     # Indexes
     __table_args__ = (
         Index('idx_excursion_bookings_excursion_id', 'excursion_id'),
-        Index('idx_excursion_bookings_client_id', 'client_id'),
-        Index('idx_excursion_bookings_unique', 'excursion_id', 'client_id', unique=True),
+        Index('idx_excursion_bookings_user_id', 'user_id'),
+        Index('idx_excursion_bookings_unique', 'excursion_id', 'user_id', unique=True),
     )
 
 
@@ -1035,7 +978,7 @@ class ClientStatus(Base):
     __tablename__ = "client_status"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, unique=True)
     status = Column(String(50), nullable=False, default='active')  # active, inactive, suspended, trial
     membership_type = Column(String(50))  # basic, premium, elite
     membership_expiry = Column(Date)
@@ -1045,7 +988,7 @@ class ClientStatus(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
+    client = relationship("Client", back_populates="client_status")
 
     # Indexes
     __table_args__ = (
@@ -1062,7 +1005,7 @@ class ShopOrder(Base):
     __tablename__ = "shop_orders"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     order_number = Column(String(50), nullable=False, unique=True)
     status = Column(String(50), nullable=False, default='pending')  # pending, processing, shipped, delivered, cancelled
     subtotal = Column(Numeric(10, 2), nullable=False)
@@ -1079,12 +1022,12 @@ class ShopOrder(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    user = relationship("User")
+    user = relationship("User", back_populates="shop_orders")
     shop_order_items = relationship("ShopOrderItem", back_populates="shop_order", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
-        Index('idx_shop_orders_client_id', 'client_id'),
+        Index('idx_shop_orders_user_id', 'user_id'),
         Index('idx_shop_orders_status', 'status'),
         Index('idx_shop_orders_created_at', 'created_at'),
     )

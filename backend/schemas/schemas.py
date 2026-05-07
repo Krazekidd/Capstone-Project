@@ -333,47 +333,6 @@ class ProductReviewResponse(ProductReviewBase):
     model_config = {"from_attributes": True}
 
 
-class OrderItemBase(BaseModel):
-    product_id: uuid.UUID
-    quantity: int
-    unit_price: float
-
-
-class OrderItemResponse(OrderItemBase):
-    id: uuid.UUID
-    order_id: uuid.UUID
-    line_total: float
-    product: Optional[ProductResponse] = None
-
-    model_config = {"from_attributes": True}
-
-
-class OrderBase(BaseModel):
-    items: List[OrderItemBase]
-    shipping_address: dict
-    notes: Optional[str] = None
-
-
-class OrderResponse(BaseModel):
-    id: uuid.UUID
-    reference: str
-    user_id: uuid.UUID
-    status: str
-    subtotal: float
-    shipping_fee: float
-    discount: float
-    total: float
-    currency: str
-    shipping_address: dict
-    notes: Optional[str] = None
-    placed_at: datetime
-    paid_at: Optional[datetime] = None
-    shipped_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
-    items: List[OrderItemResponse] = []
-
-    model_config = {"from_attributes": True}
-
 
 class WishlistResponse(BaseModel):
     id: uuid.UUID
@@ -982,22 +941,31 @@ class ClientWithStatusResponse(BaseModel):
 # Shop Order Schemas
 # ---------------------------------------------------------------------------
 
-class OrderItemResponse(BaseModel):
-    id: uuid.UUID
-    order_id: uuid.UUID
+class ShopOrderItemBase(BaseModel):
     product_id: uuid.UUID
-    product_name: str
     quantity: int
     unit_price: float
+
+class ShopOrderItemResponse(ShopOrderItemBase):
+    id: uuid.UUID
+    shop_order_id: uuid.UUID
+    product_name: str
     line_total: float
+    product: Optional[ProductResponse] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
 
 
+class ShopOrderBase(BaseModel):
+    items: List[ShopOrderItemBase]
+    shipping_address: dict
+    notes: Optional[str] = None
+
+
 class AdminOrderResponse(BaseModel):
     id: uuid.UUID
-    client_id: uuid.UUID
+    user_id: uuid.UUID
     order_number: str
     status: str
     subtotal: float
@@ -1012,7 +980,7 @@ class AdminOrderResponse(BaseModel):
     delivered_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    items: List[OrderItemResponse] = []
+    shop_order_items: List[ShopOrderItemResponse] = []
 
     model_config = {"from_attributes": True}
 

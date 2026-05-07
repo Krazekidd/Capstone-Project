@@ -7,16 +7,16 @@ import uuid
 
 from database import get_user_db
 from models import (
-    User, Product, Order, OrderItem, ProductReview, Wishlist
+    User, Product, ShopOrder, ShopOrderItem, ProductReview, Wishlist
 )
 from schemas import (
     ProductResponse,
     ProductBase,
     ProductReviewBase,
     ProductReviewResponse,
-    OrderResponse,
-    OrderBase,
-    OrderItemResponse,
+    AdminOrderResponse,
+    ShopOrderBase,
+    ShopOrderItemResponse,
     WishlistResponse,
     APIResponse,
 )
@@ -262,9 +262,9 @@ async def remove_from_wishlist(
 
 # ========== ORDERS ==========
 
-@router.post("/orders", response_model=OrderResponse)
+@router.post("/orders", response_model=AdminOrderResponse)
 async def create_order(
-    order_data: OrderBase,
+    order_data: ShopOrderBase,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db),
 ):
@@ -298,24 +298,25 @@ async def create_order(
     discount = 0
     total = subtotal + shipping_fee - discount
     
-    # Generate order reference
+    # Generate order number
     date_str = datetime.now().strftime("%Y%m%d")
     count_result = await db.execute(
-        select(Order).where(Order.placed_at >= datetime.now().replace(hour=0, minute=0, second=0))
+        select(ShopOrder).where(ShopOrder.created_at >= datetime.now().replace(hour=0, minute=0, second=0))
     )
     count = len(count_result.scalars().all()) + 1
-    reference = f"GVO-{date_str}-{count:04d}"
+    order_number = f"GVO-{date_str}-{count:04d}"
     
     # Create order
-    new_order = Order(
-        reference=reference,
+    new_order = ShopOrder(
         user_id=user_id,
+        order_number=order_number,
         status="pending",
         subtotal=subtotal,
-        shipping_fee=shipping_fee,
-        discount=discount,
-        total=total,
+        tax_amount=0,  # TODO: Calculate tax based on location
+        shipping_amount=shipping_fee,
+        total_amount=total,
         shipping_address=order_data.shipping_address,
+        billing_address=order_data.shipping_address,  # TODO: Add separate billing address
         notes=order_data.notes,
     )
     
@@ -324,9 +325,10 @@ async def create_order(
     
     # Create order items
     for item_data in order_data.items:
-        order_item = OrderItem(
-            order_id=new_order.id,
+        order_item = ShopOrderItem(
+            shop_order_id=new_order.id,
             product_id=item_data.product_id,
+            product_name=products[item_data.product_id].name,  # Denormalize product name
             quantity=item_data.quantity,
             unit_price=item_data.unit_price,
             line_total=item_data.quantity * item_data.unit_price,
@@ -345,12 +347,12 @@ async def create_order(
     await db.refresh(new_order)
     
     # Load items for response
-    await db.refresh(new_order, ["order_items"])
+    await db.refresh(new_order, ["shop_order_items"])
     
     return new_order
 
 
-@router.get("/orders", response_model=list[OrderResponse])
+@router.get("/orders", response_model=list[AdminOrderResponse])
 async def get_orders(
     status_filter: str = Query(default=None),
     limit: int = Query(default=10, le=100),
@@ -361,14 +363,14 @@ async def get_orders(
     """Get user's orders"""
     user_id = current_user["user_id"]
     
-    query = select(Order).options(
-        selectinload(Order.items).selectinload(OrderItem.product)
-    ).where(Order.user_id == user_id)
+    query = select(ShopOrder).options(
+        selectinload(ShopOrder.shop_order_items).selectinload(ShopOrderItem.product)
+    ).where(ShopOrder.user_id == user_id)
     
     if status_filter:
-        query = query.where(Order.status == status_filter)
+        query = query.where(ShopOrder.status == status_filter)
     
-    query = query.order_by(Order.placed_at.desc()).offset(offset).limit(limit)
+    query = query.order_by(ShopOrder.created_at.desc()).offset(offset).limit(limit)
     
     result = await db.execute(query)
     orders = result.scalars().all()
@@ -376,7 +378,7 @@ async def get_orders(
     return orders
 
 
-@router.get("/orders/{order_id}", response_model=OrderResponse)
+@router.get("/orders/{order_id}", response_model=AdminOrderResponse)
 async def get_order(
     order_id: uuid.UUID,
     current_user: dict = Depends(get_current_user),
@@ -386,13 +388,13 @@ async def get_order(
     user_id = current_user["user_id"]
     
     result = await db.execute(
-        select(Order)
+        select(ShopOrder)
         .options(
-            selectinload(Order.items).selectinload(OrderItem.product)
+            selectinload(ShopOrder.shop_order_items).selectinload(ShopOrderItem.product)
         )
         .where(
-            Order.id == order_id,
-            Order.user_id == user_id
+            ShopOrder.id == order_id,
+            ShopOrder.user_id == user_id
         )
     )
     order = result.scalar_one_or_none()

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
-import "./Trainer.css";
+import "./trainer.css";
 
 /* ─────────────────────────────────────────────
    TRAINER DATA  (the logged-in trainer)

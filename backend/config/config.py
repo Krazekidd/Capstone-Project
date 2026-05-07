@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Server configuration
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    RELOAD: bool = True
     
     # Chatbot context window configuration
     MAX_CONTEXT_MESSAGES: int = 8
@@ -76,6 +77,7 @@ AI_MODEL = settings.AI_MODEL
 # Server configuration
 HOST = settings.HOST
 PORT = settings.PORT
+RELOAD = settings.RELOAD
 
 # Chatbot context window configuration
 MAX_CONTEXT_MESSAGES = settings.MAX_CONTEXT_MESSAGES

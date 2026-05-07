@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { accountAPI, consultationsAPI } from "../../api/api";
 import "./Consultations.css";
-import Navbar from "../../components/Navbar";
+import Navbar from "../../Components/navbar";
 
 /* ═══════════════════════════════════════
    ICONS (same as before)

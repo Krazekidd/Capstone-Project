@@ -4,19 +4,6 @@ import { authAPI } from "../../api/api";
 import { useAuth } from "../../Context/AuthContext";
 import "./Login.css";
 
-/* ─────────────────────────────────────────────────────────────
-   IMPORTANT — GOOGLE OAUTH SETUP
-   ─────────────────────────────────────────────────────────────
-   1. Go to https://console.cloud.google.com/
-   2. Create a project → APIs & Services → Credentials
-   3. Create an "OAuth 2.0 Client ID" (Web application)
-   4. Add your domain to "Authorised JavaScript origins"
-      e.g.  http://localhost:3000  (dev)
-            https://yourdomain.com  (prod)
-   5. Replace the string below with your real Client ID:
-─────────────────────────────────────────────────────────────── */
-const GOOGLE_CLIENT_ID = "9117439118-uasq6furpmqpt2pnshuhnhfkmh5cu7e1.apps.googleusercontent.com";
-
 /* ── Icons ── */
 const EyeIcon = ({ open }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -25,15 +12,6 @@ const EyeIcon = ({ open }) => (
       : <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
           <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
           <line x1="1" y1="1" x2="23" y2="23"/></>}
-  </svg>
-);
-
-const GoogleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24">
-    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
-    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
   </svg>
 );
 
@@ -49,23 +27,6 @@ const MailIcon = () => (
     <polyline points="2,4 12,13 22,4"/>
   </svg>
 );
-
-const SpinnerIcon = () => (
-  <svg className="g-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round"/>
-  </svg>
-);
-
-/* ── Password strength helper ── */
-function pwStr(p) {
-  if (!p) return 0;
-  let s = 0;
-  if (p.length >= 8) s++;
-  if (/[A-Z]/.test(p)) s++;
-  if (/[0-9]/.test(p)) s++;
-  if (/[^A-Za-z0-9]/.test(p)) s++;
-  return s;
-}
 
 /* ═══════════════════════════════════════════════════════════
    ROLE-BASED REDIRECTION HELPER
@@ -96,12 +57,6 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-
-  /* Google OAuth state */
-  const [gReady, setGReady]   = useState(false);
-  const [gLoading, setGLoading] = useState(false);
-  const [gUser, setGUser]     = useState(null);
-  const gInitRef              = useRef(false);
 
   /* Create-account modal state */
   const [modal, setModal] = useState(false);
@@ -146,108 +101,6 @@ export default function Login() {
       setEmail(rememberedEmail);
     }
   }, [navigate, isLoggedIn, user]);
-
-  /* ─────────────────────────────────
-     GOOGLE IDENTITY SERVICES — INIT
-  ───────────────────────────────── */
-  useEffect(() => {
-    if (gInitRef.current) return;
-    gInitRef.current = true;
-
-    const script = document.createElement("script");
-    script.src = "https://accounts.google.com/gsi/client";
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      if (window.google && window.google.accounts) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleCredential,
-          ux_mode: "popup",
-        });
-        setGReady(true);
-      }
-    };
-    script.onerror = () => {
-      console.error("Failed to load Google Identity Services script.");
-    };
-    document.body.appendChild(script);
-
-    return () => {
-      if (window.google?.accounts?.id) {
-        window.google.accounts.id.cancel();
-      }
-    };
-  }, []);
-
-  /* Called by Google SDK after user picks an account */
-  const handleGoogleCredential = async (response) => {
-    setGLoading(false);
-    if (!response?.credential) return;
-
-    try {
-      const result = await authAPI.googleLogin(response.credential);
-      
-      // Store user data in auth context
-      login(result);
-      
-      const redirectPath = getRedirectPath(result.role);
-      navigate(redirectPath);
-    } catch (err) {
-      setLoginError(err.detail || "Google login failed. Please try again.");
-    }
-  };
-
-  /* Trigger the Google account-chooser popup */
-  const handleGoogleClick = () => {
-    if (!gReady || gLoading) return;
-    setGLoading(true);
-    setLoginError("");
-
-    // prompt() opens the One Tap / account-chooser UI
-    window.google.accounts.id.prompt((notification) => {
-      // If the user dismisses or there's no saved account,
-      // fall back to the standard OAuth redirect/popup flow
-      if (
-        notification.isNotDisplayed() ||
-        notification.isSkippedMoment() ||
-        notification.isDismissedMoment()
-      ) {
-        // Fallback: open a standard OAuth popup using google.accounts.oauth2
-        const client = window.google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: "openid email profile",
-          callback: async (tokenResponse) => {
-            if (tokenResponse?.access_token) {
-              try {
-                const result = await authAPI.googleLoginWithToken(tokenResponse.access_token);
-                
-                // Store user data in auth context
-                login(result);
-                
-                const redirectPath = getRedirectPath(result.role);
-                navigate(redirectPath);
-              } catch (err) {
-                setLoginError("Google login failed. Please try again.");
-                setGLoading(false);
-              }
-            } else {
-              setGLoading(false);
-            }
-          },
-        });
-        client.requestAccessToken({ prompt: "select_account" });
-      }
-    });
-  };
-
-  /* Sign out of Google session */
-  const handleGoogleSignOut = () => {
-    if (window.google?.accounts?.id) {
-      window.google.accounts.id.disableAutoSelect();
-    }
-    setGUser(null);
-  };
 
   /* ── Sign In handler with role-based redirect ── */
   const handleSignIn = async (e) => {
@@ -429,6 +282,17 @@ export default function Login() {
     }
   };
 
+  /* ── Password strength helper ── */
+  function pwStr(p) {
+    if (!p) return 0;
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (/[A-Z]/.test(p)) s++;
+    if (/[0-9]/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
+  }
+
   const str = pwStr(form.password);
   const strLbl = ["", "Weak", "Fair", "Good", "Strong"][str];
   const strCls = ["", "weak", "fair", "good", "strong"][str];
@@ -436,7 +300,6 @@ export default function Login() {
   return (
     <>
       <div className="app-shell">
-
         {/* ══ LEFT PANEL ══ */}
         <div className="left-panel">
           <div className="left-bg-img"/>
@@ -473,20 +336,6 @@ export default function Login() {
         {/* ══ RIGHT PANEL ══ */}
         <div className="right-panel">
           <div className="form-wrap">
-
-            {/* ── Google signed-in banner ── */}
-            {gUser && (
-              <div className="g-signed-banner">
-                <img src={gUser.picture} alt={gUser.name} className="g-avatar"/>
-                <div className="g-signed-info">
-                  <p className="g-signed-name">Welcome, {gUser.given_name}!</p>
-                  <p className="g-signed-email">{gUser.email}</p>
-                </div>
-                <button className="g-signout-btn" onClick={handleGoogleSignOut} type="button">
-                  Sign out
-                </button>
-              </div>
-            )}
 
             <div className="form-head">
               <div className="eyebrow"><span className="eyebrow-line"/>Member Portal</div>
@@ -540,29 +389,6 @@ export default function Login() {
                 {isLoggedIn ? "Already Signed In" : isLoggingIn ? "Signing in..." : "Sign In"}
               </button>
             </form>
-
-            <div className="divider"><span>or continue with</span></div>
-
-            {/* ── Google Button ── */}
-            <button
-              className={`btn-google${gLoading ? " btn-google--loading" : ""}${!gReady ? " btn-google--disabled" : ""}`}
-              type="button"
-              onClick={handleGoogleClick}
-              disabled={!gReady || gLoading || isLoggedIn}
-              title={!gReady ? "Loading Google Sign-In…" : isLoggedIn ? "Already signed in" : "Sign in with Google"}
-            >
-              {isLoggedIn
-                ? <><span>Already Signed In</span></>
-                : gLoading
-                ? <><SpinnerIcon/><span>Opening Google…</span></>
-                : <><GoogleIcon/><span>Continue with Google</span></>
-              }
-            </button>
-
-            {/* SDK not yet loaded hint */}
-            {!gReady && (
-              <p className="g-loading-hint">Loading Google Sign-In…</p>
-            )}
 
             <div className="form-foot">
               <span>Not a member yet?</span>

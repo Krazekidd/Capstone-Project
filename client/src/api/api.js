@@ -1,7 +1,5 @@
 import axiosInstance from './axiosConfig';
 
-const API_BASE_URL = 'http://localhost:8000';
-
 export const authAPI = {
   login: async (email, password) => {
     try {

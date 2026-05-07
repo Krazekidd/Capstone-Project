@@ -75,7 +75,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:5173",  # Vite dev server (alternative)
-        "https://gym-capstone-app.vercel.app",  # Production Vercel URL
+        "https://gym-capstone-app.vercel.app",  # Production Vercel URL 
         "http://localhost:3000",
         "http://localhost:8000",
     ],

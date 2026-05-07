@@ -1,8 +1,8 @@
-import api from './axiosConfig';
+import axiosInstance from './axiosConfig';
 
 export const sendNutriMessage = async (message, onChunk, userContext = null) => {
   try {
-    const response = await fetch(`${api.defaults.baseURL}/chatbot/stream`, {
+    const response = await fetch(`${axiosInstance.defaults.baseURL}/chatbot/stream`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

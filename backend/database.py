@@ -90,10 +90,6 @@ async def check_db_connection():
 # ---------------------------------------------------------------------------
 async def init_db():
     """Initialize database connection and create tables if they don't exist."""
-    # First check if we can connect to the database
-    if not await check_db_connection():
-        raise Exception("Database connection failed. Please check your database configuration.")
-    
     # Import models so SQLAlchemy registers them against Base.metadata
     from models import (
         User, AuthToken, MembershipPlan, UserMembership, Coach,

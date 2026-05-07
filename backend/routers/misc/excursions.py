@@ -13,7 +13,7 @@ from schemas import (
     BookingResponse, MyBookingsResponse, CancelBookingResponse,
     MLScoreResponse, MLRecommendationsResponse
 )
-from auth_router import get_current_user
+from ..auth.auth import get_current_user
 from email_service import send_booking_confirmation_email, send_booking_cancellation_email
 
 logger = logging.getLogger(__name__)

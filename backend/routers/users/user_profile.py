@@ -4,7 +4,7 @@ from sqlalchemy import select, update
 from database import get_user_db
 from models import User, Client, Trainer, Admin
 from schemas import APIResponse
-from auth_router import get_current_user
+from ..auth.auth import get_current_user
 import uuid
 import logging
 import os
@@ -131,7 +131,8 @@ async def upload_profile_image(
             raise HTTPException(status_code=400, detail="File must be an image")
         
         # Create uploads directory if it doesn't exist
-        upload_dir = "uploads/avatars"
+        from config.config import PROFILE_IMAGES_DIR
+        upload_dir = PROFILE_IMAGES_DIR
         os.makedirs(upload_dir, exist_ok=True)
         
         # Generate unique filename

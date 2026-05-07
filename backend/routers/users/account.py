@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func,desc, asc
 import uuid
@@ -33,7 +33,7 @@ from schemas import (
     AccountConversationRequest, AccountConversationResponse, AccountConversationHistoryResponse,
     ProfileImageResponse
 )
-from auth_router import get_current_user
+from ..auth.auth import get_current_user
 from config.config import settings
 
 logger = logging.getLogger(__name__)

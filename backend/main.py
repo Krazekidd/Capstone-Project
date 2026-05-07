@@ -36,6 +36,20 @@ async def lifespan(app: FastAPI):
     """Initialize database connection and tables on startup."""
     logger.info("🚀 Starting application...")
     
+    # Create necessary directories for uploads
+    directories_to_create = [
+        PROFILE_IMAGES_DIR,
+        PROGRESS_PHOTOS_DIR,
+        "uploads/avatars"
+    ]
+    
+    for directory in directories_to_create:
+        try:
+            os.makedirs(directory, exist_ok=True)
+            logger.info(f"✅ Created directory: {directory}")
+        except Exception as e:
+            logger.error(f"❌ Failed to create directory {directory}: {e}")
+    
     # Check database connection first
     if not await check_db_connection():
         logger.error("❌ Failed to connect to database. Application startup aborted.")

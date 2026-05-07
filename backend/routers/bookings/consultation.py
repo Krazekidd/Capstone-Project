@@ -14,7 +14,7 @@ from schemas import (
     MyConsultationsResponse, CancelConsultationResponse,
     BusinessHoursResponse, HolidayResponse
 )
-from auth_router import get_current_user
+from ..auth.auth import get_current_user
 from email_service import send_consultation_confirmation_email, send_consultation_cancellation_email
 
 logger = logging.getLogger(__name__)

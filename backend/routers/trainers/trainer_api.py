@@ -8,7 +8,7 @@ from models import (
     SavedConversation, ConversationMessage
 )
 from schemas import APIResponse
-from auth_router import get_current_user
+from ..auth.auth import get_current_user
 from typing import Optional, List, Dict, Any
 import uuid
 import logging

@@ -612,7 +612,6 @@ class Attendance(Base):
     __table_args__ = (
         Index('idx_attendance_user_id', 'user_id'),
         Index('idx_attendance_check_in_time', 'check_in_time'),
-        Index('idx_attendance_date', func.date(check_in_time)),
     )
 
 

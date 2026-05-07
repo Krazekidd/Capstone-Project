@@ -1064,6 +1064,51 @@ class ProgressPhotoCreate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Trainer Assessment Schemas
+# ---------------------------------------------------------------------------
+
+class TrainerAssessmentScores(BaseModel):
+    technical_score: Optional[float] = None
+    communication_score: Optional[float] = None
+    professionalism_score: Optional[float] = None
+    overall_score: Optional[float] = None
+
+    model_config = {"from_attributes": True}
+
+
+class TrainerAssessmentRequest(BaseModel):
+    trainer_id: uuid.UUID
+    assessment_date: date
+    technical_score: Optional[float] = None
+    communication_score: Optional[float] = None
+    professionalism_score: Optional[float] = None
+    overall_score: Optional[float] = None
+    strengths: Optional[str] = None
+    areas_for_improvement: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[str] = "completed"
+
+
+class TrainerAssessmentResponse(BaseModel):
+    id: uuid.UUID
+    trainer_id: uuid.UUID
+    assessor_id: Optional[uuid.UUID] = None
+    assessment_date: date
+    technical_score: Optional[float] = None
+    communication_score: Optional[float] = None
+    professionalism_score: Optional[float] = None
+    overall_score: Optional[float] = None
+    strengths: Optional[str] = None
+    areas_for_improvement: Optional[str] = None
+    notes: Optional[str] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
 # Badge Schemas
 # ---------------------------------------------------------------------------
 

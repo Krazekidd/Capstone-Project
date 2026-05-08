@@ -499,6 +499,9 @@ export default function Account() {
     setTimeout(()=>setToast({show:false,msg:""}),2600);
   },[]);
 
+  // Save button state
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved'
+
   // ML recommendations
   const [mlWorkout, setMlWorkout] = useState(null);
   const [mlProgress, setMlProgress] = useState(null);
@@ -785,6 +788,7 @@ export default function Account() {
 
   const saveMeas = async () => {
     try {
+      setSaveStatus('saving');
       const mo = MONTHS[now.getMonth()], yr = now.getFullYear();
       
       // Prepare measurements data for backend
@@ -820,13 +824,18 @@ export default function Account() {
         } 
       }, ...h]);
       
+      setSaveStatus('saved');
       showToast(`✓ ${mo} ${yr} measurements saved!`);
+      
+      // Reset button state after 3 seconds
+      setTimeout(() => setSaveStatus('idle'), 3000);
       
       // Refresh history from backend
       fetchProgressHistory();
       
     } catch (error) {
       console.error('Error saving measurements:', error);
+      setSaveStatus('idle');
       showToast('❌ Failed to save measurements. Please try again.');
     }
   };
@@ -1249,7 +1258,18 @@ export default function Account() {
                 <div className="minputs" style={{marginTop:10}}>{inp("L. Calf","calfL","36","0.5")}{inp("R. Calf","calfR","36","0.5")}{inp("Glutes","glutes","100","0.5")}</div>
               </div>
               <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
-                <button className="btn-accent" onClick={saveMeas}>💾 Save {currentMo}</button>
+                <button 
+                  className={`btn-accent ${saveStatus === 'saved' ? 'saved' : ''}`} 
+                  onClick={saveMeas}
+                  disabled={saveStatus === 'saving'}
+                  style={{
+                    background: saveStatus === 'saved' ? '#2ecc71' : undefined,
+                    borderColor: saveStatus === 'saved' ? '#2ecc71' : undefined,
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {saveStatus === 'saving' ? '⏳ Saving...' : saveStatus === 'saved' ? '✓ Saved' : `💾 Save ${currentMo}`}
+                </button>
                 <button className="btn-ghost" onClick={()=>setMeas({weight:"",height:"",bf:"",chest:"",waist:"",shoulders:"",armL:"",armR:"",neck:"",hips:"",thighL:"",thighR:"",calfL:"",calfR:"",glutes:""})}>Clear</button>
                 <button className="btn-accent" style={{background:"#4a9eff",borderColor:"#4a9eff"}} onClick={fetchMLData} disabled={mlLoading}>
                   {mlLoading ? "⏳ Analysing…" : "🤖 Get ML Plan"}

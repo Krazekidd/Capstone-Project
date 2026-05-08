@@ -132,106 +132,6 @@ async def get_my_account(
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# GET USER BY ID (Admin or Self)
-# ============================================================
-@router.get("/{user_id}", response_model=ClientAccount | TrainerAccount | AdminAccount)
-async def get_account_by_id(
-    user_id: uuid.UUID,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Get account by user ID (admin only or self)"""
-    try:
-        # Check if user is admin or requesting their own account
-        if current_user["role"] != "admin" and current_user["user_id"] != user_id:
-            raise HTTPException(status_code=403, detail="Not authorized to view this account")
-        
-        user_id = user_id
-        
-        # First get the user to know their role
-        user_result = await db.execute(select(User).where(User.id == user_id))
-        user = user_result.scalar_one_or_none()
-        
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        role = user.role
-        
-        if role == "client":
-            result = await db.execute(
-                select(Client, User.email).join(User, Client.id == User.id)
-                .where(Client.id == user_id)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Client not found")
-            
-            client, email = row
-            return ClientAccount(
-                id=uuid.UUID(bytes=client.id),
-                name=client.name,
-                gender=client.gender,
-                email=email,
-                phone_number=client.phone_number,
-                birthday=client.birthday,
-                height=client.height,
-                weight=client.weight,
-                profile_image=client.profile_image,
-                created_at=client.created_at,
-                updated_at=client.updated_at
-            )
-        
-        elif role == "trainer":
-            result = await db.execute(
-                select(Trainer, User.email).join(User, Trainer.id == User.id)
-                .where(Trainer.id == user_id)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Trainer not found")
-            
-            trainer, email = row
-            return TrainerAccount(
-                id=uuid.UUID(bytes=trainer.id),
-                name=trainer.name,
-                email=email,
-                certification=trainer.certification,
-                rating=trainer.rating,
-                trainer_level=trainer.trainer_level,
-                is_senior=trainer.is_senior,
-                created_at=trainer.created_at,
-                updated_at=trainer.updated_at
-            )
-        
-        elif role == "admin":
-            result = await db.execute(
-                select(Admin, User.email).join(User, Admin.id == User.id)
-                .where(Admin.id == user_id)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Admin not found")
-            
-            admin, email = row
-            return AdminAccount(
-                id=uuid.UUID(bytes=admin.id),
-                name=admin.name,
-                email=email,
-                phone_number=admin.phone_number,
-                created_at=admin.created_at,
-                updated_at=admin.updated_at
-            )
-        
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching account by ID: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================
 # UPDATE CURRENT USER ACCOUNT
 # ============================================================
 @router.put("/me", response_model=APIResponse)
@@ -932,9 +832,17 @@ async def get_my_goals(
     """Get current user's goals from client_goals table"""
     from models import ClientGoal, Client
     
+    logger.info("=== GOALS ENDPOINT CALLED ===")
+    logger.info(f"Current user data: {current_user}")
+    
     user_id = current_user["user_id"]
+    logger.info(f"Extracted user_id: {user_id}")
+    
+    role = current_user.get("role", "unknown")
+    logger.info(f"User role: {role}")
     
     if current_user["role"] != "client":
+        logger.warning(f"Access denied for role: {role}")
         raise HTTPException(status_code=400, detail="Goals only available for clients")
     
     # Verify that client record exists
@@ -1072,8 +980,6 @@ async def get_goals_history(
         )
         for goal in goals
     ]
-
-# ============================================================
 # CLIENT HEALTH CONDITIONS ENDPOINTS
 # ============================================================
 
@@ -1085,10 +991,20 @@ async def get_my_health_conditions(
     """Get current user's health conditions"""
     from models import ClientHealthCondition
     
+    logger.info("=== HEALTH-CONDITIONS ENDPOINT CALLED ===")
+    logger.info(f"Current user data: {current_user}")
+    
     user_id = current_user["user_id"]
+    logger.info(f"Extracted user_id: {user_id}")
+    
+    role = current_user.get("role", "unknown")
+    logger.info(f"User role: {role}")
     
     if current_user["role"] != "client":
+        logger.warning(f"Access denied for role: {role}")
         raise HTTPException(status_code=400, detail="Health conditions only available for clients")
+    
+    logger.info("Access granted - fetching health conditions...")
     
     result = await db.execute(
         select(ClientHealthCondition)
@@ -3466,139 +3382,6 @@ async def delete_profile_image(
         logger.error(f"Error removing profile image: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to remove profile image")
 
-# ============================================================
-# GOALS MANAGEMENT ENDPOINTS
-# ============================================================
-@router.get("/goals", response_model=ClientGoalsResponse)
-async def get_goals(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Get client goals"""
-    try:
-        user_id = current_user["user_id"]
-        
-        result = await db.execute(
-            select(ClientGoal).where(ClientGoal.client_id == user_id)
-        )
-        goals = result.scalars().all()
-        
-        return ClientGoalsResponse(
-            goals=[
-                {
-                    "id": str(goal.id),
-                    "goal_type": goal.goal_type,
-                    "target_value": float(goal.target_value) if goal.target_value else None,
-                    "current_value": float(goal.current_value) if goal.current_value else None,
-                    "target_date": goal.target_date,
-                    "is_active": goal.is_active,
-                    "notes": goal.notes
-                }
-                for goal in goals
-            ]
-        )
-        
-    except Exception as e:
-        logger.error(f"Error getting goals: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get goals")
-
-@router.put("/goals", response_model=APIResponse)
-async def update_goals(
-    goals_data: dict,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Update client goals"""
-    try:
-        user_id = current_user["user_id"]
-        
-        # Delete existing goals
-        await db.execute(delete(ClientGoal).where(ClientGoal.client_id == user_id))
-        
-        # Create new goals from the data
-        for goal_type, target_value in goals_data.items():
-            if target_value is not None:
-                new_goal = ClientGoal(
-                    client_id=user_id,
-                    goal_type=goal_type,
-                    target_value=float(target_value),
-                    is_active=True
-                )
-                db.add(new_goal)
-        
-        await db.commit()
-        
-        return APIResponse(success=True, message="Goals updated successfully", data=None)
-        
-    except Exception as e:
-        logger.error(f"Error updating goals: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to update goals")
-
-# ============================================================
-# HEALTH CONDITIONS ENDPOINTS
-# ============================================================
-@router.get("/health-conditions", response_model=List[HealthConditionResponse])
-async def get_health_conditions(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Get client health conditions"""
-    try:
-        user_id = current_user["user_id"]
-        
-        result = await db.execute(
-            select(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id)
-        )
-        conditions = result.scalars().all()
-        
-        return [
-            HealthConditionResponse(
-                id=str(condition.id),
-                condition_name=condition.condition_name,
-                severity=condition.severity,
-                medications=condition.medications,
-                notes=condition.notes,
-                is_active=condition.is_active
-            )
-            for condition in conditions
-        ]
-        
-    except Exception as e:
-        logger.error(f"Error getting health conditions: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get health conditions")
-
-@router.put("/health-conditions", response_model=APIResponse)
-async def update_health_conditions(
-    conditions_data: dict,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Update client health conditions"""
-    try:
-        user_id = current_user["user_id"]
-        
-        # Delete existing conditions
-        await db.execute(delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id))
-        
-        # Create new conditions
-        if "conditions" in conditions_data:
-            for condition_name in conditions_data["conditions"]:
-                new_condition = ClientHealthCondition(
-                    client_id=user_id,
-                    condition_name=condition_name,
-                    is_active=True
-                )
-                db.add(new_condition)
-        
-        await db.commit()
-        
-        return APIResponse(success=True, message="Health conditions updated successfully", data=None)
-        
-    except Exception as e:
-        logger.error(f"Error updating health conditions: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to update health conditions")
 
 # ============================================================
 # WATER INTAKE ENDPOINTS
@@ -4156,3 +3939,109 @@ async def create_activity_data(
         logger.error(f"Error creating activity data: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create activity data")
+
+# ============================================================
+# GET USER BY ID (Admin or Self) - MOVED TO END TO FIX ROUTING CONFLICTS
+# ============================================================
+@router.get("/{user_id}", response_model=ClientAccount | TrainerAccount | AdminAccount)
+async def get_account_by_id(
+    user_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get account by user ID (admin only or self)"""
+    try:
+        logger.info("=== USER_ID ROUTE CALLED ===")
+        logger.info(f"Raw user_id parameter: {user_id}")
+        logger.info(f"Type of user_id: {type(user_id)}")
+        logger.info(f"Current user data: {current_user}")
+        
+        # Check if user is admin or requesting their own account
+        if current_user["role"] != "admin" and current_user["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this account")
+        
+        user_id = user_id
+        logger.info(f"Proceeding with user_id: {user_id}")
+        
+        # First get the user to know their role
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        role = user.role
+        
+        if role == "client":
+            result = await db.execute(
+                select(Client, User.email).join(User, Client.id == User.id)
+                .where(Client.id == user_id)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Client not found")
+            
+            client, email = row
+            return ClientAccount(
+                id=uuid.UUID(bytes=client.id),
+                name=client.name,
+                gender=client.gender,
+                email=email,
+                phone_number=client.phone_number,
+                birthday=client.birthday,
+                height=client.height,
+                weight=client.weight,
+                profile_image=client.profile_image,
+                created_at=client.created_at,
+                updated_at=client.updated_at
+            )
+        
+        elif role == "trainer":
+            result = await db.execute(
+                select(Trainer, User.email).join(User, Trainer.id == User.id)
+                .where(Trainer.id == user_id)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Trainer not found")
+            
+            trainer, email = row
+            return TrainerAccount(
+                id=uuid.UUID(bytes=trainer.id),
+                name=trainer.name,
+                email=email,
+                certification=trainer.certification,
+                rating=trainer.rating,
+                trainer_level=trainer.trainer_level,
+                is_senior=trainer.is_senior,
+                created_at=trainer.created_at,
+                updated_at=trainer.updated_at
+            )
+        
+        elif role == "admin":
+            result = await db.execute(
+                select(Admin, User.email).join(User, Admin.id == User.id)
+                .where(Admin.id == user_id)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Admin not found")
+            
+            admin, email = row
+            return AdminAccount(
+                id=uuid.UUID(bytes=admin.id),
+                name=admin.name,
+                email=email,
+                phone_number=admin.phone_number,
+                created_at=admin.created_at,
+                updated_at=admin.updated_at
+            )
+        
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching account by ID: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

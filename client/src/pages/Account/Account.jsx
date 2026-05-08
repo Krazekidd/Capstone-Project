@@ -1346,30 +1346,7 @@ export default function Account() {
                     </div>
                   ))}
                 </div>
-                <p style={{fontSize:11,color:"var(--sub,#6b6b7a)",marginTop:8}}>{mlWorkout.disclaimer}</p>
-              </div>
-            )}
-
-            <div className="target-grid">
-              {[["💪","Chest & Arms","chest","Push & definition"],["🦴","Back & Lats","back","Width & thickness"],["🦵","Legs & Glutes","legs","Strength & size"],["🎯","Core & Abs","core","Stability & tone"],["⚡","Full Body","fullbody","Total conditioning"],["🏃","Cardio & HIIT","cardio","Burn & endurance"]].map(([ic,nm,key,desc])=>(
-                <button key={key} className={`tgt-btn${activeTarget===key?" on":""}`} onClick={()=>setActiveTarget(k=>k===key?null:key)}>
-                  <div className="tgt-ic">{ic}</div><div className="tgt-nm">{nm}</div><div className="tgt-desc">{desc}</div>
-                </button>
-              ))}
-            </div>
-            {activeTarget && (
-              <div className="workout-area">
-                <div className="workout-heading">— {activeTarget.toUpperCase()} WORKOUTS —</div>
-                <div className="workout-grid">
-                  {WORKOUT_DB[activeTarget].map(w=>(
-                    <div className="workout-card" key={w.name}>
-                      <div className="wc-icon">{w.icon}</div>
-                      <div className="wc-name">{w.name}</div>
-                      <div className="wc-detail">{w.detail}</div>
-                      <div className="wc-sets">{w.sets.map(s=><span className="stag" key={s}>{s}</span>)}</div>
-                    </div>
-                  ))}
-                </div>
+                <p style={{fontSize:11,color:"var(--sub,#6b6b7a)",marginTop:8}}>{mlWorkout?.disclaimer}</p>
               </div>
             )}
           </div>

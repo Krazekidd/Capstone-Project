@@ -1141,6 +1141,33 @@ body {
     box-shadow: none;
 }
 
+.btn-accent.saved {
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 16px rgba(46, 204, 113, 0.25);
+}
+
+.btn-accent.saved:hover {
+    opacity: 0.9;
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 6px 24px rgba(46, 204, 113, 0.4);
+}
+
+.btn-accent.saving {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 16px rgba(243, 156, 18, 0.25);
+    position: relative;
+}
+
+.btn-accent.saving:hover {
+    opacity: 0.9;
+    transform: none;
+    box-shadow: 0 4px 16px rgba(243, 156, 18, 0.3);
+}
+
 .btn-ghost {
     background: transparent;
     border: 1px solid var(--border);

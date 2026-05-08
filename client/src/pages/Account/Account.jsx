@@ -435,6 +435,7 @@ export default function Account() {
   const [healthNotes, setHealthNotes] = useState("");
   const [healthHist, setHealthHist] = useState([]);
   const [showHealthHist, setShowHealthHist] = useState(false);
+  const [healthSaveStatus, setHealthSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved'
 
   // Activity (wearable)
   const [activity, setActivity] = useState({ steps:"—", heartRate:"—", calories:"—", sleep:"—" });
@@ -864,6 +865,9 @@ export default function Account() {
 
   const saveHealth = async () => {
     try {
+      // Set saving state
+      setHealthSaveStatus('saving');
+      
       // Save to backend API
       const conditionsToSave = health.filter(c => c !== "None");
       await progressAPI.updateHealthConditions(conditionsToSave);
@@ -871,9 +875,16 @@ export default function Account() {
       // Update local history for display
       const d = now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
       setHealthHist(h => [{date:d,data:{ conditions:health.join(", ")||"None", notes:healthNotes||"—" }},...h]);
+      
+      // Set saved state and show success
+      setHealthSaveStatus('saved');
       showToast("✓ Health profile saved!");
+      
+      // Reset to idle after 3 seconds
+      setTimeout(() => setHealthSaveStatus('idle'), 3000);
     } catch (error) {
       console.error('Error saving health conditions:', error);
+      setHealthSaveStatus('idle');
       showToast("⚠️ Failed to save health profile");
     }
   };
@@ -1206,7 +1217,14 @@ export default function Account() {
             ))}
           </div>
           <textarea className="notes-ta" rows={2} value={healthNotes} onChange={e=>setHealthNotes(e.target.value)} placeholder="Additional notes — medications, injuries, surgical history…"/>
-          <button className="btn-accent" style={{marginTop:14}} onClick={saveHealth}>Save Health Profile</button>
+          <button 
+            className={`btn-accent ${healthSaveStatus === 'saved' ? 'saved' : ''} ${healthSaveStatus === 'saving' ? 'saving' : ''}`} 
+            style={{marginTop:14}} 
+            onClick={saveHealth}
+            disabled={healthSaveStatus === 'saving'}
+          >
+            {healthSaveStatus === 'saving' ? 'Saving...' : healthSaveStatus === 'saved' ? '✓ Saved' : 'Save Health Profile'}
+          </button>
         </div>
 
         {/* ═══════════ TRACK PROGRESS ═══════════ */}

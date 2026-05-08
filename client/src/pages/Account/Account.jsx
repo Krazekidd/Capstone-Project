@@ -460,11 +460,6 @@ export default function Account() {
   ]);
   const [chartTab, setChartTab] = useState("weight");
 
-  // Strength
-  const [lifts, setLifts] = useState({ bench:100, squat:130, dead:160, ohp:65, pullups:18 });
-  const [liftHist, setLiftHist] = useState([]);
-  const [showLiftHist, setShowLiftHist] = useState(false);
-
   // AI
   const [aiMsgs, setAiMsgs] = useState([{ role:"ai", text:"Hey! I'm NutriAI 🤖 — your personal fitness & nutrition coach. Ask me anything about your goals, workouts, or diet!" }]);
   const [aiIn, setAiIn] = useState("");
@@ -630,10 +625,6 @@ export default function Account() {
     { label:"Hips",  data:history.map(h=>h.hips),  borderColor:"#f0eeea", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
     { label:"Thigh", data:history.map(h=>h.thigh), borderColor:"#6b6b7a", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
   ]};
-  const sData = { labels:["Bench","Squat","Deadlift","OHP","Pull-ups"], datasets:[
-    { label:"Current", data:[lifts.bench,lifts.squat,lifts.dead,lifts.ohp,lifts.pullups], backgroundColor:"rgba(255,107,26,0.78)", borderRadius:8 },
-    { label:"Goal",    data:[120,150,180,80,25], backgroundColor:"rgba(255,255,255,0.08)", borderRadius:8, borderWidth:1, borderColor:"rgba(255,255,255,0.25)" },
-  ]};
   const compareItems = [
     { label:"Weight", current:history[history.length-1].weight, goal:goals.weight, unit:"kg" },
     { label:"Chest",  current:history[history.length-1].chest,  goal:goals.chest,  unit:"cm" },
@@ -792,7 +783,6 @@ export default function Account() {
       {showMeasHist && <HistoryDrawer title="Measurement" entries={measHist} onClose={()=>setShowMeasHist(false)} onRestore={e=>setRestoreMeas(e)}/>}
       {showGoalHist && <HistoryDrawer title="Goal" entries={goalHist} onClose={()=>setShowGoalHist(false)}/>}
       {showHealthHist && <HistoryDrawer title="Health" entries={healthHist} onClose={()=>setShowHealthHist(false)}/>}
-      {showLiftHist && <HistoryDrawer title="Strength" entries={liftHist} onClose={()=>setShowLiftHist(false)}/>}
       {showCal && <CalendarModal attendedDays={attendedDays} onClose={()=>setShowCal(false)} onToggle={toggleDay} tz={tz}/>}
 
       {/* Settings */}
@@ -1255,7 +1245,7 @@ export default function Account() {
           <div className="ctitle">📊 Progress Dashboard</div>
           <p className="csub">Your journey in data — current vs goal vs predicted trajectory</p>
           <div className="chart-tabs">
-            {[["compare","Comparison"],["weight","Weight & Predicted"],["body","Body Measurements"],["strength","Strength"],["ml","ML Forecast"]].map(([id,lbl])=>(
+            {[["compare","Comparison"],["weight","Weight & Predicted"],["body","Body Measurements"],["ml","ML Forecast"]].map(([id,lbl])=>(
               <button key={id} className={`ctab${chartTab===id?" on":""}`} onClick={()=>setChartTab(id)}>{lbl}</button>
             ))}
           </div>
@@ -1286,7 +1276,6 @@ export default function Account() {
           </div>
           <div style={{display:chartTab==="weight"?"block":"none"}}><div className="chart-wrap"><ChartLine id="wc" data={wData}/></div></div>
           <div style={{display:chartTab==="body"?"block":"none"}}><div className="chart-wrap"><ChartLine id="bc" data={bData}/></div></div>
-          <div style={{display:chartTab==="strength"?"block":"none"}}><div className="chart-wrap"><ChartBar id="sc" data={sData}/></div></div>
           <div style={{display:chartTab==="ml"?"block":"none"}}>
             {mlChartData
               ? <>
@@ -1350,26 +1339,6 @@ export default function Account() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* ═══════════ STRENGTH ═══════════ */}
-        <div className="card">
-          <div className="card-head-row">
-            <div><div className="clabel">Lifting</div><div className="ctitle">🏋️ Strength Monitor</div></div>
-            <button className="hist-btn" onClick={()=>setShowLiftHist(true)}>📋 History</button>
-          </div>
-          <p className="csub">Log your current lifts — progress is tracked against your BMI and training tenure.</p>
-          <div className="strength-inputs">
-            {[["Bench Press (kg)","bench"],["Squat (kg)","squat"],["Deadlift (kg)","dead"],["OHP (kg)","ohp"],["Pull-ups (reps)","pullups"]].map(([lbl,k])=>(
-              <div className="field" key={k}><label>{lbl}</label><input type="number" value={lifts[k]} onChange={e=>setLifts(p=>({...p,[k]:+e.target.value}))}/></div>
-            ))}
-          </div>
-          <div className="chart-wrap" style={{marginTop:16}}><ChartBar id="str2" data={sData}/></div>
-          <button className="btn-accent" style={{marginTop:14}} onClick={()=>{
-            const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
-            setLiftHist(h=>[{date:d,data:{bench:lifts.bench+"kg",squat:lifts.squat+"kg",dead:lifts.dead+"kg"}},...h]);
-            showToast("✓ Strength saved!");
-          }}>💾 Save Progress</button>
         </div>
 
         {/* ═══════════ AI NUTRI COACH ═══════════ */}

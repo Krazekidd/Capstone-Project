@@ -222,6 +222,16 @@ export const progressAPI = {
     }
   },
   
+  getGoalsHistory: async (limit = 10) => {
+    try {
+      const response = await axiosInstance.get(`/account/goals/history?limit=${limit}`);
+      return response.data || [];
+    } catch (error) {
+      console.error('Get goals history error:', error.response?.data);
+      return [];
+    }
+  },
+  
   // Health Conditions
   getHealthConditions: async () => {
     try {

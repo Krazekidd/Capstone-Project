@@ -930,12 +930,21 @@ async def get_my_goals(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Get current user's goals from client_goals table"""
-    from models import ClientGoal
+    from models import ClientGoal, Client
     
     user_id = current_user["user_id"]
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Goals only available for clients")
+    
+    # Verify that client record exists
+    client_result = await db.execute(
+        select(Client).where(Client.id == user_id)
+    )
+    client = client_result.scalar_one_or_none()
+    
+    if not client:
+        raise HTTPException(status_code=404, detail="Client profile not found. Please complete your client profile first.")
     
     result = await db.execute(
         select(ClientGoal).where(ClientGoal.client_id == user_id)
@@ -979,12 +988,21 @@ async def update_my_goals(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Update current user's goals"""
-    from models import ClientGoal
+    from models import ClientGoal, Client
     
     user_id = current_user["user_id"]
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Goals only available for clients")
+    
+    # Verify that client record exists
+    client_result = await db.execute(
+        select(Client).where(Client.id == user_id)
+    )
+    client = client_result.scalar_one_or_none()
+    
+    if not client:
+        raise HTTPException(status_code=404, detail="Client profile not found. Please complete your client profile first.")
     
     # Check if goals exist
     result = await db.execute(
@@ -1007,6 +1025,53 @@ async def update_my_goals(
     await db.commit()
     
     return APIResponse(success=True, message="Goals updated successfully")
+
+@router.get("/goals/history", response_model=List[ClientGoalsResponse])
+async def get_goals_history(
+    limit: int = Query(10, ge=1, le=50),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get goals history for current user"""
+    from models import ClientGoal
+    
+    user_id = current_user["user_id"]
+    
+    if current_user["role"] != "client":
+        raise HTTPException(status_code=400, detail="Goals history only available for clients")
+    
+    # For now, return the current goals since we don't have a history table
+    # In the future, we could create a goals_history table or use audit logs
+    result = await db.execute(
+        select(ClientGoal)
+        .where(ClientGoal.client_id == user_id)
+        .order_by(desc(ClientGoal.updated_at))
+        .limit(limit)
+    )
+    goals = result.scalars().all()
+    
+    return [
+        ClientGoalsResponse(
+            id=goal.id,
+            client_id=uuid.UUID(bytes=goal.client_id),
+            goal_type=goal.goal_type,
+            primary_goal=goal.primary_goal,
+            target_weight_kg=float(goal.target_weight_kg) if goal.target_weight_kg else None,
+            target_chest_cm=float(goal.target_chest_cm) if goal.target_chest_cm else None,
+            target_waist_cm=float(goal.target_waist_cm) if goal.target_waist_cm else None,
+            target_hips_cm=float(goal.target_hips_cm) if goal.target_hips_cm else None,
+            target_thigh_cm=float(goal.target_thigh_cm) if goal.target_thigh_cm else None,
+            target_arm_cm=float(goal.target_arm_cm) if goal.target_arm_cm else None,
+            target_value=float(goal.target_value) if goal.target_value else None,
+            current_value=float(goal.current_value) if goal.current_value else None,
+            target_date=goal.target_date,
+            is_active=goal.is_active,
+            notes=goal.notes,
+            created_at=goal.created_at,
+            updated_at=goal.updated_at
+        )
+        for goal in goals
+    ]
 
 # ============================================================
 # CLIENT HEALTH CONDITIONS ENDPOINTS

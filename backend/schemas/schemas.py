@@ -796,6 +796,14 @@ class ClientGoalsResponse(BaseModel):
     id: uuid.UUID
     client_id: uuid.UUID
     goal_type: str
+    primary_goal: Optional[str] = None
+    target_weight_kg: Optional[float] = None
+    target_chest_cm: Optional[float] = None
+    target_waist_cm: Optional[float] = None
+    target_hips_cm: Optional[float] = None
+    target_thigh_cm: Optional[float] = None
+    target_arm_cm: Optional[float] = None
+    # Legacy fields for backward compatibility
     target_value: Optional[float] = None
     current_value: Optional[float] = None
     target_date: Optional[date] = None
@@ -809,6 +817,14 @@ class ClientGoalsResponse(BaseModel):
 
 class UpdateClientGoalsRequest(BaseModel):
     goal_type: Optional[str] = None
+    primary_goal: Optional[str] = None
+    target_weight_kg: Optional[float] = None
+    target_chest_cm: Optional[float] = None
+    target_waist_cm: Optional[float] = None
+    target_hips_cm: Optional[float] = None
+    target_thigh_cm: Optional[float] = None
+    target_arm_cm: Optional[float] = None
+    # Legacy fields for backward compatibility
     target_value: Optional[float] = None
     current_value: Optional[float] = None
     target_date: Optional[date] = None

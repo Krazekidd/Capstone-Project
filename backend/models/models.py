@@ -771,6 +771,17 @@ class ClientGoal(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     goal_type = Column(String(50), nullable=False)  # weight_loss, muscle_gain, endurance, etc.
+    primary_goal = Column(String(100))  # Bulk Up, Cut Down, etc.
+    
+    # Specific body measurement targets
+    target_weight_kg = Column(Numeric(6, 2))
+    target_chest_cm = Column(Numeric(6, 2))
+    target_waist_cm = Column(Numeric(6, 2))
+    target_hips_cm = Column(Numeric(6, 2))
+    target_thigh_cm = Column(Numeric(6, 2))
+    target_arm_cm = Column(Numeric(6, 2))
+    
+    # Legacy fields for backward compatibility
     target_value = Column(Numeric(10, 2))
     current_value = Column(Numeric(10, 2))
     target_date = Column(Date)

@@ -586,9 +586,69 @@ export default function Account() {
   useEffect(()=>{ if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight; },[chatMsgs]);
   useEffect(()=>{ if(aiScrollRef.current) aiScrollRef.current.scrollTop=aiScrollRef.current.scrollHeight; },[aiMsgs]);
 
+  // Load goals from API on component mount
+  const fetchGoals = async () => {
+    try {
+      const goalsData = await progressAPI.getGoals();
+      if (goalsData) {
+        // Update form with loaded goals
+        setGoalType(goalsData.primary_goal || 'Bulk Up');
+        setGoalIn({
+          weight: goalsData.target_weight_kg || 80,
+          chest: goalsData.target_chest_cm || 100,
+          waist: goalsData.target_waist_cm || 80,
+          hips: goalsData.target_hips_cm || 98,
+          thigh: goalsData.target_thigh_cm || 58,
+          arm: goalsData.target_arm_cm || 38
+        });
+        setGoals({
+          weight: goalsData.target_weight_kg || 80,
+          chest: goalsData.target_chest_cm || 100,
+          waist: goalsData.target_waist_cm || 80,
+          hips: goalsData.target_hips_cm || 98,
+          thigh: goalsData.target_thigh_cm || 58,
+          arm: goalsData.target_arm_cm || 38
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching goals:', error);
+    }
+  };
+
+  // Load goals history from API
+  const fetchGoalsHistory = async () => {
+    try {
+      const historyData = await progressAPI.getGoalsHistory();
+      
+      // Transform backend data to frontend format
+      const formattedHistory = historyData.map(entry => ({
+        date: new Date(entry.updated_at).toLocaleDateString("en-GB", { 
+          day: "numeric", 
+          month: "short", 
+          year: "numeric" 
+        }),
+        data: {
+          weight: entry.target_weight_kg ? `${entry.target_weight_kg}kg` : undefined,
+          chest: entry.target_chest_cm ? `${entry.target_chest_cm}cm` : undefined,
+          waist: entry.target_waist_cm ? `${entry.target_waist_cm}cm` : undefined,
+          hips: entry.target_hips_cm ? `${entry.target_hips_cm}cm` : undefined,
+          thigh: entry.target_thigh_cm ? `${entry.target_thigh_cm}cm` : undefined,
+          arm: entry.target_arm_cm ? `${entry.target_arm_cm}cm` : undefined,
+          type: entry.primary_goal || 'Bulk Up'
+        }
+      })).filter(entry => Object.values(entry.data).some(val => val !== undefined));
+
+      setGoalHist(formattedHistory);
+    } catch (error) {
+      console.error('Error fetching goals history:', error);
+    }
+  };
+
   // Load progress history on component mount
   useEffect(() => {
     fetchProgressHistory();
+    fetchGoals();
+    fetchGoalsHistory();
   }, []);
 
   // Sessions calc
@@ -657,10 +717,30 @@ export default function Account() {
 
   // Handlers
   const saveGoals = () => setConfirmGoal(true);
-  const doSaveGoals = () => {
-    const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
-    setGoalHist(h=>[{date:d,data:{...goalIn,type:goalType}},...h]);
-    setGoals({...goalIn}); setConfirmGoal(false); showToast("✓ Goals updated!");
+  const doSaveGoals = async () => {
+    try {
+      const goalsData = {
+        primary_goal: goalType,
+        target_weight_kg: goalIn.weight,
+        target_chest_cm: goalIn.chest,
+        target_waist_cm: goalIn.waist,
+        target_hips_cm: goalIn.hips,
+        target_thigh_cm: goalIn.thigh,
+        target_arm_cm: goalIn.arm,
+        goal_type: GOAL_MAP[goalType] || 'maintain'
+      };
+      
+      await progressAPI.updateGoals(goalsData);
+      
+      const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+      setGoalHist(h=>[{date:d,data:{...goalIn,type:goalType}},...h]);
+      setGoals({...goalIn}); 
+      setConfirmGoal(false); 
+      showToast("✓ Goals updated!");
+    } catch (error) {
+      console.error('Error saving goals:', error);
+      showToast("⚠️ Failed to save goals");
+    }
   };
 
   // Fetch progress history from backend

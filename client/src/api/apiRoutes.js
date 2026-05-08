@@ -140,10 +140,13 @@ export const API_ENDPOINTS = {
     ENERGY_EXPENDITURE: '/api/ml/energy-expenditure',
   },
 
-  // Account (Need Backend Implementation)
+  // Account
   ACCOUNT: {
     ME: '/account/me',
     MEASUREMENTS: '/account/measurements',
+    PROGRESS: '/account/progress',
+    PROGRESS_HISTORY: '/account/progress/history',
+    PROGRESS_LATEST: '/account/progress/latest',
     GOALS: '/account/goals',
     HEALTH_CONDITIONS: '/account/health-conditions',
     WATER_INTAKE: '/account/water-intake',
@@ -253,10 +256,10 @@ export const API_STATUS = {
     BOOKINGS: true,
     SHOP: true,
     ML: true,
+    ACCOUNT: true, // Progress tracking endpoints are implemented
   },
   NEEDS_IMPLEMENTATION: {
     // Routes that need backend implementation
-    ACCOUNT: false,
     EXCURSIONS: false,
     ADMIN: false,
     TRAINER: false,

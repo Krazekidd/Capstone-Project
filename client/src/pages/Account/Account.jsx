@@ -5,6 +5,7 @@ import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 import { sendNutriMessage } from "../../api/nutriAI";
 import { buildMLProfile, getMLWorkoutRecommendation, getMLProgressPrediction, getMLFoodSuggestions } from "../../api/mlApi";
+import { progressAPI } from "../../api/api";
 import ReactMarkdown from "react-markdown";
 import { useAuth } from "../../Context/AuthContext";
 import "./Account.css";
@@ -585,6 +586,11 @@ export default function Account() {
   useEffect(()=>{ if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight; },[chatMsgs]);
   useEffect(()=>{ if(aiScrollRef.current) aiScrollRef.current.scrollTop=aiScrollRef.current.scrollHeight; },[aiMsgs]);
 
+  // Load progress history on component mount
+  useEffect(() => {
+    fetchProgressHistory();
+  }, []);
+
   // Sessions calc
   useEffect(()=>{
     const keys=Object.keys(attendedDays).filter(k=>attendedDays[k]?.am||attendedDays[k]?.pm);
@@ -657,10 +663,92 @@ export default function Account() {
     setGoals({...goalIn}); setConfirmGoal(false); showToast("✓ Goals updated!");
   };
 
-  const saveMeas = () => {
-    const mo=MONTHS[now.getMonth()], yr=now.getFullYear();
-    setMeasHist(h=>[{ date:`${mo} ${yr}`, data:{ weight:(meas.weight||"84")+"kg", waist:(meas.waist||"84")+"cm", chest:(meas.chest||"96")+"cm", bmi:currentBMI.toString() } },...h]);
-    showToast(`✓ ${mo} ${yr} measurements saved!`);
+  // Fetch progress history from backend
+  const fetchProgressHistory = async () => {
+    try {
+      const historyData = await progressAPI.getProgressHistory();
+      
+      // Transform backend data to frontend format
+      const formattedHistory = historyData.map(entry => ({
+        date: new Date(entry.recorded_at).toLocaleDateString("en-GB", { 
+          day: "numeric", 
+          month: "short", 
+          year: "numeric" 
+        }),
+        data: {
+          weight: entry.weight ? `${entry.weight}kg` : undefined,
+          waist: entry.measurements?.waist ? `${entry.measurements.waist}cm` : undefined,
+          chest: entry.measurements?.chest ? `${entry.measurements.chest}cm` : undefined,
+          bmi: entry.weight && entry.height ? 
+            (entry.weight / ((entry.height / 100) ** 2)).toFixed(1) : undefined,
+          // Include other measurements if available
+          ...(entry.measurements?.body_fat && { body_fat: `${entry.measurements.body_fat}%` }),
+          ...(entry.measurements?.shoulders && { shoulders: `${entry.measurements.shoulders}cm` }),
+          ...(entry.measurements?.arm_left && { arm_left: `${entry.measurements.arm_left}cm` }),
+          ...(entry.measurements?.arm_right && { arm_right: `${entry.measurements.arm_right}cm` }),
+          ...(entry.measurements?.neck && { neck: `${entry.measurements.neck}cm` }),
+          ...(entry.measurements?.hips && { hips: `${entry.measurements.hips}cm` }),
+          ...(entry.measurements?.thigh_left && { thigh_left: `${entry.measurements.thigh_left}cm` }),
+          ...(entry.measurements?.thigh_right && { thigh_right: `${entry.measurements.thigh_right}cm` }),
+          ...(entry.measurements?.calf_left && { calf_left: `${entry.measurements.calf_left}cm` }),
+          ...(entry.measurements?.calf_right && { calf_right: `${entry.measurements.calf_right}cm` }),
+          ...(entry.measurements?.glutes && { glutes: `${entry.measurements.glutes}cm` })
+        }
+      })).filter(entry => Object.values(entry.data).some(val => val !== undefined));
+
+      setMeasHist(formattedHistory);
+    } catch (error) {
+      console.error('Error fetching progress history:', error);
+      // Keep existing local state if fetch fails
+    }
+  };
+
+  const saveMeas = async () => {
+    try {
+      const mo = MONTHS[now.getMonth()], yr = now.getFullYear();
+      
+      // Prepare measurements data for backend
+      const measurementsData = {
+        weight: parseFloat(meas.weight) || null,
+        height: parseFloat(meas.height) || null,
+        body_fat: parseFloat(meas.bf) || null,
+        chest: parseFloat(meas.chest) || null,
+        waist: parseFloat(meas.waist) || null,
+        shoulders: parseFloat(meas.shoulders) || null,
+        arm_left: parseFloat(meas.armL) || null,
+        arm_right: parseFloat(meas.armR) || null,
+        neck: parseFloat(meas.neck) || null,
+        hips: parseFloat(meas.hips) || null,
+        thigh_left: parseFloat(meas.thighL) || null,
+        thigh_right: parseFloat(meas.thighR) || null,
+        calf_left: parseFloat(meas.calfL) || null,
+        calf_right: parseFloat(meas.calfR) || null,
+        glutes: parseFloat(meas.glutes) || null
+      };
+
+      // Save to backend
+      await progressAPI.saveProgress(measurementsData);
+      
+      // Update local state for immediate UI feedback
+      setMeasHist(h => [{
+        date: `${mo} ${yr}`, 
+        data: { 
+          weight: (meas.weight || "84") + "kg", 
+          waist: (meas.waist || "84") + "cm", 
+          chest: (meas.chest || "96") + "cm", 
+          bmi: currentBMI.toString() 
+        } 
+      }, ...h]);
+      
+      showToast(`✓ ${mo} ${yr} measurements saved!`);
+      
+      // Refresh history from backend
+      fetchProgressHistory();
+      
+    } catch (error) {
+      console.error('Error saving measurements:', error);
+      showToast('❌ Failed to save measurements. Please try again.');
+    }
   };
 
   const saveHealth = () => {

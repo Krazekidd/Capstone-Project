@@ -9,6 +9,15 @@ const axiosInstance = axios.create({
     },
 });
 
+// Create separate axios instance for refresh requests (no auth header)
+const refreshAxiosInstance = axios.create({
+    baseURL: import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000',
+    timeout: 10000,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+});
+
 // Request interceptor to add auth token
 axiosInstance.interceptors.request.use(
     (config) => {
@@ -38,7 +47,7 @@ axiosInstance.interceptors.response.use(
                 // Try to refresh the token
                 const refresh_token = localStorage.getItem('refresh_token');
                 if (refresh_token) {
-                    const response = await axiosInstance.post('/auth/refresh', { refresh_token });
+                    const response = await refreshAxiosInstance.post('/auth/refresh', { refresh_token });
                     const data = response.data;
                     
                     // Store new tokens

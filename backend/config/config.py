@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     AI_MODEL: str = "qwen/qwen3-vl-30b-a3b-thinking"
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/Accounts"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/accounts"
     
     # Server configuration
     HOST: str = "0.0.0.0"

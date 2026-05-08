@@ -18,6 +18,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     ARRAY,
+    JSON,
 )
 from sqlalchemy.sql import func
 from database import Base
@@ -583,7 +584,7 @@ class NutritionPlan(Base):
     daily_carbs_g = Column(Numeric(6, 2), nullable=False)
     daily_fat_g = Column(Numeric(6, 2), nullable=False)
     daily_fiber_g = Column(Numeric(6, 2))
-    meals = Column(JSONB, nullable=False, default='[]')
+    meals = Column(JSON, nullable=False, default='[]')
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
@@ -606,8 +607,8 @@ class NutritionGoals(Base):
     daily_carbs_g = Column(Numeric(6, 2), nullable=False)
     daily_fat_g = Column(Numeric(6, 2), nullable=False)
     daily_fiber_g = Column(Numeric(6, 2))
-    dietary_restrictions = Column(ARRAY(String), nullable=False, default='{}')
-    allergies = Column(ARRAY(String), nullable=False, default='{}')
+    dietary_restrictions = Column(JSON)
+    allergies = Column(JSON)
     goal_type = Column(String(50), nullable=False, default='maintain')
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)

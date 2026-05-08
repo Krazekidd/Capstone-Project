@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 import { sendNutriMessage } from "../../api/nutriAI";
+import { buildMLProfile, getMLWorkoutRecommendation, getMLProgressPrediction, getMLFoodSuggestions } from "../../api/mlApi";
 import ReactMarkdown from "react-markdown";
 import { useAuth } from "../../Context/AuthContext";
 import "./Account.css";
@@ -68,6 +69,18 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const calcBMI = (w, h) => h > 0 ? +(w / ((h/100)**2)).toFixed(1) : 0;
 const bmiCategory = b => b < 18.5 ? "Underweight" : b < 25 ? "Healthy" : b < 30 ? "Overweight" : "Obese";
 const bmiColor    = b => b < 18.5 ? "#00b4d8" : b < 25 ? "#2ecc71" : b < 30 ? "#ffa040" : "#e63946";
+const calculateAge = (birthday) => {
+  if (!birthday) return 28;
+  const today = new Date(), birth = new Date(birthday);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+};
+const GOAL_MAP = {
+  "Bulk Up":"gain_muscle","Cut Down":"lose_weight","Athletic Build":"maintain",
+  "Lean & Shredded":"lose_weight","Maintain":"maintain","Tone & Define":"maintain",
+};
 
 // ─── CHART COMPONENT ─────────────────────────────────────────────────────────
 const mkOpts = () => ({
@@ -490,12 +503,53 @@ export default function Account() {
     setTimeout(()=>setToast({show:false,msg:""}),2600);
   },[]);
 
+  // ML recommendations
+  const [mlWorkout, setMlWorkout] = useState(null);
+  const [mlProgress, setMlProgress] = useState(null);
+  const [mlFood, setMlFood] = useState(null);
+  const [mlLoading, setMlLoading] = useState(false);
+  const [mlError, setMlError] = useState(null);
+
   // Logout handler
   const handleLogout = () => {
     logout();
     setShowSettings(false);
     showToast("Logged out — see you next time! 👋");
     navigate("/login");
+  };
+
+  // ML data fetch — calls all 3 ML endpoints in parallel
+  const fetchMLData = async () => {
+    const w = parseFloat(meas.weight), h = parseFloat(meas.height);
+    if (!w || !h) { showToast("⚠️ Enter weight and height first."); return; }
+    setMlLoading(true); setMlError(null);
+    const expMap = { 1:1, 3:2, 4:3, 5:3 };
+    const profile = buildMLProfile({
+      age: calculateAge(birthday),
+      gender: gender === "nonbinary" ? "male" : gender,
+      weight_kg: w,
+      height_m: h / 100,
+      fat_pct: parseFloat(meas.bf) || 20,
+      experience_level: expMap[level.tier] || 1,
+      workout_freq: 3,
+      session_duration: 1.0,
+      avg_bpm: 130,
+      health_conditions: health.filter(c => c !== "None"),
+      goal: GOAL_MAP[goalType] || "maintain",
+    });
+    try {
+      const [workout, progress, food] = await Promise.all([
+        getMLWorkoutRecommendation(profile),
+        getMLProgressPrediction(profile),
+        getMLFoodSuggestions(profile, 8),
+      ]);
+      setMlWorkout(workout); setMlProgress(progress); setMlFood(food);
+      showToast("✓ ML recommendations loaded!");
+    } catch {
+      setMlError("ML service unavailable — check backend connection.");
+      showToast("⚠️ ML recommendations failed.");
+    }
+    setMlLoading(false);
   };
 
   // Update measurements and gender when auth context changes
@@ -588,6 +642,14 @@ export default function Account() {
   ];
   const cMax = Math.max(...compareItems.map(i=>Math.max(i.current,i.goal)));
 
+  const mlChartData = mlProgress ? {
+    labels: mlProgress.projections.map(p => p.label),
+    datasets: [
+      { label:"ML Weight (kg)", data:mlProgress.projections.map(p=>p.weight), borderColor:"#4a9eff", backgroundColor:"rgba(74,158,255,0.12)", borderWidth:2.5, tension:0.4, fill:true, pointBackgroundColor:"#4a9eff", pointRadius:5, pointHoverRadius:7 },
+      { label:"ML Body Fat %",  data:mlProgress.projections.map(p=>p.fat_pct), borderColor:"#ffa040", backgroundColor:"rgba(255,160,64,0.06)", borderWidth:2, tension:0.4, fill:true, borderDash:[4,3], pointRadius:4 },
+    ],
+  } : null;
+
   const av = { chest:parseFloat(meas.chest)||96, waist:parseFloat(meas.waist)||84, hips:parseFloat(meas.hips)||96, thigh:parseFloat(meas.thighL)||56, arm:parseFloat(meas.armL)||37, shoulders:parseFloat(meas.shoulders)||118 };
 
   const inp = (label, key, ph, step="1") => (
@@ -631,19 +693,6 @@ export default function Account() {
     const um={role:"user",text:aiIn,image:aiImg};
     setAiMsgs(m=>[...m,um]); setAiIn(""); setAiImg(null); setAiLoading(true);
     
-    // Calculate age from birthday
-    const calculateAge = (birthday) => {
-      if (!birthday) return 28; // Default age if no birthday set
-      const today = new Date();
-      const birthDate = new Date(birthday);
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-      return age;
-    };
-
     // Create user context for the AI (matching UserMetrics schema)
     const userContext = {
       weight_kg: parseFloat(meas.weight) || 84,
@@ -1042,10 +1091,14 @@ export default function Account() {
                 <div className="minputs">{inp("Hips","hips","96","0.5")}{inp("L. Thigh","thighL","56","0.5")}{inp("R. Thigh","thighR","56","0.5")}</div>
                 <div className="minputs" style={{marginTop:10}}>{inp("L. Calf","calfL","36","0.5")}{inp("R. Calf","calfR","36","0.5")}{inp("Glutes","glutes","100","0.5")}</div>
               </div>
-              <div style={{display:"flex",gap:10}}>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
                 <button className="btn-accent" onClick={saveMeas}>💾 Save {currentMo}</button>
                 <button className="btn-ghost" onClick={()=>setMeas({weight:"",height:"",bf:"",chest:"",waist:"",shoulders:"",armL:"",armR:"",neck:"",hips:"",thighL:"",thighR:"",calfL:"",calfR:"",glutes:""})}>Clear</button>
+                <button className="btn-accent" style={{background:"#4a9eff",borderColor:"#4a9eff"}} onClick={fetchMLData} disabled={mlLoading}>
+                  {mlLoading ? "⏳ Analysing…" : "🤖 Get ML Plan"}
+                </button>
               </div>
+              {mlError && <div className="health-note" style={{marginTop:8,color:"#e63946"}}>⚠️ {mlError}</div>}
             </div>
           </div>
         </div>
@@ -1162,6 +1215,37 @@ export default function Account() {
           </div>
         </div>
 
+        {mlFood && (
+          <div className="card" style={{marginTop:20}}>
+            <div className="clabel">ML Food Engine</div>
+            <div className="ctitle">🥗 Personalised Food Suggestions</div>
+            <p className="csub">{mlFood.note}</p>
+            <div style={{overflowX:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                <thead>
+                  <tr style={{color:"var(--sub,#6b6b7a)",borderBottom:"1px solid var(--border)"}}>
+                    {["Food","Calories","Protein","Carbs","Fat","Fibre"].map(h=>(
+                      <th key={h} style={{padding:"6px 8px",textAlign:"left",fontWeight:600}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {mlFood.suggestions.map((f,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                      <td style={{padding:"7px 8px",fontWeight:600}}>{f.food}</td>
+                      <td style={{padding:"7px 8px",color:"#ff6b1a"}}>{Math.round(f.calories)}</td>
+                      <td style={{padding:"7px 8px",color:"#2ecc71"}}>{f.protein_g.toFixed(1)}g</td>
+                      <td style={{padding:"7px 8px",color:"#ffa040"}}>{f.carbs_g.toFixed(1)}g</td>
+                      <td style={{padding:"7px 8px",color:"#4a9eff"}}>{f.fat_g.toFixed(1)}g</td>
+                      <td style={{padding:"7px 8px",color:"#6b6b7a"}}>{f.fiber_g.toFixed(1)}g</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* ═══════════ PROGRESS CHARTS ═══════════ */}
         <div className="section-divider">
           <div className="divider-line"/><div className="divider-label">ANALYTICS</div><div className="divider-line"/>
@@ -1171,7 +1255,7 @@ export default function Account() {
           <div className="ctitle">📊 Progress Dashboard</div>
           <p className="csub">Your journey in data — current vs goal vs predicted trajectory</p>
           <div className="chart-tabs">
-            {[["compare","Comparison"],["weight","Weight & Predicted"],["body","Body Measurements"],["strength","Strength"]].map(([id,lbl])=>(
+            {[["compare","Comparison"],["weight","Weight & Predicted"],["body","Body Measurements"],["strength","Strength"],["ml","ML Forecast"]].map(([id,lbl])=>(
               <button key={id} className={`ctab${chartTab===id?" on":""}`} onClick={()=>setChartTab(id)}>{lbl}</button>
             ))}
           </div>
@@ -1203,6 +1287,33 @@ export default function Account() {
           <div style={{display:chartTab==="weight"?"block":"none"}}><div className="chart-wrap"><ChartLine id="wc" data={wData}/></div></div>
           <div style={{display:chartTab==="body"?"block":"none"}}><div className="chart-wrap"><ChartLine id="bc" data={bData}/></div></div>
           <div style={{display:chartTab==="strength"?"block":"none"}}><div className="chart-wrap"><ChartBar id="sc" data={sData}/></div></div>
+          <div style={{display:chartTab==="ml"?"block":"none"}}>
+            {mlChartData
+              ? <>
+                  <div className="chart-wrap"><ChartLine id="mlc" data={mlChartData}/></div>
+                  {mlProgress?.user_summary && (
+                    <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:14}}>
+                      {[
+                        ["Start Weight",`${mlProgress.user_summary.start_weight_kg} kg`],
+                        ["Start BMI",`${mlProgress.user_summary.start_bmi} — ${mlProgress.user_summary.bmi_category}`],
+                        ["Plan",mlProgress.user_summary.workout_plan],
+                        ["Cal/Session",`${Math.round(mlProgress.user_summary.estimated_calories_per_session)} kcal`],
+                        ["Weekly Burn",`${Math.round(mlProgress.user_summary.estimated_weekly_calories_burned)} kcal`],
+                      ].map(([k,v])=>(
+                        <div key={k} className="hstat" style={{minWidth:120}}>
+                          <div className="hstat-val" style={{fontSize:14}}>{v}</div>
+                          <div className="hstat-lbl">{k}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p style={{fontSize:11,color:"var(--sub,#6b6b7a)",marginTop:10}}>{mlProgress.note}</p>
+                </>
+              : <div style={{padding:"32px",textAlign:"center",color:"var(--sub,#6b6b7a)"}}>
+                  Click <strong style={{color:"#4a9eff"}}>🤖 Get ML Plan</strong> in the measurements section to generate your personalised forecast.
+                </div>
+            }
+          </div>
         </div>
 
         {/* ═══════════ WORKOUTS ═══════════ */}
@@ -1215,6 +1326,30 @@ export default function Account() {
             <div className="clabel">AI Personalised</div>
             <div className="ctitle">🎯 Recommended Workouts</div>
             <p className="csub">Based on your BMI ({currentBMI} — {bmiCategory(currentBMI)}), goal: {goalType}, health conditions</p>
+
+            {mlWorkout && (
+              <div className="workout-area" style={{marginBottom:20}}>
+                <div className="workout-heading">
+                  — ML: {mlWorkout.workout_category?.toUpperCase()} · {mlWorkout.fitness_level} · {Math.round(mlWorkout.predicted_calories_per_session)} kcal/session —
+                </div>
+                <div className="workout-grid">
+                  {mlWorkout.workouts.map((w,i)=>(
+                    <div className="workout-card" key={i}>
+                      <div className="wc-icon">🤖</div>
+                      <div className="wc-name">{w.exercise}</div>
+                      <div className="wc-detail">{mlWorkout.workout_category}</div>
+                      <div className="wc-sets">
+                        <span className="stag">{w.sets} sets</span>
+                        <span className="stag">{w.reps} reps</span>
+                        <span className="stag">Rest {w.rest}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p style={{fontSize:11,color:"var(--sub,#6b6b7a)",marginTop:8}}>{mlWorkout.disclaimer}</p>
+              </div>
+            )}
+
             <div className="target-grid">
               {[["💪","Chest & Arms","chest","Push & definition"],["🦴","Back & Lats","back","Width & thickness"],["🦵","Legs & Glutes","legs","Strength & size"],["🎯","Core & Abs","core","Stability & tone"],["⚡","Full Body","fullbody","Total conditioning"],["🏃","Cardio & HIIT","cardio","Burn & endurance"]].map(([ic,nm,key,desc])=>(
                 <button key={key} className={`tgt-btn${activeTarget===key?" on":""}`} onClick={()=>setActiveTarget(k=>k===key?null:key)}>
@@ -1333,9 +1468,9 @@ export default function Account() {
                 <button className="attach-btn" onClick={()=>aiImgRef.current?.click()} title="Attach image">📎</button>
                 <input ref={aiImgRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f)setAiImg(URL.createObjectURL(f));}}/>
                 <textarea className="ai-ta" value={aiIn} onChange={e=>setAiIn(e.target.value)}
-                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleAskAI();}}}
+                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();askAI();}}}
                   placeholder="Ask NutriAI about nutrition, workouts, recovery… (Enter to send)" rows={2}/>
-                <button className="btn-accent ai-send" onClick={handleAskAI} disabled={aiLoading||!aiIn.trim()}>
+                <button className="btn-accent ai-send" onClick={askAI} disabled={aiLoading||!aiIn.trim()}>
                   {aiLoading?"…":"Send ➤"}
                 </button>
               </div>

@@ -373,9 +373,9 @@ class MLWorkoutEntry(BaseModel):
     week: int; actual_weight: float
 class MLUserProfile(BaseModel):
     age: int; gender: str; weight_kg: float; height_m: float
-    bmi: float = None; fat_pct: float = 20.0; experience_level: int = 1
+    bmi: Optional[float] = None; fat_pct: float = 20.0; experience_level: int = 1
     workout_freq: int = 3; session_duration: float = 1.0; avg_bpm: int = 130
-    health_conditions: list = []; goal: str; workout_history: list = None
+    health_conditions: list = []; goal: str; workout_history: Optional[list] = None
 class MLExerciseItem(BaseModel):
     exercise: str; sets: int; reps: str; rest: str
 class MLWorkoutResponse(BaseModel):

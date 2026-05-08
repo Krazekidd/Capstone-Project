@@ -854,6 +854,11 @@ class UpdateHealthConditionsRequest(BaseModel):
     is_active: Optional[bool] = None
 
 
+class UpdateMultipleHealthConditionsRequest(BaseModel):
+    conditions: List[str] = []
+    notes: Optional[str] = ""
+
+
 class WaterIntakeResponse(BaseModel):
     id: uuid.UUID
     client_id: uuid.UUID

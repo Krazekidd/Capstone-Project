@@ -243,12 +243,15 @@ export const progressAPI = {
     }
   },
   
-  updateHealthConditions: async (conditions) => {
+  updateHealthConditions: async (conditions, notes = "") => {
     try {
-      const response = await axiosInstance.put('/account/health-conditions', { conditions });
+      const payload = { conditions: conditions, notes: notes };
+      console.log('API: Sending payload:', JSON.stringify(payload, null, 2));
+      const response = await axiosInstance.put('/account/health-conditions', payload);
       return response.data;
     } catch (error) {
       console.error('Update health conditions error:', error.response?.data);
+      console.error('Full error:', error);
       throw error.response?.data || { detail: 'Failed to update health conditions' };
     }
   },

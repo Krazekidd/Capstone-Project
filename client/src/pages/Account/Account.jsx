@@ -656,13 +656,17 @@ export default function Account() {
       // Transform backend data to frontend format
       const conditions = conditionsData.map(c => c.condition_name);
       
-      // Update local state with fetched conditions
+      // Get notes from the first condition (if any)
+      const notes = conditionsData.length > 0 ? (conditionsData[0].notes || "") : "";
+      
+      // Update local state with fetched conditions and notes
       setHealth(conditions.length > 0 ? conditions : []);
+      setHealthNotes(notes);
       
       // Create initial history entry if none exists
       if (conditions.length > 0 && healthHist.length === 0) {
         const d = now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
-        setHealthHist([{date:d,data:{ conditions:conditions.join(", ")||"None", notes:"—" }}]);
+        setHealthHist([{date:d,data:{ conditions:conditions.join(", ")||"None", notes:notes||"—" }}]);
       }
     } catch (error) {
       console.error('Error fetching health conditions:', error);
@@ -870,7 +874,9 @@ export default function Account() {
       
       // Save to backend API
       const conditionsToSave = health.filter(c => c !== "None");
-      await progressAPI.updateHealthConditions(conditionsToSave);
+      console.log("Sending conditions to API:", conditionsToSave);
+      console.log("Sending notes to API:", healthNotes);
+      await progressAPI.updateHealthConditions(conditionsToSave, healthNotes);
       
       // Update local history for display
       const d = now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});

@@ -21,8 +21,8 @@ from schemas import (
     UpdateAdminProfileRequest, APIResponse, UserProgressResponse,
     ProgressRequest, BodyMeasurements, ProgressTrackingResponse, ClientGoalsResponse, UpdateClientGoalsRequest,
     HealthConditionResponse,WaterIntakeResponse,UpdateWaterIntakeRequest,
-    StrengthRecordResponse, UpdateStrengthRecordRequest,TrainerRatingResponse,TrainerRatingsSummaryResponse,
-    TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse, BadgeCheckResponse,
+    StrengthRecordResponse, UpdateStrengthRecordRequest,TrainerRatingResponse,TrainerRatingsSummaryResponse,UpdateTrainerRatingRequest,
+    TrainingScheduleResponse, UpdateTrainingScheduleRequest, BadgeResponse, BadgeCheckResponse,
     TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,ShopOrderItemResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
     DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
@@ -31,7 +31,7 @@ from schemas import (
     ProgressAnalyticsResponse, ProgressComparisonResponse, ProgressSummaryResponse,
     ActivityDataCreate, ActivityDataResponse, ActivityDataListResponse,
     AccountConversationRequest, AccountConversationResponse, AccountConversationHistoryResponse,
-    ProfileImageResponse
+    ProfileImageResponse, UpdateMultipleHealthConditionsRequest
 )
 from ..auth.auth import get_current_user
 from config.config import settings
@@ -862,6 +862,7 @@ async def get_my_goals(
     if not goals:
         # Return default goals
         return ClientGoalsResponse(
+            id=uuid.uuid4(),
             client_id=user_id,
             goal_type="Bulk Up",
             primary_goal=None,
@@ -871,11 +872,13 @@ async def get_my_goals(
             target_hips_cm=98,
             target_thigh_cm=58,
             target_arm_cm=38,
+            is_active=True,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
     
     return ClientGoalsResponse(
+        id=goals.id,
         client_id=uuid.UUID(bytes=goals.client_id),
         goal_type=goals.goal_type,
         primary_goal=goals.primary_goal,
@@ -885,6 +888,7 @@ async def get_my_goals(
         target_hips_cm=float(goals.target_hips_cm) if goals.target_hips_cm else None,
         target_thigh_cm=float(goals.target_thigh_cm) if goals.target_thigh_cm else None,
         target_arm_cm=float(goals.target_arm_cm) if goals.target_arm_cm else None,
+        is_active=goals.is_active,
         created_at=goals.created_at,
         updated_at=goals.updated_at
     )
@@ -1015,43 +1019,83 @@ async def get_my_health_conditions(
     return [
         HealthConditionResponse(
             id=c.id,
+            client_id=c.client_id,
             condition_name=c.condition_name,
-            created_at=c.created_at
+            severity=c.severity,
+            medications=c.medications,
+            notes=c.notes,
+            is_active=c.is_active,
+            created_at=c.created_at,
+            updated_at=c.updated_at
         )
         for c in conditions
     ]
 
 @router.put("/health-conditions", response_model=APIResponse)
 async def update_my_health_conditions(
-    conditions_data: dict,
+    conditions_request: UpdateMultipleHealthConditionsRequest,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
     """Update current user's health conditions"""
     from models import ClientHealthCondition
     
+    logger.info("=== UPDATE HEALTH CONDITIONS ENDPOINT CALLED ===")
+    logger.info(f"Current user data: {current_user}")
+    logger.info(f"Conditions received: {conditions_request.conditions}")
+    logger.info(f"Notes received: {conditions_request.notes}")
+    
     user_id = current_user["user_id"]
     
     if current_user["role"] != "client":
+        logger.error(f"User {user_id} is not a client: {current_user['role']}")
         raise HTTPException(status_code=400, detail="Health conditions only available for clients")
     
-    # Delete existing conditions
-    await db.execute(
-        delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id)
-    )
-    
-    # Add new conditions
-    if "conditions" in conditions_data:
-        for condition in conditions_data["conditions"]:
+    try:
+        # Delete existing conditions
+        logger.info(f"Deleting existing conditions for user {user_id}")
+        await db.execute(
+            delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id)
+        )
+        
+        # Add new conditions
+        conditions_added = 0
+        for i, condition in enumerate(conditions_request.conditions):
+            if condition and condition.strip():  # Only add non-empty conditions
+                logger.info(f"Adding condition: {condition}")
+                # Add notes to the first condition, or create a separate notes condition
+                notes = conditions_request.notes if i == 0 else None
+                new_condition = ClientHealthCondition(
+                    client_id=user_id,
+                    condition_name=condition.strip(),
+                    notes=notes
+                )
+                db.add(new_condition)
+                conditions_added += 1
+        
+        # If there are no conditions but there are notes, create a notes-only record
+        if not conditions_request.conditions and conditions_request.notes and conditions_request.notes.strip():
+            logger.info(f"Adding notes-only record")
             new_condition = ClientHealthCondition(
                 client_id=user_id,
-                condition_name=condition
+                condition_name="General Notes",
+                notes=conditions_request.notes.strip()
             )
             db.add(new_condition)
-    
-    await db.commit()
-    
-    return APIResponse(success=True, message="Health conditions updated successfully")
+            conditions_added += 1
+        
+        await db.commit()
+        logger.info(f"Successfully saved {conditions_added} health conditions for user {user_id}")
+        
+        return APIResponse(
+            success=True, 
+            message=f"Health conditions updated successfully ({conditions_added} conditions saved)"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error updating health conditions: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update health conditions: {str(e)}")
 
 # ============================================================
 # CLIENT WATER INTAKE ENDPOINTS

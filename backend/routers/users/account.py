@@ -20,7 +20,7 @@ from schemas import (
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
     UpdateAdminProfileRequest, APIResponse, UserProgressResponse,
     ProgressRequest, BodyMeasurements, ProgressTrackingResponse, ClientGoalsResponse, UpdateClientGoalsRequest,
-    HealthConditionResponse, UpdateHealthConditionsRequest,WaterIntakeResponse,UpdateWaterIntakeRequest,
+    HealthConditionResponse,WaterIntakeResponse,UpdateWaterIntakeRequest,
     StrengthRecordResponse, UpdateStrengthRecordRequest,TrainerRatingResponse,TrainerRatingsSummaryResponse,
     TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse, BadgeCheckResponse,
     TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,ShopOrderItemResponse,AdminOrderResponse,
@@ -1107,7 +1107,7 @@ async def get_my_health_conditions(
 
 @router.put("/health-conditions", response_model=APIResponse)
 async def update_my_health_conditions(
-    request: UpdateHealthConditionsRequest,
+    conditions_data: dict,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
@@ -1125,12 +1125,13 @@ async def update_my_health_conditions(
     )
     
     # Add new conditions
-    for condition in request.conditions:
-        new_condition = ClientHealthCondition(
-            client_id=user_id,
-            condition_name=condition
-        )
-        db.add(new_condition)
+    if "conditions" in conditions_data:
+        for condition in conditions_data["conditions"]:
+            new_condition = ClientHealthCondition(
+                client_id=user_id,
+                condition_name=condition
+            )
+            db.add(new_condition)
     
     await db.commit()
     

@@ -647,11 +647,33 @@ export default function Account() {
     }
   };
 
+  // Load health conditions from API on component mount
+  const fetchHealthConditions = async () => {
+    try {
+      const conditionsData = await progressAPI.getHealthConditions();
+      
+      // Transform backend data to frontend format
+      const conditions = conditionsData.map(c => c.condition_name);
+      
+      // Update local state with fetched conditions
+      setHealth(conditions.length > 0 ? conditions : []);
+      
+      // Create initial history entry if none exists
+      if (conditions.length > 0 && healthHist.length === 0) {
+        const d = now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+        setHealthHist([{date:d,data:{ conditions:conditions.join(", ")||"None", notes:"—" }}]);
+      }
+    } catch (error) {
+      console.error('Error fetching health conditions:', error);
+    }
+  };
+
   // Load progress history on component mount
   useEffect(() => {
     fetchProgressHistory();
     fetchGoals();
     fetchGoalsHistory();
+    fetchHealthConditions();
   }, []);
 
   // Sessions calc
@@ -840,10 +862,20 @@ export default function Account() {
     }
   };
 
-  const saveHealth = () => {
-    const d=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
-    setHealthHist(h=>[{date:d,data:{ conditions:health.join(", ")||"None", notes:healthNotes||"—" }},...h]);
-    showToast("✓ Health profile saved!");
+  const saveHealth = async () => {
+    try {
+      // Save to backend API
+      const conditionsToSave = health.filter(c => c !== "None");
+      await progressAPI.updateHealthConditions(conditionsToSave);
+      
+      // Update local history for display
+      const d = now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+      setHealthHist(h => [{date:d,data:{ conditions:health.join(", ")||"None", notes:healthNotes||"—" }},...h]);
+      showToast("✓ Health profile saved!");
+    } catch (error) {
+      console.error('Error saving health conditions:', error);
+      showToast("⚠️ Failed to save health profile");
+    }
   };
 
   const toggleDay = (key, morningOnly) => {

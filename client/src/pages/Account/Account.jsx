@@ -617,7 +617,6 @@ export default function Account() {
   const wData = { labels, datasets:[
     { label:"Weight (kg)", data:history.map(h=>h.weight), borderColor:"#ff6b1a", backgroundColor:"rgba(255,107,26,0.12)", borderWidth:2.5, tension:0.4, fill:true, pointBackgroundColor:"#ff6b1a", pointRadius:5, pointHoverRadius:7 },
     { label:"Goal",        data:history.map(()=>goals.weight), borderColor:"rgba(255,255,255,0.3)", borderWidth:1.5, borderDash:[6,4], fill:false, pointRadius:0 },
-    { label:"Predicted",   data:history.map((h,i)=>+(h.weight-i*0.35).toFixed(1)), borderColor:"#4a9eff", backgroundColor:"rgba(74,158,255,0.06)", borderWidth:1.5, borderDash:[3,3], tension:0.4, fill:true, pointRadius:0 },
   ]};
   const bData = { labels, datasets:[
     { label:"Chest", data:history.map(h=>h.chest), borderColor:"#ff6b1a", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },

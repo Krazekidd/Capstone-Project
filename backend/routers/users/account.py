@@ -51,14 +51,14 @@ async def get_my_account(
     try:
         user_id = current_user["user_id"]
         role = current_user["role"]
-        user_id_bytes = user_id.bytes
+        user_id = user_id
         
         logger.info(f"Fetching account for user {user_id} with role {role}")
         
         if role == "client":
             result = await db.execute(
                 select(Client, User.email).join(User, Client.id == User.id)
-                .where(Client.id == user_id_bytes)
+                .where(Client.id == user_id)
             )
             row = result.first()
             if not row:
@@ -84,7 +84,7 @@ async def get_my_account(
         elif role == "trainer":
             result = await db.execute(
                 select(Trainer, User.email).join(User, Trainer.id == User.id)
-                .where(Trainer.id == user_id_bytes)
+                .where(Trainer.id == user_id)
             )
             row = result.first()
             if not row:
@@ -106,7 +106,7 @@ async def get_my_account(
         elif role == "admin":
             result = await db.execute(
                 select(Admin, User.email).join(User, Admin.id == User.id)
-                .where(Admin.id == user_id_bytes)
+                .where(Admin.id == user_id)
             )
             row = result.first()
             if not row:
@@ -146,10 +146,10 @@ async def get_account_by_id(
         if current_user["role"] != "admin" and current_user["user_id"] != user_id:
             raise HTTPException(status_code=403, detail="Not authorized to view this account")
         
-        user_id_bytes = user_id.bytes
+        user_id = user_id
         
         # First get the user to know their role
-        user_result = await db.execute(select(User).where(User.id == user_id_bytes))
+        user_result = await db.execute(select(User).where(User.id == user_id))
         user = user_result.scalar_one_or_none()
         
         if not user:
@@ -160,7 +160,7 @@ async def get_account_by_id(
         if role == "client":
             result = await db.execute(
                 select(Client, User.email).join(User, Client.id == User.id)
-                .where(Client.id == user_id_bytes)
+                .where(Client.id == user_id)
             )
             row = result.first()
             if not row:
@@ -184,7 +184,7 @@ async def get_account_by_id(
         elif role == "trainer":
             result = await db.execute(
                 select(Trainer, User.email).join(User, Trainer.id == User.id)
-                .where(Trainer.id == user_id_bytes)
+                .where(Trainer.id == user_id)
             )
             row = result.first()
             if not row:
@@ -206,7 +206,7 @@ async def get_account_by_id(
         elif role == "admin":
             result = await db.execute(
                 select(Admin, User.email).join(User, Admin.id == User.id)
-                .where(Admin.id == user_id_bytes)
+                .where(Admin.id == user_id)
             )
             row = result.first()
             if not row:
@@ -244,7 +244,7 @@ async def update_my_account(
     try:
         user_id = current_user["user_id"]
         role = current_user["role"]
-        user_id_bytes = user_id.bytes
+        user_id = user_id
         
         # Filter out None values
         update_values = {k: v for k, v in update_data.dict().items() if v is not None}
@@ -254,30 +254,30 @@ async def update_my_account(
         
         # Update based on role
         if role == "client":
-            stmt = update(Client).where(Client.id == user_id_bytes).values(**update_values)
+            stmt = update(Client).where(Client.id == user_id).values(**update_values)
             result = await db.execute(stmt)
             
             # Also update User email if provided
             if 'email' in update_values:
-                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
+                user_stmt = update(User).where(User.id == user_id).values(email=update_values['email'])
                 await db.execute(user_stmt)
             
         elif role == "trainer":
-            stmt = update(Trainer).where(Trainer.id == user_id_bytes).values(**update_values)
+            stmt = update(Trainer).where(Trainer.id == user_id).values(**update_values)
             result = await db.execute(stmt)
             
             # Also update User email if provided
             if 'email' in update_values:
-                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
+                user_stmt = update(User).where(User.id == user_id).values(email=update_values['email'])
                 await db.execute(user_stmt)
                 
         elif role == "admin":
-            stmt = update(Admin).where(Admin.id == user_id_bytes).values(**update_values)
+            stmt = update(Admin).where(Admin.id == user_id).values(**update_values)
             result = await db.execute(stmt)
             
             # Also update User email if provided
             if 'email' in update_values:
-                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
+                user_stmt = update(User).where(User.id == user_id).values(email=update_values['email'])
                 await db.execute(user_stmt)
         else:
             raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
@@ -308,18 +308,18 @@ async def delete_my_account(
     try:
         user_id = current_user["user_id"]
         role = current_user["role"]
-        user_id_bytes = user_id.bytes
+        user_id = user_id
         
         # Delete from role-specific table first (cascade will handle User)
         if role == "client":
-            await db.execute(delete(Client).where(Client.id == user_id_bytes))
+            await db.execute(delete(Client).where(Client.id == user_id))
         elif role == "trainer":
-            await db.execute(delete(Trainer).where(Trainer.id == user_id_bytes))
+            await db.execute(delete(Trainer).where(Trainer.id == user_id))
         elif role == "admin":
-            await db.execute(delete(Admin).where(Admin.id == user_id_bytes))
+            await db.execute(delete(Admin).where(Admin.id == user_id))
         
         # Delete the user account
-        await db.execute(delete(User).where(User.id == user_id_bytes))
+        await db.execute(delete(User).where(User.id == user_id))
         await db.commit()
         
         return APIResponse(success=True, message="Account deleted successfully", data=None)
@@ -339,53 +339,85 @@ async def save_progress(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Save complete body measurements to progress tracking"""
-    user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
-    
-    # Create new progress entry using body_measurements table
-    from models import BodyMeasurement
-    
-    new_measurement = BodyMeasurement(
-        user_id=user_id_bytes,
-        weight=measurements.weight,
-        height=measurements.height,
-        body_fat=measurements.body_fat,
-        chest=measurements.chest,
-        waist=measurements.waist,
-        shoulders=measurements.shoulders,
-        arm_left=measurements.arm_left,
-        arm_right=measurements.arm_right,
-        neck=measurements.neck,
-        hips=measurements.hips,
-        thigh_left=measurements.thigh_left,
-        thigh_right=measurements.thigh_right,
-        calf_left=measurements.calf_left,
-        calf_right=measurements.calf_right,
-        glutes=measurements.glutes
-    )
-    
-    db.add(new_measurement)
-    await db.commit()
-    await db.refresh(new_measurement)
-    
-    # Also update the client profile with latest weight/height
-    if measurements.weight or measurements.height:
-        update_data = {}
-        if measurements.weight:
-            update_data["weight"] = str(measurements.weight)
-        if measurements.height:
-            update_data["height"] = str(measurements.height)
+    try:
+        user_id = current_user["user_id"]
+        role = current_user.get("role", "client")  # Default to client if role is missing
         
-        if update_data:
-            from sqlalchemy import update as sql_update
-            stmt = sql_update(Client).where(Client.id == user_id_bytes).values(**update_data)
-            await db.execute(stmt)
+        # Only clients can save progress
+        if role != "client":
+            raise HTTPException(status_code=403, detail="Only clients can save progress measurements")
+        
+        # Ensure user has a client profile
+        from models import Client
+        
+        # Check if client profile exists
+        client_result = await db.execute(select(Client).where(Client.id == user_id))
+        client = client_result.scalar_one_or_none()
+        
+        # Create client profile if it doesn't exist
+        if not client:
+            logger.info(f"Creating client profile for user {user_id}")
+            user = current_user["user"]
+            new_client = Client(
+                id=user_id,
+                name=f"{user.first_name} {user.last_name}",
+                phone_number=user.phone
+            )
+            db.add(new_client)
             await db.commit()
-    
-    return {
-        "message": "Progress saved successfully",
-        "id": str(uuid.UUID(bytes=new_measurement.id))
-    }
+            await db.refresh(new_client)
+        
+        # Create new progress entry using body_measurements table
+        from models import BodyMeasurement
+        
+        new_measurement = BodyMeasurement(
+            client_id=user_id,
+            weight=measurements.weight,
+            height=measurements.height,
+            body_fat=measurements.body_fat,
+            chest=measurements.chest,
+            waist=measurements.waist,
+            shoulders=measurements.shoulders,
+            arm_left=measurements.arm_left,
+            arm_right=measurements.arm_right,
+            neck=measurements.neck,
+            hips=measurements.hips,
+            thigh_left=measurements.thigh_left,
+            thigh_right=measurements.thigh_right,
+            calf_left=measurements.calf_left,
+            calf_right=measurements.calf_right,
+            glutes=measurements.glutes
+        )
+        
+        db.add(new_measurement)
+        await db.commit()
+        await db.refresh(new_measurement)
+        
+        # Also update the client profile with latest weight/height
+        if measurements.weight or measurements.height:
+            update_data = {}
+            if measurements.weight:
+                update_data["weight"] = float(measurements.weight)
+            if measurements.height:
+                update_data["height"] = float(measurements.height)
+            
+            if update_data:
+                from sqlalchemy import update as sql_update
+                stmt = sql_update(Client).where(Client.id == user_id).values(**update_data)
+                await db.execute(stmt)
+                await db.commit()
+        
+        return {
+            "message": "Progress saved successfully",
+            "id": str(new_measurement.id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving progress: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save progress measurements")
 
 @router.get("/progress/history", response_model=list[ProgressTrackingResponse])
 async def get_progress_history(
@@ -396,14 +428,13 @@ async def get_progress_history(
     """Get enhanced progress history with integrated photos for the current user"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         logger.info(f"Fetching enhanced progress history for user: {user_id}")
         
         # Get body measurements
         measurements_result = await db.execute(
             select(BodyMeasurement)
-            .where(BodyMeasurement.user_id == user_id_bytes)
+            .where(BodyMeasurement.client_id == user_id)
             .order_by(asc(BodyMeasurement.recorded_at))
             .limit(limit)
         )
@@ -412,7 +443,7 @@ async def get_progress_history(
         # Get progress photos for the same period
         photos_result = await db.execute(
             select(ProgressPhoto)
-            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.client_id == user_id)
             .order_by(desc(ProgressPhoto.created_at))
             .limit(limit * 2)  # Get more photos to match with measurements
         )
@@ -463,13 +494,13 @@ async def get_progress_history(
             
             response.append(
                 ProgressTrackingResponse(
-                    id=uuid.UUID(bytes=measurement.id),
+                    id=measurement.id,
                     user_id=user_id,
                     weight=float(measurement.weight) if measurement.weight else None,
                     height=float(measurement.height) if measurement.height else None,
                     measurements=BodyMeasurements(**measurements_dict) if measurements_dict else None,
                     recorded_at=measurement.recorded_at,
-                    created_at=measurement.created_at,
+                    created_at=measurement.recorded_at,
                     progress_photos=related_photos
                 )
             )
@@ -489,12 +520,11 @@ async def get_latest_progress(
     """Get most recent progress entry with photos"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get latest measurement
         result = await db.execute(
             select(BodyMeasurement)
-            .where(BodyMeasurement.user_id == user_id_bytes)
+            .where(BodyMeasurement.client_id == user_id)
             .order_by(desc(BodyMeasurement.recorded_at))
             .limit(1)
         )
@@ -506,7 +536,7 @@ async def get_latest_progress(
         # Get photos from the last 2 days
         photos_result = await db.execute(
             select(ProgressPhoto)
-            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.client_id == user_id)
             .where(ProgressPhoto.created_at >= entry.recorded_at - timedelta(days=2))
             .order_by(desc(ProgressPhoto.created_at))
         )
@@ -550,13 +580,13 @@ async def get_latest_progress(
         ]
         
         return ProgressTrackingResponse(
-            id=uuid.UUID(bytes=entry.id),
+            id=entry.id,
             user_id=user_id,
             weight=float(entry.weight) if entry.weight else None,
             height=float(entry.height) if entry.height else None,
             measurements=BodyMeasurements(**measurements_dict) if measurements_dict else None,
             recorded_at=entry.recorded_at,
-            created_at=entry.created_at,
+            created_at=entry.recorded_at,
             progress_photos=photo_responses
         )
         
@@ -579,23 +609,22 @@ async def get_progress_analytics(
     """Get detailed progress analytics for specified period"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Calculate date range based on period
         end_date = datetime.utcnow().date()
         if period == "week":
             start_date = end_date - timedelta(days=7)
         elif period == "month":
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date.replace(day=1)
         elif period == "quarter":
-            start_date = end_date - timedelta(days=90)
+            start_date = end_date.replace(month=(end_date.month - 1) // 3 * 3 + 1, day=1)
         else:  # year
-            start_date = end_date - timedelta(days=365)
+            start_date = end_date.replace(year=end_date.year-1, month=1, day=1)
         
         # Get measurements in period
         measurements_result = await db.execute(
             select(BodyMeasurement)
-            .where(BodyMeasurement.user_id == user_id_bytes)
+            .where(BodyMeasurement.client_id == user_id)
             .where(BodyMeasurement.recorded_at >= start_date)
             .where(BodyMeasurement.recorded_at <= end_date)
             .order_by(asc(BodyMeasurement.recorded_at))
@@ -605,7 +634,7 @@ async def get_progress_analytics(
         # Get photos count in period
         photos_count_result = await db.execute(
             select(func.count(ProgressPhoto.id))
-            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.client_id == user_id)
             .where(ProgressPhoto.created_at >= start_date)
             .where(ProgressPhoto.created_at <= end_date)
         )
@@ -690,12 +719,11 @@ async def get_progress_summary(
     """Get comprehensive progress summary with timeline and photos"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get latest measurements
         latest_result = await db.execute(
             select(BodyMeasurement)
-            .where(BodyMeasurement.user_id == user_id_bytes)
+            .where(BodyMeasurement.client_id == user_id)
             .order_by(desc(BodyMeasurement.recorded_at))
             .limit(1)
         )
@@ -704,7 +732,7 @@ async def get_progress_summary(
         # Get progress timeline (last 6 measurements)
         timeline_result = await db.execute(
             select(BodyMeasurement)
-            .where(BodyMeasurement.user_id == user_id_bytes)
+            .where(BodyMeasurement.client_id == user_id)
             .order_by(desc(BodyMeasurement.recorded_at))
             .limit(6)
         )
@@ -713,7 +741,7 @@ async def get_progress_summary(
         # Get recent photos
         photos_result = await db.execute(
             select(ProgressPhoto)
-            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.client_id == user_id)
             .order_by(desc(ProgressPhoto.created_at))
             .limit(6)
         )
@@ -805,7 +833,6 @@ async def compare_progress_periods(
     """Compare progress between two different time periods"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Helper function to get date range for period
         def get_date_range(period_name):
@@ -837,7 +864,7 @@ async def compare_progress_periods(
         async def get_period_stats(start_date, end_date):
             result = await db.execute(
                 select(BodyMeasurement)
-                .where(BodyMeasurement.user_id == user_id_bytes)
+                .where(BodyMeasurement.client_id == user_id)
                 .where(BodyMeasurement.recorded_at >= start_date)
                 .where(BodyMeasurement.recorded_at <= end_date)
                 .order_by(asc(BodyMeasurement.recorded_at))
@@ -906,13 +933,12 @@ async def get_my_goals(
     from models import ClientGoal
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Goals only available for clients")
     
     result = await db.execute(
-        select(ClientGoal).where(ClientGoal.client_id == user_id_bytes)
+        select(ClientGoal).where(ClientGoal.client_id == user_id)
     )
     goals = result.scalar_one_or_none()
     
@@ -956,25 +982,24 @@ async def update_my_goals(
     from models import ClientGoal
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Goals only available for clients")
     
     # Check if goals exist
     result = await db.execute(
-        select(ClientGoal).where(ClientGoal.client_id == user_id_bytes)
+        select(ClientGoal).where(ClientGoal.client_id == user_id)
     )
     existing = result.scalar_one_or_none()
     
     update_values = {k: v for k, v in goals_data.dict().items() if v is not None}
     
     if existing:
-        stmt = update(ClientGoal).where(ClientGoal.client_id == user_id_bytes).values(**update_values)
+        stmt = update(ClientGoal).where(ClientGoal.client_id == user_id).values(**update_values)
         await db.execute(stmt)
     else:
         new_goals = ClientGoal(
-            client_id=user_id_bytes,
+            client_id=user_id,
             **update_values
         )
         db.add(new_goals)
@@ -996,14 +1021,13 @@ async def get_my_health_conditions(
     from models import ClientHealthCondition
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Health conditions only available for clients")
     
     result = await db.execute(
         select(ClientHealthCondition)
-        .where(ClientHealthCondition.client_id == user_id_bytes)
+        .where(ClientHealthCondition.client_id == user_id)
     )
     conditions = result.scalars().all()
     
@@ -1026,20 +1050,19 @@ async def update_my_health_conditions(
     from models import ClientHealthCondition
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Health conditions only available for clients")
     
     # Delete existing conditions
     await db.execute(
-        delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id_bytes)
+        delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id)
     )
     
     # Add new conditions
     for condition in request.conditions:
         new_condition = ClientHealthCondition(
-            client_id=user_id_bytes,
+            client_id=user_id,
             condition_name=condition
         )
         db.add(new_condition)
@@ -1061,13 +1084,12 @@ async def get_today_water_intake(
     from models import ClientWaterIntake
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     today = datetime.utcnow().date()
     
     result = await db.execute(
         select(ClientWaterIntake)
-        .where(ClientWaterIntake.client_id == user_id_bytes)
+        .where(ClientWaterIntake.client_id == user_id)
         .where(ClientWaterIntake.intake_date == today)
     )
     intake = result.scalar_one_or_none()
@@ -1087,13 +1109,12 @@ async def log_water_intake(
     from models import ClientWaterIntake
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     today = datetime.utcnow().date()
     
     result = await db.execute(
         select(ClientWaterIntake)
-        .where(ClientWaterIntake.client_id == user_id_bytes)
+        .where(ClientWaterIntake.client_id == user_id)
         .where(ClientWaterIntake.intake_date == today)
     )
     intake = result.scalar_one_or_none()
@@ -1102,7 +1123,7 @@ async def log_water_intake(
         intake.cups_consumed = request.cups_consumed
     else:
         new_intake = ClientWaterIntake(
-            client_id=user_id_bytes,
+            client_id=user_id,
             intake_date=today,
             cups_consumed=request.cups_consumed
         )
@@ -1125,14 +1146,13 @@ async def get_strength_records(
     from models import ClientStrengthRecord
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Strength records only available for clients")
     
     result = await db.execute(
         select(ClientStrengthRecord)
-        .where(ClientStrengthRecord.client_id == user_id_bytes)
+        .where(ClientStrengthRecord.client_id == user_id)
         .order_by(ClientStrengthRecord.exercise_name)
     )
     records = result.scalars().all()
@@ -1162,14 +1182,13 @@ async def update_strength_record(
     from models import ClientStrengthRecord
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Strength records only available for clients")
     
     result = await db.execute(
         select(ClientStrengthRecord)
-        .where(ClientStrengthRecord.client_id == user_id_bytes)
+        .where(ClientStrengthRecord.client_id == user_id)
         .where(ClientStrengthRecord.exercise_name == exercise_name)
     )
     record = result.scalar_one_or_none()
@@ -1183,7 +1202,7 @@ async def update_strength_record(
         await db.execute(stmt)
     else:
         new_record = ClientStrengthRecord(
-            client_id=user_id_bytes,
+            client_id=user_id,
             exercise_name=exercise_name,
             **update_values,
             record_date=datetime.utcnow().date()
@@ -1207,10 +1226,9 @@ async def get_my_trainer_ratings(
     from models import TrainerRating
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     result = await db.execute(
-        select(TrainerRating).where(TrainerRating.client_id == user_id_bytes)
+        select(TrainerRating).where(TrainerRating.client_id == user_id)
     )
     ratings = result.scalars().all()
     
@@ -1240,7 +1258,6 @@ async def rate_trainer(
     from models import TrainerRating
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Only clients can rate trainers")
@@ -1248,7 +1265,7 @@ async def rate_trainer(
     # Check if rating exists
     result = await db.execute(
         select(TrainerRating)
-        .where(TrainerRating.client_id == user_id_bytes)
+        .where(TrainerRating.client_id == user_id)
         .where(TrainerRating.trainer_name == request.trainer_name)
     )
     existing = result.scalar_one_or_none()
@@ -1257,7 +1274,7 @@ async def rate_trainer(
         existing.rating = request.rating
     else:
         new_rating = TrainerRating(
-            client_id=user_id_bytes,
+            client_id=user_id,
             trainer_name=request.trainer_name,
             rating=request.rating
         )
@@ -1279,14 +1296,13 @@ async def get_my_badges(
     """Get current user's badges"""
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Badges only available for clients")
     
     result = await db.execute(
         select(ClientBadge)
-        .where(ClientBadge.client_id == user_id_bytes)
+        .where(ClientBadge.client_id == user_id)
         .order_by(ClientBadge.awarded_date.desc())
     )
     badges = result.scalars().all()
@@ -1307,7 +1323,6 @@ async def check_and_award_badges(
 ):
     """Check and award new badges based on user activity"""
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Badges only available for clients")
@@ -1316,7 +1331,7 @@ async def check_and_award_badges(
         # Get existing badges to avoid duplicates
         existing_badges_result = await db.execute(
             select(ClientBadge)
-            .where(ClientBadge.client_id == user_id_bytes)
+            .where(ClientBadge.client_id == user_id)
         )
         existing_badges = {b.badge_name for b in existing_badges_result.scalars().all()}
         
@@ -1324,23 +1339,23 @@ async def check_and_award_badges(
         today = datetime.utcnow().date()
         
         # Check workout consistency badges
-        workout_badges = await _check_workout_badges(db, user_id_bytes, existing_badges, today)
+        workout_badges = await _check_workout_badges(db, user_id, existing_badges, today)
         new_badges.extend(workout_badges)
         
         # Check strength badges
-        strength_badges = await _check_strength_badges(db, user_id_bytes, existing_badges, today)
+        strength_badges = await _check_strength_badges(db, user_id, existing_badges, today)
         new_badges.extend(strength_badges)
         
         # Check progress badges
-        progress_badges = await _check_progress_badges(db, user_id_bytes, existing_badges, today)
+        progress_badges = await _check_progress_badges(db, user_id, existing_badges, today)
         new_badges.extend(progress_badges)
         
         # Check attendance badges
-        attendance_badges = await _check_attendance_badges(db, user_id_bytes, existing_badges, today)
+        attendance_badges = await _check_attendance_badges(db, user_id, existing_badges, today)
         new_badges.extend(attendance_badges)
         
         # Check streak badges
-        streak_badges = await _check_streak_badges(db, user_id_bytes, existing_badges, today)
+        streak_badges = await _check_streak_badges(db, user_id, existing_badges, today)
         new_badges.extend(streak_badges)
         
         # Commit all new badges to database
@@ -1350,7 +1365,7 @@ async def check_and_award_badges(
         # Get total badge count
         total_badges_result = await db.execute(
             select(func.count(ClientBadge.id))
-            .where(ClientBadge.client_id == user_id_bytes)
+            .where(ClientBadge.client_id == user_id)
         )
         total_badges = total_badges_result.scalar() or 0
         
@@ -1377,14 +1392,14 @@ async def check_and_award_badges(
         raise HTTPException(status_code=500, detail="Failed to check badges")
 
 
-async def _check_workout_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+async def _check_workout_badges(db: AsyncSession, user_id: uuid.UUID, existing_badges: set, today: date) -> List[ClientBadge]:
     """Check workout-related badges"""
     new_badges = []
     
     # Check total workout sessions (using training_schedule as proxy)
     schedule_result = await db.execute(
         select(func.count(TrainingSchedule.id))
-        .where(TrainingSchedule.client_id == user_id_bytes)
+        .where(TrainingSchedule.client_id == user_id)
         .where(TrainingSchedule.is_active == True)
     )
     total_workouts = schedule_result.scalar() or 0
@@ -1400,7 +1415,7 @@ async def _check_workout_badges(db: AsyncSession, user_id_bytes: bytes, existing
     for threshold, badge_name in workout_thresholds:
         if total_workouts >= threshold and badge_name not in existing_badges:
             new_badge = ClientBadge(
-                client_id=user_id_bytes,
+                client_id=user_id,
                 badge_name=badge_name,
                 awarded_date=today
             )
@@ -1410,7 +1425,7 @@ async def _check_workout_badges(db: AsyncSession, user_id_bytes: bytes, existing
     return new_badges
 
 
-async def _check_strength_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+async def _check_strength_badges(db: AsyncSession, user_id: uuid.UUID, existing_badges: set, today: date) -> List[ClientBadge]:
     """Check strength-related badges"""
     new_badges = []
     
@@ -1418,14 +1433,14 @@ async def _check_strength_badges(db: AsyncSession, user_id_bytes: bytes, existin
     try:
         strength_result = await db.execute(
             select(func.count(TrainingSchedule.id))
-            .where(TrainingSchedule.client_id == user_id_bytes)
+            .where(TrainingSchedule.client_id == user_id)
             .where(TrainingSchedule.workout_type.ilike('%strength%'))
         )
         strength_workouts = strength_result.scalar() or 0
         
         if strength_workouts >= 20 and "Strength Champion" not in existing_badges:
             new_badge = ClientBadge(
-                client_id=user_id_bytes,
+                client_id=user_id,
                 badge_name="Strength Champion",
                 awarded_date=today
             )
@@ -1437,20 +1452,20 @@ async def _check_strength_badges(db: AsyncSession, user_id_bytes: bytes, existin
     return new_badges
 
 
-async def _check_progress_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+async def _check_progress_badges(db: AsyncSession, user_id: uuid.UUID, existing_badges: set, today: date) -> List[ClientBadge]:
     """Check progress-related badges"""
     new_badges = []
     
     # Check body measurements count
     measurements_result = await db.execute(
         select(func.count(BodyMeasurement.id))
-        .where(BodyMeasurement.user_id == user_id_bytes)
+        .where(BodyMeasurement.user_id == user_id)
     )
     total_measurements = measurements_result.scalar() or 0
     
     if total_measurements >= 5 and "Consistency Award" not in existing_badges:
         new_badge = ClientBadge(
-            client_id=user_id_bytes,
+            client_id=user_id,
             badge_name="Consistency Award",
             awarded_date=today
         )
@@ -1460,13 +1475,13 @@ async def _check_progress_badges(db: AsyncSession, user_id_bytes: bytes, existin
     # Check progress photos count
     photos_result = await db.execute(
         select(func.count(ProgressPhoto.id))
-        .where(ProgressPhoto.user_id == user_id_bytes)
+        .where(ProgressPhoto.user_id == user_id)
     )
     total_photos = photos_result.scalar() or 0
     
     if total_photos >= 10 and "Photo Pro" not in existing_badges:
         new_badge = ClientBadge(
-            client_id=user_id_bytes,
+            client_id=user_id,
             badge_name="Photo Pro",
             awarded_date=today
         )
@@ -1476,7 +1491,7 @@ async def _check_progress_badges(db: AsyncSession, user_id_bytes: bytes, existin
     return new_badges
 
 
-async def _check_attendance_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+async def _check_attendance_badges(db: AsyncSession, user_id: uuid.UUID, existing_badges: set, today: date) -> List[ClientBadge]:
     """Check attendance-related badges"""
     new_badges = []
     
@@ -1484,7 +1499,7 @@ async def _check_attendance_badges(db: AsyncSession, user_id_bytes: bytes, exist
     try:
         attendance_result = await db.execute(
             select(func.count(Attendance.id))
-            .where(Attendance.user_id == user_id_bytes)
+            .where(Attendance.client_id == user_id)
         )
         total_attendance = attendance_result.scalar() or 0
         
@@ -1497,7 +1512,7 @@ async def _check_attendance_badges(db: AsyncSession, user_id_bytes: bytes, exist
         for threshold, badge_name in attendance_thresholds:
             if total_attendance >= threshold and badge_name not in existing_badges:
                 new_badge = ClientBadge(
-                    client_id=user_id_bytes,
+                    client_id=user_id,
                     badge_name=badge_name,
                     awarded_date=today
                 )
@@ -1509,14 +1524,14 @@ async def _check_attendance_badges(db: AsyncSession, user_id_bytes: bytes, exist
     return new_badges
 
 
-async def _check_streak_badges(db: AsyncSession, user_id_bytes: bytes, existing_badges: set, today: date) -> List[ClientBadge]:
+async def _check_streak_badges(db: AsyncSession, user_id: uuid.UUID, existing_badges: set, today: date) -> List[ClientBadge]:
     """Check streak-related badges"""
     new_badges = []
     
     # Check consecutive days with activity (using measurements as proxy)
     measurements_result = await db.execute(
         select(BodyMeasurement.recorded_at)
-        .where(BodyMeasurement.user_id == user_id_bytes)
+        .where(BodyMeasurement.user_id == user_id)
         .order_by(desc(BodyMeasurement.recorded_at))
         .limit(30)  # Check last 30 measurements
     )
@@ -1541,7 +1556,7 @@ async def _check_streak_badges(db: AsyncSession, user_id_bytes: bytes, existing_
     for weeks, badge_name in streak_badges:
         if streak >= (weeks * 7) and badge_name not in existing_badges:
             new_badge = ClientBadge(
-                client_id=user_id_bytes,
+                client_id=user_id,
                 badge_name=badge_name,
                 awarded_date=today
             )
@@ -1567,11 +1582,10 @@ async def get_training_schedule(
     import json
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     result = await db.execute(
         select(TrainingSchedule)
-        .where(TrainingSchedule.client_id == user_id_bytes)
+        .where(TrainingSchedule.client_id == user_id)
         .where(TrainingSchedule.is_active == True)
         .order_by(TrainingSchedule.day_number)
     )
@@ -1607,7 +1621,6 @@ async def update_training_schedule(
     import json
     
     user_id = current_user["user_id"]
-    user_id_bytes = user_id.bytes
     
     # Only clients can update their own training schedule
     if current_user["role"] != "client":
@@ -1618,7 +1631,7 @@ async def update_training_schedule(
         result = await db.execute(
             select(TrainingSchedule)
             .where(TrainingSchedule.id == schedule_id)
-            .where(TrainingSchedule.client_id == user_id_bytes)
+            .where(TrainingSchedule.client_id == user_id)
         )
         schedule = result.scalar_one_or_none()
         
@@ -2455,7 +2468,6 @@ async def upload_progress_photo(
     """Upload a progress photo"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Validate file type
         if not file.content_type or not file.content_type.startswith('image/'):
@@ -2477,7 +2489,7 @@ async def upload_progress_photo(
         
         # Save to database
         new_photo = ProgressPhoto(
-            user_id=user_id_bytes,
+            client_id=user_id,
             filename=unique_filename,
             original_filename=file.filename,
             file_path=file_path,
@@ -2517,11 +2529,10 @@ async def get_progress_photos(
     """Get user's progress photos"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
             select(ProgressPhoto)
-            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.client_id == user_id)
             .order_by(ProgressPhoto.created_at.desc())
         )
         photos = result.scalars().all()
@@ -2554,13 +2565,12 @@ async def delete_progress_photo(
     """Delete a progress photo"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get photo
         result = await db.execute(
             select(ProgressPhoto)
             .where(ProgressPhoto.id == photo_id.bytes)
-            .where(ProgressPhoto.user_id == user_id_bytes)
+            .where(ProgressPhoto.client_id == user_id)
         )
         photo = result.scalar_one_or_none()
         
@@ -2600,13 +2610,10 @@ async def check_in_attendance(
     """Log gym attendance check-in"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Check if user already has an active session (checked in but not checked out)
         result = await db.execute(
-            select(Attendance)
-            .where(Attendance.user_id == user_id_bytes)
-            .where(Attendance.check_out_time.is_(None))
+            select(Attendance).where(Attendance.client_id == user_id).where(Attendance.check_out_time.is_(None))
             .order_by(desc(Attendance.check_in_time))
             .limit(1)
         )
@@ -2620,7 +2627,7 @@ async def check_in_attendance(
         
         # Create new attendance record
         new_attendance = Attendance(
-            user_id=user_id_bytes,
+            client_id=user_id,
             notes=check_in_data.notes
         )
         
@@ -2654,13 +2661,10 @@ async def check_out_attendance(
     """Log gym attendance check-out"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Find the most recent active session
         result = await db.execute(
-            select(Attendance)
-            .where(Attendance.user_id == user_id_bytes)
-            .where(Attendance.check_out_time.is_(None))
+            select(Attendance).where(Attendance.client_id == user_id).where(Attendance.check_out_time.is_(None))
             .order_by(desc(Attendance.check_in_time))
             .limit(1)
         )
@@ -2711,12 +2715,10 @@ async def get_attendance_history(
     """Get attendance history for the current user"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get total count
         count_result = await db.execute(
-            select(func.count(Attendance.id))
-            .where(Attendance.user_id == user_id_bytes)
+            select(func.count(Attendance.id)).where(Attendance.client_id == user_id)
         )
         total_sessions = count_result.scalar()
         
@@ -2726,8 +2728,7 @@ async def get_attendance_history(
         
         # Get attendance records
         result = await db.execute(
-            select(Attendance)
-            .where(Attendance.user_id == user_id_bytes)
+            select(Attendance).where(Attendance.client_id == user_id)
             .order_by(desc(Attendance.check_in_time))
             .offset(offset)
             .limit(page_size)
@@ -2767,12 +2768,10 @@ async def get_session_stats(
     """Get session statistics for the current user"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get all attendance records for the user
         result = await db.execute(
-            select(Attendance)
-            .where(Attendance.user_id == user_id_bytes)
+            select(Attendance).where(Attendance.client_id == user_id)
             .order_by(asc(Attendance.check_in_time))
         )
         all_sessions = result.scalars().all()
@@ -2862,12 +2861,10 @@ async def get_nutrition_plan(
     """Get personalized nutrition plan for the current user"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get the most recent nutrition plan
         result = await db.execute(
-            select(NutritionPlan)
-            .where(NutritionPlan.user_id == user_id_bytes)
+            select(NutritionPlan).where(NutritionPlan.client_id == user_id)
             .order_by(desc(NutritionPlan.created_at))
             .limit(1)
         )
@@ -2880,7 +2877,7 @@ async def get_nutrition_plan(
             # Get client goals and basic info
             client_result = await db.execute(
                 select(Client, ClientGoal).join(ClientGoal, Client.id == ClientGoal.client_id, isouter=True)
-                .where(Client.id == user_id_bytes)
+                .where(Client.id == user_id)
             )
             client_data = client_result.first()
             
@@ -2942,7 +2939,7 @@ async def get_nutrition_plan(
             
             # Create new nutrition plan
             new_plan = NutritionPlan(
-                user_id=user_id_bytes,
+                client_id=user_id,
                 daily_calories=daily_calories,
                 daily_protein_g=daily_protein_g,
                 daily_carbs_g=daily_carbs_g,
@@ -2993,10 +2990,9 @@ async def get_activity_data(
         from models import ActivityData
         
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Build query
-        query = select(ActivityData).where(ActivityData.user_id == user_id_bytes)
+        query = select(ActivityData).where(ActivityData.client_id == user_id)
         
         # Apply date filters
         if start_date:
@@ -3061,12 +3057,11 @@ async def update_activity_data(
         from models import ActivityData
         
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Check if activity data exists for this date
         result = await db.execute(
             select(ActivityData).where(
-                ActivityData.user_id == user_id_bytes,
+                ActivityData.client_id == user_id,
                 ActivityData.date == activity_data.date
             )
         )
@@ -3082,7 +3077,7 @@ async def update_activity_data(
         else:
             # Create new activity data
             activity_obj = ActivityData(
-                user_id=user_id_bytes,
+                client_id=user_id,
                 **activity_data.dict()
             )
             db.add(activity_obj)
@@ -3126,11 +3121,10 @@ async def update_nutrition_goals(
         from models import NutritionGoals
         
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Check if goals exist
         result = await db.execute(
-            select(NutritionGoals).where(NutritionGoals.user_id == user_id_bytes)
+            select(NutritionGoals).where(NutritionGoals.client_id == user_id)
         )
         existing_goals = result.scalar_one_or_none()
         
@@ -3145,7 +3139,7 @@ async def update_nutrition_goals(
         else:
             # Create new goals with defaults for missing values
             new_goals = NutritionGoals(
-                user_id=user_id_bytes,
+                client_id=user_id,
                 daily_calories=update_values.get('daily_calories', 2000),
                 daily_protein_g=update_values.get('daily_protein_g', 150),
                 daily_carbs_g=update_values.get('daily_carbs_g', 250),
@@ -3302,7 +3296,6 @@ async def upload_profile_image(
     """Upload profile picture for the current user"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Validate file type
         allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
@@ -3338,7 +3331,7 @@ async def upload_profile_image(
         avatar_url = f"/{profile_images_dir}/{unique_filename}"
         
         # Update user's avatar_url in database
-        stmt = update(User).where(User.id == user_id_bytes).values(avatar_url=avatar_url)
+        stmt = update(User).where(User.id == user_id).values(avatar_url=avatar_url)
         await db.execute(stmt)
         await db.commit()
         
@@ -3365,10 +3358,9 @@ async def delete_profile_image(
     """Remove profile picture for the current user"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get current user to check if they have a profile image
-        user_result = await db.execute(select(User).where(User.id == user_id_bytes))
+        user_result = await db.execute(select(User).where(User.id == user_id))
         user = user_result.scalar_one_or_none()
         
         if not user:
@@ -3390,7 +3382,7 @@ async def delete_profile_image(
                 logger.info(f"Deleted profile image file: {file_path}")
         
         # Update user's avatar_url to null
-        stmt = update(User).where(User.id == user_id_bytes).values(avatar_url=None)
+        stmt = update(User).where(User.id == user_id).values(avatar_url=None)
         await db.execute(stmt)
         await db.commit()
         
@@ -3419,10 +3411,9 @@ async def get_goals(
     """Get client goals"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(ClientGoal).where(ClientGoal.client_id == user_id_bytes)
+            select(ClientGoal).where(ClientGoal.client_id == user_id)
         )
         goals = result.scalars().all()
         
@@ -3454,16 +3445,15 @@ async def update_goals(
     """Update client goals"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Delete existing goals
-        await db.execute(delete(ClientGoal).where(ClientGoal.client_id == user_id_bytes))
+        await db.execute(delete(ClientGoal).where(ClientGoal.client_id == user_id))
         
         # Create new goals from the data
         for goal_type, target_value in goals_data.items():
             if target_value is not None:
                 new_goal = ClientGoal(
-                    client_id=user_id_bytes,
+                    client_id=user_id,
                     goal_type=goal_type,
                     target_value=float(target_value),
                     is_active=True
@@ -3490,10 +3480,9 @@ async def get_health_conditions(
     """Get client health conditions"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id_bytes)
+            select(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id)
         )
         conditions = result.scalars().all()
         
@@ -3522,16 +3511,15 @@ async def update_health_conditions(
     """Update client health conditions"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Delete existing conditions
-        await db.execute(delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id_bytes))
+        await db.execute(delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id))
         
         # Create new conditions
         if "conditions" in conditions_data:
             for condition_name in conditions_data["conditions"]:
                 new_condition = ClientHealthCondition(
-                    client_id=user_id_bytes,
+                    client_id=user_id,
                     condition_name=condition_name,
                     is_active=True
                 )
@@ -3557,12 +3545,11 @@ async def get_water_intake(
     """Get today's water intake"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         today = date.today()
         
         result = await db.execute(
             select(ClientWaterIntake).where(
-                ClientWaterIntake.client_id == user_id_bytes,
+                ClientWaterIntake.client_id == user_id,
                 ClientWaterIntake.date == today
             )
         )
@@ -3586,14 +3573,13 @@ async def log_water_intake(
     """Log water intake"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         today = date.today()
         cups = intake_data.get("cups_consumed", 0)
         
         # Check if entry exists for today
         result = await db.execute(
             select(ClientWaterIntake).where(
-                ClientWaterIntake.client_id == user_id_bytes,
+                ClientWaterIntake.client_id == user_id,
                 ClientWaterIntake.date == today
             )
         )
@@ -3605,7 +3591,7 @@ async def log_water_intake(
         else:
             # Create new
             new_intake = ClientWaterIntake(
-                client_id=user_id_bytes,
+                client_id=user_id,
                 date=today,
                 amount_ml=cups * 250
             )
@@ -3631,10 +3617,9 @@ async def get_strength_records(
     """Get client strength records"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(ClientStrengthRecord).where(ClientStrengthRecord.client_id == user_id_bytes)
+            select(ClientStrengthRecord).where(ClientStrengthRecord.client_id == user_id)
             .order_by(desc(ClientStrengthRecord.recorded_at))
         )
         records = result.scalars().all()
@@ -3667,12 +3652,11 @@ async def update_strength_record(
     """Update strength record for exercise"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Check if record exists
         result = await db.execute(
             select(ClientStrengthRecord).where(
-                ClientStrengthRecord.client_id == user_id_bytes,
+                ClientStrengthRecord.client_id == user_id,
                 ClientStrengthRecord.exercise_name == exercise_name
             )
         )
@@ -3686,7 +3670,7 @@ async def update_strength_record(
         else:
             # Create new
             new_record = ClientStrengthRecord(
-                client_id=user_id_bytes,
+                client_id=user_id,
                 exercise_name=exercise_name,
                 **record_data
             )
@@ -3712,10 +3696,9 @@ async def get_trainer_ratings(
     """Get client's trainer ratings"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(TrainerRating).where(TrainerRating.client_id == user_id_bytes)
+            select(TrainerRating).where(TrainerRating.client_id == user_id)
             .order_by(desc(TrainerRating.created_at))
         )
         ratings = result.scalars().all()
@@ -3753,11 +3736,10 @@ async def rate_trainer(
     """Rate a trainer"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         new_rating = TrainerRating(
             trainer_id=uuid.UUID(rating_data["trainer_name"]),
-            client_id=user_id_bytes,
+            client_id=user_id,
             rating=rating_data["rating"],
             review=rating_data.get("comment", ""),
             session_date=date.today()
@@ -3783,10 +3765,9 @@ async def get_badges(
     """Get client badges"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(ClientBadge).where(ClientBadge.client_id == user_id_bytes)
+            select(ClientBadge).where(ClientBadge.client_id == user_id)
             .order_by(desc(ClientBadge.awarded_date))
         )
         badges = result.scalars().all()
@@ -3815,10 +3796,9 @@ async def get_training_schedule(
     """Get client training schedule"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(TrainingSchedule).where(TrainingSchedule.client_id == user_id_bytes)
+            select(TrainingSchedule).where(TrainingSchedule.client_id == user_id)
             .where(TrainingSchedule.is_active == True)
             .order_by(asc(TrainingSchedule.day_number))
         )
@@ -3854,10 +3834,9 @@ async def get_attendance_history(
     """Get attendance history"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(Attendance).where(Attendance.user_id == user_id_bytes)
+            select(Attendance).where(Attendance.client_id == user_id)
             .order_by(desc(Attendance.check_in_time))
         )
         attendance = result.scalars().all()
@@ -3895,10 +3874,9 @@ async def log_attendance(
     """Log attendance"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         new_attendance = Attendance(
-            user_id=user_id_bytes,
+            client_id=user_id,
             check_in_time=datetime.utcnow(),
             notes=attendance_data.get("notes", "")
         )
@@ -3926,7 +3904,6 @@ async def upload_progress_photo(
     """Upload progress photo"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Validate file
         if not photo.content_type.startswith('image/'):
@@ -3945,7 +3922,7 @@ async def upload_progress_photo(
         
         # Create database record
         new_photo = ProgressPhoto(
-            user_id=user_id_bytes,
+            client_id=user_id,
             filename=filename,
             original_filename=photo.filename,
             file_path=file_path,
@@ -3984,17 +3961,16 @@ async def get_session_stats(
     """Get session statistics"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         # Get total sessions
         attendance_result = await db.execute(
-            select(func.count(Attendance.id)).where(Attendance.user_id == user_id_bytes)
+            select(func.count(Attendance.id)).where(Attendance.client_id == user_id)
         )
-        total_sessions = attendance_result.scalar() or 0
+        total_sessions = attendance_result.scalar()
         
         # Get attended days for calendar
         attendance_result = await db.execute(
-            select(Attendance).where(Attendance.user_id == user_id_bytes)
+            select(Attendance).where(Attendance.client_id == user_id)
             .order_by(desc(Attendance.check_in_time))
         )
         attendance = attendance_result.scalars().all()
@@ -4032,10 +4008,9 @@ async def get_nutrition_plan(
     """Get nutrition plan"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         result = await db.execute(
-            select(NutritionPlan).where(NutritionPlan.user_id == user_id_bytes)
+            select(NutritionPlan).where(NutritionPlan.client_id == user_id)
             .order_by(desc(NutritionPlan.created_at))
             .limit(1)
         )
@@ -4046,6 +4021,7 @@ async def get_nutrition_plan(
         
         return NutritionPlanResponse(
             id=str(plan.id),
+            user_id=user_id,
             daily_calories=float(plan.daily_calories),
             daily_protein_g=float(plan.daily_protein_g),
             daily_carbs_g=float(plan.daily_carbs_g),
@@ -4074,10 +4050,9 @@ async def create_activity_data(
     """Create activity data entry"""
     try:
         user_id = current_user["user_id"]
-        user_id_bytes = user_id.bytes
         
         new_activity = ActivityData(
-            user_id=user_id_bytes,
+            client_id=user_id,
             date=activity_data.date,
             steps=activity_data.steps,
             heart_rate_avg=activity_data.heart_rate_avg,

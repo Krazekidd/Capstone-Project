@@ -84,7 +84,9 @@ async def get_current_user(
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
 
-        return {"user_id": user_id, "user": user}
+        # Ensure role is always available, default to 'client' if not set
+        role = getattr(user, 'role', 'client') or 'client'
+        return {"user_id": user_id, "user": user, "role": role}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 

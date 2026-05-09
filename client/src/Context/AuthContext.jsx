@@ -48,6 +48,7 @@ export const AuthProvider = ({ children }) => {
             email: userData.user?.email || userData.email,
             membership: userData.user?.membership || userData.membership,
             avatar: userData.user?.avatar_url || userData.avatar_url || userData.avatar,
+            is_senior: userData.user?.is_senior ?? userData.is_senior ?? false,
             ...userData
         };
         setUser(userObj);
@@ -60,7 +61,8 @@ export const AuthProvider = ({ children }) => {
             lastName: userObj.lastName,
             email: userObj.email,
             membership: userObj.membership,
-            avatar: userObj.avatar
+            avatar: userObj.avatar,
+            is_senior: userObj.is_senior,
         };
         localStorage.setItem('userData', JSON.stringify(dataToStore));
         

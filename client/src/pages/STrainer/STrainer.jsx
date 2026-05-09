@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
 import { gradesAPI } from "../../api/api";
+import { useAuth } from "../../Context/AuthContext";
+import axiosInstance from "../../api/axiosConfig";
 import "./STrainer.css";
 
 /* ─────────────────────────────────────────────
@@ -18,21 +20,21 @@ const CRITERIA = [
   { key:"punctuality", label:"Punctuality",           icon:"⏱️" },
 ];
 
-const SENIOR = {
-  name:     "Marcus Reid",
-  title:    "Senior Trainer · Head of Strength & Performance",
-  certs:    "NSCA-CSCS · Olympic Lifting Coach · CPR/AED",
-  exp:      "18 yrs",
-  since:    "March 2016",
-  clients:  24,
-  active:   18,
+const SENIOR_DEFAULT = {
+  name:     "Senior Trainer",
+  title:    "Senior Trainer",
+  certs:    "",
+  exp:      "—",
+  since:    "—",
+  clients:  0,
+  active:   0,
   img:      "https://images.unsplash.com/photo-1567013127542-490d757e51fc?w=800&q=80&fit=crop",
   coverImg: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1600&q=80&fit=crop",
-  quote:    "Champions aren't made in gyms — they're made from something deep inside.",
-  bio:      "Elite performance coach specialising in strength conditioning and functional movement. Known for evidence-based programming and a relentless standard of excellence.",
-  specs:    ["Strength","Olympic Lifting","Powerlifting","Sports Conditioning"],
-  myInternal: [88,90,91,89,93,94,92,95,94,96,95],
-  myClient:   [4.5,4.6,4.7,4.6,4.8,4.8,4.7,4.9,4.8,4.9,5.0],
+  quote:    "",
+  bio:      "",
+  specs:    [],
+  myInternal: [],
+  myClient:   [],
 };
 
 const TRAINERS = []; // populated from API
@@ -474,6 +476,8 @@ function ReviewCard({ r }) {
    MAIN PAGE
 ───────────────────────────────────────────── */
 export default function SeniorTrainerPage() {
+  const { user } = useAuth();
+  const [senior, setSenior]             = useState(SENIOR_DEFAULT);
   const [trainers, setTrainers]     = useState([]);
   const [grades, setGrades]         = useState({});
   const [loadingTrainers, setLoadingTrainers] = useState(true);
@@ -489,6 +493,26 @@ export default function SeniorTrainerPage() {
     setToast({show:true,msg});
     setTimeout(()=>setToast({show:false,msg:""}),2800);
   },[]);
+
+  /* Load logged-in senior trainer's own profile */
+  useEffect(()=>{
+    axiosInstance.get('/account/me')
+      .then(res=>{
+        const d = res.data;
+        setSenior(prev=>({
+          ...prev,
+          name:     d.name || `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || prev.name,
+          title:    d.trainer_level ? `Senior Trainer · ${d.trainer_level.charAt(0).toUpperCase()+d.trainer_level.slice(1)}` : prev.title,
+          certs:    d.certification || prev.certs,
+          exp:      d.experience_years ? `${d.experience_years} yrs` : prev.exp,
+          since:    d.created_at ? new Date(d.created_at).toLocaleDateString("en-US",{month:"long",year:"numeric"}) : prev.since,
+          img:      d.profile_image || user?.avatar || prev.img,
+          specs:    d.specialties?.length ? d.specialties : prev.specs,
+          bio:      d.bio || prev.bio,
+        }));
+      })
+      .catch(()=>{}); // silently fall back to defaults
+  },[user]);
 
   /* Load trainers + their grades from the API */
   useEffect(()=>{
@@ -518,8 +542,8 @@ export default function SeniorTrainerPage() {
   },[]);
 
   /* senior's own stats */
-  const myIntAvg = Math.round(avg(SENIOR.myInternal)*1)||0;
-  const myCliAvg = avg(SENIOR.myClient)||0;
+  const myIntAvg = Math.round(avg(senior.myInternal)*1)||0;
+  const myCliAvg = avg(senior.myClient)||0;
   const myOverall= (((myIntAvg/20)+myCliAvg)/2).toFixed(1);
 
   const saveGrade = async (trainerId, mi, data) => {
@@ -594,28 +618,28 @@ export default function SeniorTrainerPage() {
 
       {/* ─── PROFILE HERO ─── */}
       <div className="sd-hero">
-        <div className="sd-hero-cover" style={{backgroundImage:`url(${SENIOR.coverImg})`}}/>
+        <div className="sd-hero-cover" style={{backgroundImage:`url(${senior.coverImg})`}}/>
         <div className="sd-hero-tint"/>
         <div className="sd-hero-body">
           <div className="sd-hero-left">
             <div className="sd-hero-avatar-ring">
-              <img src={SENIOR.img} alt={SENIOR.name} className="sd-hero-avatar"/>
+              <img src={senior.img} alt={senior.name} className="sd-hero-avatar"/>
             </div>
             <div className="sd-hero-crown"><Ico.crown/> Senior Trainer</div>
           </div>
           <div className="sd-hero-copy">
             <p className="sd-hero-eyebrow">B.A.D People Fitness · Senior Dashboard</p>
-            <h1 className="sd-hero-name">{SENIOR.name}</h1>
-            <p className="sd-hero-title">{SENIOR.title}</p>
-            <p className="sd-hero-bio">{SENIOR.bio}</p>
+            <h1 className="sd-hero-name">{senior.name}</h1>
+            <p className="sd-hero-title">{senior.title}</p>
+            <p className="sd-hero-bio">{senior.bio}</p>
             <div className="sd-hero-tags">
-              {SENIOR.specs.map(s=><span key={s} className="sd-tag">{s}</span>)}
+              {senior.specs.map(s=><span key={s} className="sd-tag">{s}</span>)}
             </div>
             <div className="sd-hero-meta">
-              <div><span>Since</span><strong>{SENIOR.since}</strong></div>
-              <div><span>Experience</span><strong>{SENIOR.exp}</strong></div>
-              <div><span>Clients</span><strong>{SENIOR.clients}</strong></div>
-              <div><span>Active</span><strong>{SENIOR.active}</strong></div>
+              <div><span>Since</span><strong>{senior.since}</strong></div>
+              <div><span>Experience</span><strong>{senior.exp}</strong></div>
+              <div><span>Clients</span><strong>{senior.clients}</strong></div>
+              <div><span>Active</span><strong>{senior.active}</strong></div>
             </div>
           </div>
           <div className="sd-hero-kpis">
@@ -657,7 +681,7 @@ export default function SeniorTrainerPage() {
                 {val:myIntAvg+"%",  lbl:"My Internal Rating",  col:gradeCol(myIntAvg/10), trend:true  },
                 {val:myCliAvg.toFixed(1)+"/5", lbl:"My Client Rating", col:"#22C55E",    trend:true  },
                 {val:myOverall,     lbl:"Overall Score",        col:"#F26522",            trend:null  },
-                {val:SENIOR.active, lbl:"Active Clients",       col:"#F26522",            trend:null  },
+                {val:senior.active, lbl:"Active Clients",       col:"#F26522",            trend:null  },
                 {val:`${AT_RISK.filter(c=>c.risk==="high").length}`, lbl:"High Risk Clients", col:"#EF4444", trend:null },
                 {val:REVIEWS.length,lbl:"Total Reviews",        col:"#F26522",            trend:null  },
               ].map((k,i)=>(
@@ -678,7 +702,7 @@ export default function SeniorTrainerPage() {
                 </div>
               </div>
               <div className="sd-chart-wrap">
-                <MiniChart internalArr={SENIOR.myInternal} clientArr={SENIOR.myClient}/>
+                <MiniChart internalArr={senior.myInternal} clientArr={senior.myClient}/>
               </div>
             </div>
 

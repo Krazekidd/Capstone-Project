@@ -32,12 +32,12 @@ def _hash(password: str) -> str:
 SEED_USERS = [
     {
         "email":      "senior@badpeople.fit",
-        "first_name": "Marcus",
-        "last_name":  "Reid",
+        "first_name": "Jordan",
+        "last_name":  "Calloway",
         "role":       "trainer",
         "profile": {
             "type":        "trainer",
-            "name":        "Marcus Reid",
+            "name":        "Jordan Calloway",
             "is_senior":   True,
             "trainer_level": "expert",
             "certification": "NSCA-CSCS · Olympic Lifting Coach · CPR/AED",
@@ -48,12 +48,12 @@ SEED_USERS = [
     },
     {
         "email":      "trainer@badpeople.fit",
-        "first_name": "Sasha",
-        "last_name":  "Volkov",
+        "first_name": "Riley",
+        "last_name":  "Okafor",
         "role":       "trainer",
         "profile": {
             "type":        "trainer",
-            "name":        "Sasha Volkov",
+            "name":        "Riley Okafor",
             "is_senior":   False,
             "trainer_level": "advanced",
             "certification": "NASM-CPT",
@@ -64,12 +64,12 @@ SEED_USERS = [
     },
     {
         "email":      "admin@badpeople.fit",
-        "first_name": "Admin",
-        "last_name":  "User",
+        "first_name": "Morgan",
+        "last_name":  "Vance",
         "role":       "admin",
         "profile": {
             "type":       "admin",
-            "name":       "Admin User",
+            "name":       "Morgan Vance",
             "department": "Operations",
             "access_level": "full",
         },

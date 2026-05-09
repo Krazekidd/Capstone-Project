@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 engine = create_async_engine(
     DATABASE_URL,
-    echo=False,  # Set True to log SQL statements during development
+    echo=True,  # Set True to log SQL statements during development
     future=True,
     pool_pre_ping=True,  # Checks connections before use; handles DB restarts
     pool_size=5,
@@ -49,7 +49,7 @@ async def get_db():
 
 # User database engine
 userEngine = create_async_engine(
-    settings.DATABASE_URL, echo=False, future=True
+    settings.DATABASE_URL, echo=True, future=True
 )
 
 UserAsyncSessionLocal = async_sessionmaker(

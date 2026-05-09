@@ -276,10 +276,12 @@ function PlanCard({ plan, billing, onSelect, onInquire, added }) {
       </ul>
 
       {/* Schedule */}
+      {plan.schedule && (
       <div className="plan-schedule">
-        <ClockIcon/>
-        <span>{plan.schedule}</span>
+      <ClockIcon/>
+      <span>{plan.schedule}</span>
       </div>
+)}
 
       {/* Includes */}
       <div className="plan-includes">

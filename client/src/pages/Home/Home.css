@@ -104,6 +104,7 @@ ul {
     letter-spacing: 3px;
     line-height: 1;
     margin-bottom: 18px;
+    color: var(--white);
 }
 
 .section-sub {
@@ -868,82 +869,95 @@ ul {
 ──────────────────────────────── */
 .trainers-section {
     background: var(--charcoal);
-}
+} 
 
+.trainers-section .section-title {
+    color: var(--white);
+}
 .trainers-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 20px;
 }
 
-.trainer-card {
-    background: var(--charcoal-2);
+.trainers-section .trainer-card {
+    background: var(--charcoal);
     border: 1px solid var(--border);
     overflow: hidden;
-    transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border-radius: 0;
+    text-align: left;
+    padding: 0;
+    flex-shrink: 1;
 }
 
-.trainer-card:hover {
-    transform: translateY(-5px);
+.trainers-section .trainer-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-orange);
     border-color: var(--border-orange);
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 
-.trainer-img-wrap {
+.trainers-section .trainer-card:hover .trainer-img {
+    transform: scale(1.06);
+}
+
+.trainers-section .trainer-img-wrap {
     position: relative;
     height: 280px;
+    width: 100%;
     overflow: hidden;
 }
 
-.trainer-img {
+.trainers-section .trainer-img {
     width: 100%;
     height: 100%;
     background-size: cover;
     background-position: center top;
-    transition: transform 0.5s;
+    transition: transform 0.5s ease;
 }
 
-.trainer-card:hover .trainer-img {
-    transform: scale(1.05);
-}
-
-.trainer-img-overlay {
+.trainers-section .trainer-img-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, transparent 50%, rgba(10, 10, 10, 0.7) 100%);
+    background: linear-gradient(to bottom, transparent 40%, rgba(10, 10, 10, 0.85) 100%);
 }
 
-.trainer-info {
-    padding: 18px 20px 20px;
+.trainers-section .trainer-info {
+    padding: 20px;
     border-top: 2px solid var(--border-orange);
 }
 
-.trainer-name {
+.trainers-section .trainer-name {
     font-family: var(--font-display);
-    font-size: 22px;
-    letter-spacing: 1px;
-    margin-bottom: 4px;
+    font-size: 24px;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    color: var(--white);
     transition: color 0.2s;
 }
 
-.trainer-card:hover .trainer-name {
+.trainers-section .trainer-card:hover .trainer-name {
     color: var(--orange);
 }
 
-.trainer-role {
+.trainers-section .trainer-role {
     font-family: var(--font-condensed);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--orange);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
-.trainer-certs {
-    font-size: 12px;
-    color: var(--muted);
+.trainers-section .trainer-certs {
+    font-size: 13px;
+    color: var(--muted-light);
+    line-height: 1.65;
 }
 
 /* ────────────────────────────────
@@ -1118,18 +1132,28 @@ ul {
     bottom: 32px;
     right: 32px;
     z-index: 900;
-    width: 58px;
-    height: 58px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
     background: var(--orange);
     border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     cursor: pointer;
     color: var(--white);
     box-shadow: 0 8px 32px rgba(242, 101, 34, 0.5);
     transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    line-height: 1;
+}
+
+.chat-fab svg {
+    display: block;
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    pointer-events: none;
 }
 
 .chat-fab:hover {
@@ -2000,5 +2024,15 @@ ul {
 
     .cta-banner {
         padding: 80px 24px;
-    }
+    } 
+
+    .trainers-section .trainer-card {
+    width: 100% !important;
+    flex-shrink: 1 !important;
+    flex-direction: column !important;
+    border-radius: 0 !important;
+    text-align: left !important;
+    padding: 0 !important; 
+    
+}
 }

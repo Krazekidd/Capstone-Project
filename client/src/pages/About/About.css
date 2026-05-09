@@ -842,6 +842,7 @@ ul {
     font-size: 22px;
     letter-spacing: 1px;
     margin-bottom: 10px;
+    color: var(--white);
 }
 
 .objective-desc {
@@ -1068,46 +1069,56 @@ ul {
 
 .trainers-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 20px;
+    width: 100%;
 }
 
-.trainer-card {
-    background: var(--charcoal-2);
+.trainers-section .trainer-card {
+    background: var(--charcoal);
     border: 1px solid var(--border);
     overflow: hidden;
-    transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+    width: 100%;
+    border-radius: 0;
+    text-align: left;
+    padding: 0;
+    flex-shrink: 1;
 }
 
-.trainer-card:hover {
+.trainers-section .trainer-card:hover {
     transform: translateY(-6px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border-orange);
     border-color: var(--border-orange);
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 
-.trainer-img-wrap {
+.trainers-section .trainer-img-wrap {
     position: relative;
-    height: 280px;
+    height: 300px;
+    width: 100%;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
-.trainer-img {
+.trainers-section .trainer-img {
     width: 100%;
     height: 100%;
     background-size: cover;
     background-position: center top;
-    transition: transform 0.5s;
+    transition: transform 0.5s ease;
 }
 
-.trainer-card:hover .trainer-img {
-    transform: scale(1.05);
+.trainers-section .trainer-card:hover .trainer-img {
+    transform: scale(1.06);
 }
 
-.trainer-img-overlay {
+.trainers-section .trainer-img-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, transparent 45%, rgba(10, 10, 10, 0.8) 100%);
+    background: linear-gradient(to bottom, transparent 40%, rgba(10, 10, 10, 0.85) 100%);
 }
 
 .trainer-athletes-badge {
@@ -1132,8 +1143,8 @@ ul {
     fill: var(--orange);
 }
 
-.trainer-body {
-    padding: 18px 20px 22px;
+.trainers-section .trainer-body {
+    padding: 20px;
     border-top: 2px solid var(--border-orange);
 }
 
@@ -1150,31 +1161,33 @@ ul {
     margin-bottom: 10px;
 }
 
-.trainer-name {
+.trainers-section .trainer-name {
     font-family: var(--font-display);
-    font-size: 22px;
-    letter-spacing: 1px;
-    margin-bottom: 4px;
+    font-size: 24px;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+    color: var(--white);
     transition: color 0.2s;
 }
 
-.trainer-card:hover .trainer-name {
+.trainers-section .trainer-card:hover .trainer-name {
     color: var(--orange);
 }
 
-.trainer-role {
+.trainers-section .trainer-role {
     font-family: var(--font-condensed);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 1.5px;
+    letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--orange);
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
-.trainer-certs {
-    font-size: 12px;
-    color: var(--muted);
+.trainers-section .trainer-certs {
+    font-size: 13px;
+    color: var(--muted-light);
+    line-height: 1.65;
 }
 
 /* ────────────────────────────────
@@ -1241,6 +1254,7 @@ ul {
     font-size: 22px;
     letter-spacing: 1px;
     margin-bottom: 4px;
+    color: var(--white);
 }
 
 .athlete-sport {
@@ -1319,6 +1333,7 @@ ul {
     letter-spacing: 2px;
     margin-bottom: 10px;
     transition: color 0.2s;
+    color: var(--white);
 }
 
 .program-card:hover .program-name {
@@ -1710,6 +1725,7 @@ ul {
     letter-spacing: 2px;
     line-height: 1;
     margin-bottom: 10px;
+    color: var(--white);
 }
 
 .contact-form-sub {
@@ -2132,10 +2148,6 @@ ul {
     }
 
     .trainers-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .athletes-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
@@ -2217,4 +2229,24 @@ ul {
         text-align: center;
         padding: 20px;
     }
+} 
+
+/* ──────────────────────────────────────────
+   FORCE ALL SECTION TITLES TO WHITE (FIXED)
+   Applied on all screen sizes
+────────────────────────────────────────── */
+.section-title,
+.who-section .section-title,
+.objectives-section .section-title,
+.expertise-section .section-title,
+.milestones-section .section-title,
+.trainers-section .section-title,
+.athletes-section .section-title,
+.programs-band .section-title,
+.contact-wrapper .section-title,
+.about-hero-title,
+.who-copy .section-title,
+.who-copy h2,
+h2.section-title {
+    color: #FFFFFF !important;
 }

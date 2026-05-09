@@ -182,7 +182,7 @@ function LiveChat() {
   return (
     <>
       <button className={`chat-fab${open ? " chat-fab--open" : ""}`} onClick={() => setOpen(o => !o)} aria-label="Live chat">
-        {open ? <CloseIcon /> : <ChatIcon />}
+        {open ? <><CloseIcon /><span className="chat-fab-label">Close</span></> : <><ChatIcon /><span className="chat-fab-label">Chat With Us</span></>}
         {!open && <span className="chat-fab-badge">1</span>}
       </button>
 

@@ -10,7 +10,7 @@ from schemas import (
     RecommendationResponse, UserMetrics, WorkoutPlan
 )
 from utils import create_prompt, create_chat_prompt, create_chatbot_prompt, chat_sessions
-
+#something
 logger = logging.getLogger(__name__)
 router = APIRouter()
 

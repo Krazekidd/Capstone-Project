@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, func,desc, asc
+from sqlalchemy import select, update, delete, func, desc, asc
 import uuid
 import json
 import logging
@@ -13,11 +13,11 @@ from schemas import (
     UpdateClientProfileRequest, UpdateTrainerProfileRequest, 
     UpdateAdminProfileRequest, APIResponse, UserProgressResponse,
     ProgressRequest, BodyMeasurements, ProgressTrackingResponse, ClientGoalsResponse, UpdateClientGoalsRequest,
-    HealthConditionResponse, UpdateHealthConditionsRequest,WaterIntakeResponse,UpdateWaterIntakeRequest,
-    StrengthRecordResponse, UpdateStrengthRecordRequest,TrainerRatingResponse,TrainerRatingsSummaryResponse,
+    HealthConditionResponse, UpdateHealthConditionsRequest, WaterIntakeResponse, UpdateWaterIntakeRequest,
+    StrengthRecordResponse, UpdateStrengthRecordRequest, TrainerRatingResponse, TrainerRatingsSummaryResponse,
     TrainingScheduleResponse, UpdateTrainerRatingRequest, UpdateTrainingScheduleRequest, BadgeResponse,
-    TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,OrderItemResponse,AdminOrderResponse,
-    ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
+    TrainerAssessmentScores, TrainerAssessmentRequest, TrainerAssessmentResponse, OrderItemResponse, AdminOrderResponse,
+    ClientStatusResponse, ClientWithStatusResponse, UpdateOrderStatusRequest,
     DashboardStatsResponse
 )
 from auth_router import get_current_user
@@ -25,295 +25,9 @@ from auth_router import get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/account", tags=["account"])
 
-# ============================================================
-# GET CURRENT USER ACCOUNT
-# ============================================================
-@router.get("/me", response_model=ClientAccount | TrainerAccount | AdminAccount)
-async def get_my_account(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Get account of currently logged in user"""
-    try:
-        user_id = current_user["user_id"]
-        role = current_user["role"]
-        user_id_bytes = user_id.bytes
-        
-        logger.info(f"Fetching account for user {user_id} with role {role}")
-        
-        if role == "client":
-            result = await db.execute(
-                select(Client, User.email).join(User, Client.id == User.id)
-                .where(Client.id == user_id_bytes)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Client profile not found")
-            
-            client, email = row
-            # Handle None values for datetime fields
-            ccreated_at = client.created_at if client.created_at else datetime.utcnow()
-            cupdated_at = client.updated_at if client.updated_at else ccreated_at
-            return ClientAccount(
-                id=uuid.UUID(bytes=client.id),
-                name=client.name,
-                gender=client.gender,
-                email=email,
-                phone_number=client.phone_number,
-                birthday=client.birthday,
-                height=client.height,
-                weight=client.weight,
-                created_at=ccreated_at,
-                updated_at=cupdated_at
-            )
-        
-        elif role == "trainer":
-            result = await db.execute(
-                select(Trainer, User.email).join(User, Trainer.id == User.id)
-                .where(Trainer.id == user_id_bytes)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Trainer profile not found")
-            
-            trainer, email = row
-            return TrainerAccount(
-                id=uuid.UUID(bytes=trainer.id),
-                name=trainer.name,
-                email=email,
-                certification=trainer.certification,
-                rating=trainer.rating,
-                trainer_level=trainer.trainer_level,
-                is_senior=trainer.is_senior,
-                created_at=trainer.created_at,
-                updated_at=trainer.updated_at
-            )
-        
-        elif role == "admin":
-            result = await db.execute(
-                select(Admin, User.email).join(User, Admin.id == User.id)
-                .where(Admin.id == user_id_bytes)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Admin profile not found")
-            
-            admin, email = row
-            return AdminAccount(
-                id=uuid.UUID(bytes=admin.id),
-                name=admin.name,
-                email=email,
-                phone_number=admin.phone_number,
-                created_at=admin.created_at,
-                updated_at=admin.updated_at
-            )
-        
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching account: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================
-# GET USER BY ID (Admin or Self)
-# ============================================================
-@router.get("/{user_id}", response_model=ClientAccount | TrainerAccount | AdminAccount)
-async def get_account_by_id(
-    user_id: uuid.UUID,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Get account by user ID (admin only or self)"""
-    try:
-        # Check if user is admin or requesting their own account
-        if current_user["role"] != "admin" and current_user["user_id"] != user_id:
-            raise HTTPException(status_code=403, detail="Not authorized to view this account")
-        
-        user_id_bytes = user_id.bytes
-        
-        # First get the user to know their role
-        user_result = await db.execute(select(User).where(User.id == user_id_bytes))
-        user = user_result.scalar_one_or_none()
-        
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        role = user.role
-        
-        if role == "client":
-            result = await db.execute(
-                select(Client, User.email).join(User, Client.id == User.id)
-                .where(Client.id == user_id_bytes)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Client not found")
-            
-            client, email = row
-            return ClientAccount(
-                id=uuid.UUID(bytes=client.id),
-                name=client.name,
-                gender=client.gender,
-                email=email,
-                phone_number=client.phone_number,
-                birthday=client.birthday,
-                height=client.height,
-                weight=client.weight,
-                profile_image=client.profile_image,
-                created_at=client.created_at,
-                updated_at=client.updated_at
-            )
-        
-        elif role == "trainer":
-            result = await db.execute(
-                select(Trainer, User.email).join(User, Trainer.id == User.id)
-                .where(Trainer.id == user_id_bytes)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Trainer not found")
-            
-            trainer, email = row
-            return TrainerAccount(
-                id=uuid.UUID(bytes=trainer.id),
-                name=trainer.name,
-                email=email,
-                certification=trainer.certification,
-                rating=trainer.rating,
-                trainer_level=trainer.trainer_level,
-                is_senior=trainer.is_senior,
-                created_at=trainer.created_at,
-                updated_at=trainer.updated_at
-            )
-        
-        elif role == "admin":
-            result = await db.execute(
-                select(Admin, User.email).join(User, Admin.id == User.id)
-                .where(Admin.id == user_id_bytes)
-            )
-            row = result.first()
-            if not row:
-                raise HTTPException(status_code=404, detail="Admin not found")
-            
-            admin, email = row
-            return AdminAccount(
-                id=uuid.UUID(bytes=admin.id),
-                name=admin.name,
-                email=email,
-                phone_number=admin.phone_number,
-                created_at=admin.created_at,
-                updated_at=admin.updated_at
-            )
-        
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching account by ID: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================
-# UPDATE CURRENT USER ACCOUNT
-# ============================================================
-@router.put("/me", response_model=APIResponse)
-async def update_my_account(
-    update_data: UpdateClientProfileRequest | UpdateTrainerProfileRequest | UpdateAdminProfileRequest,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Update account of currently logged in user"""
-    try:
-        user_id = current_user["user_id"]
-        role = current_user["role"]
-        user_id_bytes = user_id.bytes
-        
-        # Filter out None values
-        update_values = {k: v for k, v in update_data.dict().items() if v is not None}
-        
-        if not update_values:
-            return APIResponse(success=True, message="No updates provided", data=None)
-        
-        # Update based on role
-        if role == "client":
-            stmt = update(Client).where(Client.id == user_id_bytes).values(**update_values)
-            result = await db.execute(stmt)
-            
-            # Also update User email if provided
-            if 'email' in update_values:
-                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
-                await db.execute(user_stmt)
-            
-        elif role == "trainer":
-            stmt = update(Trainer).where(Trainer.id == user_id_bytes).values(**update_values)
-            result = await db.execute(stmt)
-            
-            # Also update User email if provided
-            if 'email' in update_values:
-                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
-                await db.execute(user_stmt)
-                
-        elif role == "admin":
-            stmt = update(Admin).where(Admin.id == user_id_bytes).values(**update_values)
-            result = await db.execute(stmt)
-            
-            # Also update User email if provided
-            if 'email' in update_values:
-                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
-                await db.execute(user_stmt)
-        else:
-            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
-        
-        await db.commit()
-        
-        if result.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Profile not found")
-        
-        return APIResponse(success=True, message="Profile updated successfully", data=None)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating account: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ============================================================
-# DELETE USER ACCOUNT
-# ============================================================
-@router.delete("/me", response_model=APIResponse)
-async def delete_my_account(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Delete currently logged in user account"""
-    try:
-        user_id = current_user["user_id"]
-        role = current_user["role"]
-        user_id_bytes = user_id.bytes
-        
-        # Delete from role-specific table first (cascade will handle User)
-        if role == "client":
-            await db.execute(delete(Client).where(Client.id == user_id_bytes))
-        elif role == "trainer":
-            await db.execute(delete(Trainer).where(Trainer.id == user_id_bytes))
-        elif role == "admin":
-            await db.execute(delete(Admin).where(Admin.id == user_id_bytes))
-        
-        # Delete the user account
-        await db.execute(delete(User).where(User.id == user_id_bytes))
-        await db.commit()
-        
-        return APIResponse(success=True, message="Account deleted successfully", data=None)
-        
-    except Exception as e:
-        logger.error(f"Error deleting account: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+# ════════════════════════════════════════════════════════════
+# ALL SPECIFIC ROUTES MUST COME FIRST
+# ════════════════════════════════════════════════════════════
 
 # ============================================================
 # PROGRESS TRACKING ENDPOINTS
@@ -328,7 +42,6 @@ async def save_progress(
     user_id = current_user["user_id"]
     user_id_bytes = user_id.bytes
     
-    # Create new progress entry using body_measurements table
     from models import BodyMeasurement
     
     new_measurement = BodyMeasurement(
@@ -354,17 +67,15 @@ async def save_progress(
     await db.commit()
     await db.refresh(new_measurement)
     
-    # Also update the client profile with latest weight/height
     if measurements.weight or measurements.height:
         update_data = {}
         if measurements.weight:
-            update_data["weight"] = str(measurements.weight)
+            update_data["weight"] = measurements.weight
         if measurements.height:
-            update_data["height"] = str(measurements.height)
+            update_data["height"] = measurements.height
         
         if update_data:
-            from sqlalchemy import update as sql_update
-            stmt = sql_update(Client).where(Client.id == user_id_bytes).values(**update_data)
+            stmt = update(Client).where(Client.id == user_id_bytes).values(**update_data)
             await db.execute(stmt)
             await db.commit()
     
@@ -372,6 +83,7 @@ async def save_progress(
         "message": "Progress saved successfully",
         "id": str(uuid.UUID(bytes=new_measurement.id))
     }
+
 @router.get("/progress/history", response_model=list[ProgressTrackingResponse])
 async def get_progress_history(
     limit: int = Query(12, ge=1, le=100),
@@ -385,7 +97,6 @@ async def get_progress_history(
         
         logger.info(f"Fetching progress history for user: {user_id}")
         
-        # Query from body_measurements table instead of progress_tracking
         from models import BodyMeasurement
         
         result = await db.execute(
@@ -400,7 +111,6 @@ async def get_progress_history(
         
         response = []
         for entry in entries:
-            # Create measurements object from the individual fields
             measurements_dict = {
                 "weight": entry.weight,
                 "height": entry.height,
@@ -418,7 +128,6 @@ async def get_progress_history(
                 "calf_right": entry.calf_right,
                 "glutes": entry.glutes,
             }
-            # Remove None values
             measurements_dict = {k: v for k, v in measurements_dict.items() if v is not None}
             
             response.append(
@@ -437,15 +146,14 @@ async def get_progress_history(
         
     except Exception as e:
         logger.error(f"Error getting progress history: {e}", exc_info=True)
-        # Return empty list instead of throwing error
         return []
-        
+
 @router.get("/progress/latest", response_model=ProgressTrackingResponse)
 async def get_latest_progress(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Get the most recent progress entry from body_measurements"""
+    """Get the most recent progress entry"""
     from models import BodyMeasurement
     
     user_id = current_user["user_id"]
@@ -460,18 +168,8 @@ async def get_latest_progress(
     entry = result.scalar_one_or_none()
     
     if not entry:
-        # Return empty response instead of 404
-        return ProgressTrackingResponse(
-            id=uuid.uuid4(),
-            user_id=user_id,
-            weight=None,
-            height=None,
-            measurements=None,
-            recorded_at=datetime.utcnow(),
-            created_at=datetime.utcnow()
-        )
+        raise HTTPException(status_code=404, detail="No progress data found")
     
-    # Build measurements from individual fields
     measurements_dict = {
         "weight": entry.weight,
         "height": entry.height,
@@ -489,18 +187,18 @@ async def get_latest_progress(
         "calf_right": entry.calf_right,
         "glutes": entry.glutes,
     }
-    # Remove None values
     measurements_dict = {k: v for k, v in measurements_dict.items() if v is not None}
     
     return ProgressTrackingResponse(
         id=uuid.UUID(bytes=entry.id),
-        user_id=user_id,
+        user_id=uuid.UUID(bytes=entry.user_id),
         weight=entry.weight,
         height=entry.height,
         measurements=BodyMeasurements(**measurements_dict) if measurements_dict else None,
         recorded_at=entry.recorded_at,
         created_at=entry.created_at
     )
+
 # ============================================================
 # CLIENT GOALS ENDPOINTS
 # ============================================================
@@ -524,7 +222,6 @@ async def get_my_goals(
     goals = result.scalar_one_or_none()
     
     if not goals:
-        # Return default goals
         return ClientGoalsResponse(
             client_id=user_id,
             goal_type="Bulk Up",
@@ -568,7 +265,6 @@ async def update_my_goals(
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Goals only available for clients")
     
-    # Check if goals exist
     result = await db.execute(
         select(ClientGoal).where(ClientGoal.client_id == user_id_bytes)
     )
@@ -592,7 +288,6 @@ async def update_my_goals(
 # ============================================================
 # CLIENT HEALTH CONDITIONS ENDPOINTS
 # ============================================================
-
 @router.get("/health-conditions", response_model=List[HealthConditionResponse])
 async def get_my_health_conditions(
     current_user: dict = Depends(get_current_user),
@@ -637,12 +332,10 @@ async def update_my_health_conditions(
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Health conditions only available for clients")
     
-    # Delete existing conditions
     await db.execute(
         delete(ClientHealthCondition).where(ClientHealthCondition.client_id == user_id_bytes)
     )
     
-    # Add new conditions
     for condition in request.conditions:
         new_condition = ClientHealthCondition(
             client_id=user_id_bytes,
@@ -657,7 +350,6 @@ async def update_my_health_conditions(
 # ============================================================
 # CLIENT WATER INTAKE ENDPOINTS
 # ============================================================
-
 @router.get("/water-intake", response_model=WaterIntakeResponse)
 async def get_today_water_intake(
     current_user: dict = Depends(get_current_user),
@@ -721,7 +413,6 @@ async def log_water_intake(
 # ============================================================
 # CLIENT STRENGTH RECORDS ENDPOINTS
 # ============================================================
-
 @router.get("/strength-records", response_model=List[StrengthRecordResponse])
 async def get_strength_records(
     current_user: dict = Depends(get_current_user),
@@ -803,7 +494,6 @@ async def update_strength_record(
 # ============================================================
 # TRAINER RATINGS ENDPOINTS
 # ============================================================
-
 @router.get("/trainer-ratings", response_model=TrainerRatingsSummaryResponse)
 async def get_my_trainer_ratings(
     current_user: dict = Depends(get_current_user),
@@ -851,7 +541,6 @@ async def rate_trainer(
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Only clients can rate trainers")
     
-    # Check if rating exists
     result = await db.execute(
         select(TrainerRating)
         .where(TrainerRating.client_id == user_id_bytes)
@@ -876,7 +565,6 @@ async def rate_trainer(
 # ============================================================
 # CLIENT BADGES ENDPOINTS
 # ============================================================
-
 @router.get("/badges", response_model=List[BadgeResponse])
 async def get_my_badges(
     current_user: dict = Depends(get_current_user),
@@ -910,7 +598,6 @@ async def get_my_badges(
 # ============================================================
 # TRAINING SCHEDULE ENDPOINTS
 # ============================================================
-
 @router.get("/training-schedule", response_model=List[TrainingScheduleResponse])
 async def get_training_schedule(
     current_user: dict = Depends(get_current_user),
@@ -988,7 +675,6 @@ async def get_all_clients(
     try:
         role = current_user["role"]
         
-        # Only admin and trainers can view all clients
         if role not in ["admin", "trainer"]:
             raise HTTPException(status_code=403, detail="Not authorized to view all clients")
         
@@ -1024,9 +710,6 @@ async def get_all_clients(
         logger.error(f"Error getting all clients: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-# ============================================================
-# GET ALL TRAINERS (Admin only)
-# ============================================================
 # ============================================================
 # ADMIN ENDPOINTS
 # ============================================================
@@ -1153,7 +836,6 @@ async def admin_update_excursion(
     if not excursion:
         raise HTTPException(status_code=404, detail="Excursion not found")
     
-    # Update fields
     for key, value in excursion_data.items():
         if hasattr(excursion, key) and value is not None:
             if key in ["date"] and value:
@@ -1178,7 +860,6 @@ async def admin_delete_excursion(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # Check if there are bookings
     bookings_result = await db.execute(
         select(ExcursionBooking).where(ExcursionBooking.excursion_id == excursion_id)
     )
@@ -1192,30 +873,52 @@ async def admin_delete_excursion(
     
     return {"message": "Excursion deleted"}
 
-
-
-@router.get("/admin/dashboard-stats")
+@router.get("/admin/dashboard-stats", response_model=DashboardStatsResponse)
 async def get_dashboard_stats(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
     """Get dashboard statistics"""
+    from models import Client, ClientStatus, Trainer, ShopOrder
+    
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # Get counts
-    clients_count = await db.execute(select(func.count()).select_from(Client))
-    active_clients = await db.execute(
-        select(func.count()).select_from(Client)
-        # Add status filter when available
+    status_result = await db.execute(
+        select(ClientStatus.status, func.count(ClientStatus.id))
+        .group_by(ClientStatus.status)
     )
+    status_counts = status_result.all()
     
-    return {
-        "total_clients": clients_count.scalar() or 0,
-        "active_clients": active_clients.scalar() or 0,
-        "total_trainers": 0,
-        "pending_orders": 0
-    }
+    status_map = {"Active": 0, "Inactive": 0, "New": 0}
+    for status, count in status_counts:
+        if status in status_map:
+            status_map[status] = count
+    
+    total_clients_result = await db.execute(select(func.count()).select_from(Client))
+    total_clients = total_clients_result.scalar() or 0
+    
+    trainers_result = await db.execute(select(func.count()).select_from(Trainer))
+    total_trainers = trainers_result.scalar() or 0
+    
+    pending_orders_result = await db.execute(
+        select(func.count()).select_from(ShopOrder)
+        .where(ShopOrder.order_status.in_(["pending", "processing"]))
+    )
+    pending_orders = pending_orders_result.scalar() or 0
+    
+    revenue_mtd = 48320
+    
+    return DashboardStatsResponse(
+        new_clients=status_map["New"],
+        active_clients=status_map["Active"],
+        inactive_clients=status_map["Inactive"],
+        total_clients=total_clients,
+        total_trainers=total_trainers,
+        pending_orders=pending_orders,
+        revenue_mtd=revenue_mtd
+    )
+
 # ============================================================
 # SEARCH USERS (Admin only)
 # ============================================================
@@ -1229,11 +932,9 @@ async def search_users(
     try:
         role = current_user["role"]
         
-        # Only admin can search users
         if role != "admin":
             raise HTTPException(status_code=403, detail="Not authorized to search users")
         
-        # Search in clients
         client_result = await db.execute(
             select(Client, User.email)
             .join(User, Client.id == User.id)
@@ -1245,7 +946,6 @@ async def search_users(
         )
         clients = client_result.all()
         
-        # Search in trainers
         trainer_result = await db.execute(
             select(Trainer, User.email)
             .join(User, Trainer.id == User.id)
@@ -1257,7 +957,6 @@ async def search_users(
         )
         trainers = trainer_result.all()
         
-        # Search in admins
         admin_result = await db.execute(
             select(Admin, User.email)
             .join(User, Admin.id == User.id)
@@ -1304,7 +1003,6 @@ async def search_users(
 # ============================================================
 # ADMIN - TRAINER ASSESSMENTS ENDPOINTS
 # ============================================================
-
 @router.post("/admin/trainer-assessments", response_model=APIResponse)
 async def save_trainer_assessment(
     assessment: TrainerAssessmentRequest,
@@ -1336,7 +1034,6 @@ async def save_trainer_assessment(
     db.add(new_assessment)
     await db.commit()
     
-    # Also update trainer's overall rating (average of all assessments)
     result = await db.execute(
         select(func.avg(TrainerAssessment.average_score))
         .where(TrainerAssessment.trainer_id == trainer_id_bytes)
@@ -1399,7 +1096,6 @@ async def get_trainer_assessments(
 # ============================================================
 # ADMIN - CLIENTS WITH STATUS ENDPOINTS
 # ============================================================
-
 @router.get("/admin/clients-with-status", response_model=List[ClientWithStatusResponse])
 async def admin_get_clients_with_status(
     current_user: dict = Depends(get_current_user),
@@ -1515,7 +1211,6 @@ async def admin_get_orders(
     
     order_list = []
     for order in orders:
-        # Get items for this order
         items_result = await db.execute(
             select(ShopOrderItem).where(ShopOrderItem.order_id == order.id)
         )
@@ -1542,6 +1237,7 @@ async def admin_get_orders(
         })
     
     return order_list
+
 @router.put("/admin/orders/{order_id}/status", response_model=APIResponse)
 async def admin_update_order_status(
     order_id: uuid.UUID,
@@ -1575,59 +1271,10 @@ async def admin_update_order_status(
     await db.commit()
     
     return APIResponse(success=True, message="Order status updated")
+
 # ============================================================
-# ADMIN - DASHBOARD STATS ENDPOINTS
+# ADMIN - TODAY BIRTHDAYS
 # ============================================================
-@router.get("/admin/dashboard-stats", response_model=DashboardStatsResponse)
-async def get_dashboard_stats(
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Get dashboard statistics"""
-    from models import Client, ClientStatus, Trainer, ShopOrder
-    
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    
-    # Get client counts with status
-    status_result = await db.execute(
-        select(ClientStatus.status, func.count(ClientStatus.id))
-        .group_by(ClientStatus.status)
-    )
-    status_counts = status_result.all()
-    
-    status_map = {"Active": 0, "Inactive": 0, "New": 0}
-    for status, count in status_counts:
-        if status in status_map:
-            status_map[status] = count
-    
-    # Total clients (all time)
-    total_clients_result = await db.execute(select(func.count()).select_from(Client))
-    total_clients = total_clients_result.scalar() or 0
-    
-    # Total trainers
-    trainers_result = await db.execute(select(func.count()).select_from(Trainer))
-    total_trainers = trainers_result.scalar() or 0
-    
-    # Pending orders
-    pending_orders_result = await db.execute(
-        select(func.count()).select_from(ShopOrder)
-        .where(ShopOrder.order_status.in_(["pending", "processing"]))
-    )
-    pending_orders = pending_orders_result.scalar() or 0
-    
-    # Revenue MTD (simplified - you can expand this)
-    revenue_mtd = 48320  # Placeholder - calculate from actual orders
-    
-    return DashboardStatsResponse(
-        new_clients=status_map["New"],
-        active_clients=status_map["Active"],
-        inactive_clients=status_map["Inactive"],
-        total_clients=total_clients,
-        total_trainers=total_trainers,
-        pending_orders=pending_orders,
-        revenue_mtd=revenue_mtd
-    )
 @router.get("/admin/today-birthdays")
 async def get_today_birthdays(
     current_user: dict = Depends(get_current_user),
@@ -1641,8 +1288,6 @@ async def get_today_birthdays(
     
     today = datetime.utcnow().date()
     
-    # Find clients with birthday today (comparing month and day)
-    # Note: This handles cases where birthday is stored as DATE
     result = await db.execute(
         select(Client, User.email)
         .join(User, Client.id == User.id)
@@ -1665,6 +1310,7 @@ async def get_today_birthdays(
         })
     
     return birthdays
+
 @router.post("/admin/send-birthday-email")
 async def send_birthday_email_to_client(
     request: dict,
@@ -1680,7 +1326,6 @@ async def send_birthday_email_to_client(
     client_id = uuid.UUID(request.get("client_id"))
     message = request.get("message", "Happy Birthday! 🎉 We're so glad you're part of the GymPro family!")
     
-    # Get client details
     client_result = await db.execute(
         select(Client, User.email)
         .join(User, Client.id == User.id)
@@ -1693,10 +1338,293 @@ async def send_birthday_email_to_client(
     
     client, email = row
     
-    # Send email
     success = await send_birthday_email(email, client.name, message)
     
     if success:
         return APIResponse(success=True, message=f"Birthday wishes sent to {client.name}!")
     else:
         raise HTTPException(status_code=500, detail="Failed to send email")
+
+# ════════════════════════════════════════════════════════════
+# THESE ROUTES MUST BE LAST (they have dynamic path params)
+# ════════════════════════════════════════════════════════════
+
+# ============================================================
+# GET CURRENT USER ACCOUNT
+# ============================================================
+@router.get("/me", response_model=ClientAccount | TrainerAccount | AdminAccount)
+async def get_my_account(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get account of currently logged in user"""
+    try:
+        user_id = current_user["user_id"]
+        role = current_user["role"]
+        user_id_bytes = user_id.bytes
+        
+        logger.info(f"Fetching account for user {user_id} with role {role}")
+        
+        if role == "client":
+            result = await db.execute(
+                select(Client, User.email).join(User, Client.id == User.id)
+                .where(Client.id == user_id_bytes)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Client profile not found")
+            
+            client, email = row
+            ccreated_at = client.created_at if client.created_at else datetime.utcnow()
+            cupdated_at = client.updated_at if client.updated_at else ccreated_at
+            return ClientAccount(
+                id=uuid.UUID(bytes=client.id),
+                name=client.name,
+                gender=client.gender,
+                email=email,
+                phone_number=client.phone_number,
+                birthday=client.birthday,
+                height=client.height,
+                weight=client.weight,
+                created_at=ccreated_at,
+                updated_at=cupdated_at
+            )
+        
+        elif role == "trainer":
+            result = await db.execute(
+                select(Trainer, User.email).join(User, Trainer.id == User.id)
+                .where(Trainer.id == user_id_bytes)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Trainer profile not found")
+            
+            trainer, email = row
+            return TrainerAccount(
+                id=uuid.UUID(bytes=trainer.id),
+                name=trainer.name,
+                email=email,
+                certification=trainer.certification,
+                rating=trainer.rating,
+                trainer_level=trainer.trainer_level,
+                is_senior=trainer.is_senior,
+                created_at=trainer.created_at,
+                updated_at=trainer.updated_at
+            )
+        
+        elif role == "admin":
+            result = await db.execute(
+                select(Admin, User.email).join(User, Admin.id == User.id)
+                .where(Admin.id == user_id_bytes)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Admin profile not found")
+            
+            admin, email = row
+            return AdminAccount(
+                id=uuid.UUID(bytes=admin.id),
+                name=admin.name,
+                email=email,
+                phone_number=admin.phone_number,
+                created_at=admin.created_at,
+                updated_at=admin.updated_at
+            )
+        
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching account: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================
+# UPDATE CURRENT USER ACCOUNT
+# ============================================================
+@router.put("/me", response_model=APIResponse)
+async def update_my_account(
+    update_data: UpdateClientProfileRequest | UpdateTrainerProfileRequest | UpdateAdminProfileRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update account of currently logged in user"""
+    try:
+        user_id = current_user["user_id"]
+        role = current_user["role"]
+        user_id_bytes = user_id.bytes
+        
+        update_values = {k: v for k, v in update_data.dict().items() if v is not None}
+        
+        if not update_values:
+            return APIResponse(success=True, message="No updates provided", data=None)
+        
+        if role == "client":
+            stmt = update(Client).where(Client.id == user_id_bytes).values(**update_values)
+            result = await db.execute(stmt)
+            
+            if 'email' in update_values:
+                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
+                await db.execute(user_stmt)
+            
+        elif role == "trainer":
+            stmt = update(Trainer).where(Trainer.id == user_id_bytes).values(**update_values)
+            result = await db.execute(stmt)
+            
+            if 'email' in update_values:
+                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
+                await db.execute(user_stmt)
+                
+        elif role == "admin":
+            stmt = update(Admin).where(Admin.id == user_id_bytes).values(**update_values)
+            result = await db.execute(stmt)
+            
+            if 'email' in update_values:
+                user_stmt = update(User).where(User.id == user_id_bytes).values(email=update_values['email'])
+                await db.execute(user_stmt)
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
+        
+        await db.commit()
+        
+        if result.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        
+        return APIResponse(success=True, message="Profile updated successfully", data=None)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating account: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================
+# DELETE USER ACCOUNT
+# ============================================================
+@router.delete("/me", response_model=APIResponse)
+async def delete_my_account(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Delete currently logged in user account"""
+    try:
+        user_id = current_user["user_id"]
+        role = current_user["role"]
+        user_id_bytes = user_id.bytes
+        
+        if role == "client":
+            await db.execute(delete(Client).where(Client.id == user_id_bytes))
+        elif role == "trainer":
+            await db.execute(delete(Trainer).where(Trainer.id == user_id_bytes))
+        elif role == "admin":
+            await db.execute(delete(Admin).where(Admin.id == user_id_bytes))
+        
+        await db.execute(delete(User).where(User.id == user_id_bytes))
+        await db.commit()
+        
+        return APIResponse(success=True, message="Account deleted successfully", data=None)
+        
+    except Exception as e:
+        logger.error(f"Error deleting account: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ════════════════════════════════════════════════════════════
+# THIS MUST BE THE VERY LAST GET ROUTE
+# ════════════════════════════════════════════════════════════
+@router.get("/{user_id}", response_model=ClientAccount | TrainerAccount | AdminAccount)
+async def get_account_by_id(
+    user_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get account by user ID (admin only or self)"""
+    try:
+        if current_user["role"] != "admin" and current_user["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this account")
+        
+        user_id_bytes = user_id.bytes
+        
+        user_result = await db.execute(select(User).where(User.id == user_id_bytes))
+        user = user_result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        role = user.role
+        
+        if role == "client":
+            result = await db.execute(
+                select(Client, User.email).join(User, Client.id == User.id)
+                .where(Client.id == user_id_bytes)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Client not found")
+            
+            client, email = row
+            return ClientAccount(
+                id=uuid.UUID(bytes=client.id),
+                name=client.name,
+                gender=client.gender,
+                email=email,
+                phone_number=client.phone_number,
+                birthday=client.birthday,
+                height=client.height,
+                weight=client.weight,
+                profile_image=client.profile_image,
+                created_at=client.created_at,
+                updated_at=client.updated_at
+            )
+        
+        elif role == "trainer":
+            result = await db.execute(
+                select(Trainer, User.email).join(User, Trainer.id == User.id)
+                .where(Trainer.id == user_id_bytes)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Trainer not found")
+            
+            trainer, email = row
+            return TrainerAccount(
+                id=uuid.UUID(bytes=trainer.id),
+                name=trainer.name,
+                email=email,
+                certification=trainer.certification,
+                rating=trainer.rating,
+                trainer_level=trainer.trainer_level,
+                is_senior=trainer.is_senior,
+                created_at=trainer.created_at,
+                updated_at=trainer.updated_at
+            )
+        
+        elif role == "admin":
+            result = await db.execute(
+                select(Admin, User.email).join(User, Admin.id == User.id)
+                .where(Admin.id == user_id_bytes)
+            )
+            row = result.first()
+            if not row:
+                raise HTTPException(status_code=404, detail="Admin not found")
+            
+            admin, email = row
+            return AdminAccount(
+                id=uuid.UUID(bytes=admin.id),
+                name=admin.name,
+                email=email,
+                phone_number=admin.phone_number,
+                created_at=admin.created_at,
+                updated_at=admin.updated_at
+            )
+        
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid role: {role}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching account by ID: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

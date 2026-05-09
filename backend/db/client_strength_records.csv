@@ -1,0 +1,6 @@
+id,client_id,exercise_name,current_weight_kg,goal_weight_kg,current_reps,goal_reps,percentage_progress,record_date,created_at,updated_at
+1,...,"Bench Press",102.0,NULL,NULL,NULL,NULL,2026-05-04,"2026-05-04 00:08:23","2026-05-05 16:34:50"
+2,...,Squat,130.0,NULL,NULL,NULL,NULL,2026-05-04,"2026-05-04 00:08:23","2026-05-05 16:34:50"
+3,...,Deadlift,167.0,NULL,NULL,NULL,NULL,2026-05-04,"2026-05-04 00:08:24","2026-05-05 16:34:50"
+4,...,"Overhead Press",65.0,NULL,NULL,NULL,NULL,2026-05-04,"2026-05-04 00:08:24","2026-05-05 16:34:50"
+5,...,Pull-ups,NULL,NULL,22,NULL,NULL,2026-05-04,"2026-05-04 00:08:24","2026-05-05 16:34:50"

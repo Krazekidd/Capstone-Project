@@ -211,6 +211,7 @@ export const progressAPI = {
   getWaterIntake: async () => {
     try {
       const response = await axiosInstance.get('/account/water-intake');
+      console.log("Water response", response.data);
       return response.data || { cups_consumed: 0 };
     } catch (error) {
       console.error('Get water intake error:', error.response?.data);

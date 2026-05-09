@@ -1,0 +1,8 @@
+id,email,encrypted_password,role,created_at,updated_at
+23c95666-3d14-11f1-9c29-e86a6496b57f,johandson@outlook.com,$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6,client,4/20/2026 18:53,4/20/2026 18:53
+23c98e97-3d14-11f1-9c29-e86a6496b57f,plincoln@gmail.com,$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6,client,4/20/2026 18:53,4/20/2026 18:53
+23c991b6-3d14-11f1-9c29-e86a6496b57f,smirth@icloud.com,$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6,client,4/20/2026 18:53,4/20/2026 18:53
+23cd7240-3d14-11f1-9c29-e86a6496b57f,smyers@gmail.com,$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6,trainer,4/20/2026 18:53,4/20/2026 18:53
+23cd7ff0-3d14-11f1-9c29-e86a6496b57f,ashtHall@gmail.com,$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6,trainer,4/20/2026 18:53,4/20/2026 18:53
+23cfc35b-3d14-11f1-9c29-e86a6496b57f,cmontgmery@gmail.com,$2b$12$r0KfHB37dGfaWx4NK.uZ8O1kLNV56RJNouszlKmElcujTmNKxcVW6,admin,4/20/2026 18:53,4/20/2026 18:53
+d6bfb3fd-1917-4308-91f0-1cf2c3fe8223,jonathanbennett984@gmail.com,$2b$12$XJ8UrV.6/ayDsZt1zzpQauh8UgDwaoGUr5ftuU9cjNw0Kk80D0TFq,client,4/27/2026 21:15,4/28/2026 21:15

@@ -1,9 +1,10 @@
 """
 Trainer Grades API Routes
 -------------------------
-POST   /api/grades          — Submit a grade
-PUT    /api/grades/:id      — Update within 24-hour window
-GET    /api/grades          — Fetch all grades for a trainer (?trainer_id=)
+POST   /api/grades              — Submit a grade
+PUT    /api/grades/:id          — Update within 24-hour window
+GET    /api/grades              — Fetch all grades for a trainer (?trainer_id=)
+GET    /api/grades/trainers     — List all non-senior trainers with grades + client ratings
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -11,11 +12,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from schemas.schemas import GradeSubmitRequest, GradeResponse, GradeListResponse
-from services.grades_service import submit_grade as svc_submit, update_grade as svc_update, get_grades_for_trainer as svc_get_grades
+from services.grades_service import (
+    submit_grade as svc_submit,
+    update_grade as svc_update,
+    get_grades_for_trainer as svc_get_grades,
+    get_all_trainers_with_grades as svc_get_trainers,
+)
 from utils.auth import require_admin_or_senior_trainer
 from routers.auth.auth import get_current_user
 
 router = APIRouter(prefix="/api/grades", tags=["grades"])
+
+
+@router.get("/trainers")
+async def list_trainers_for_grading(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Return all non-senior trainers with their grades and per-month client ratings."""
+    return await svc_get_trainers(db)
 
 
 @router.post("", response_model=GradeResponse, status_code=201)

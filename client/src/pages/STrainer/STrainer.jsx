@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Chart, registerables } from "chart.js";
 Chart.register(...registerables);
+import { gradesAPI } from "../../api/api";
 import "./STrainer.css";
 
 /* ─────────────────────────────────────────────
@@ -34,13 +35,8 @@ const SENIOR = {
   myClient:   [4.5,4.6,4.7,4.6,4.8,4.8,4.7,4.9,4.8,4.9,5.0],
 };
 
-const TRAINERS = [
-  { id:"t1", name:"Sasha Volkov",  role:"Combat & Conditioning", exp:"14 yrs", img:"https://images.unsplash.com/photo-1570655652364-2e0a67455ac6?w=400&q=80&fit=crop&crop=top", clientRatings:[3.9,4.0,4.1,4.3,4.2,4.4,4.5,4.3,4.6,4.5,4.7] },
-  { id:"t2", name:"Priya Nair",    role:"Mobility & Recovery",   exp:"11 yrs", img:"https://images.unsplash.com/photo-1518611012118-696072aa579a?w=400&q=80&fit=crop&crop=top", clientRatings:[4.5,4.6,4.7,4.8,4.7,4.9,4.8,4.9,5.0,4.9,5.0] },
-  { id:"t3", name:"Jordan Wells",  role:"HIIT & Sports Science", exp:"9 yrs",  img:"https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?w=400&q=80&fit=crop&crop=top", clientRatings:[3.8,3.9,4.0,4.1,4.0,4.2,4.3,4.2,4.4,4.5,4.4] },
-  { id:"t4", name:"Devon Clarke",  role:"Strength & Performance", exp:"10 yrs", img:"https://images.unsplash.com/photo-1504257432389-52343af06ae3?w=400&q=80&fit=crop&crop=top", clientRatings:[4.0,4.1,4.2,4.3,4.2,4.4,4.5,4.4,4.6,4.5,4.7] },
-  { id:"t5", name:"Alicia Chen",   role:"Cardio & Wellness",     exp:"7 yrs",  img:"https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&q=80&fit=crop&crop=top", clientRatings:[4.1,4.2,4.3,4.4,4.3,4.5,4.6,4.5,4.7,4.6,4.8] },
-];
+const TRAINERS = []; // populated from API
+
 
 const AT_RISK = [
   { id:1, name:"Kwame Asante",   trainer:"Sasha Volkov",  risk:"high",   reason:"Missed 4 consecutive sessions",       attendance:38, progress:-12, lastSeen:"8 days ago", goal:"Weight Loss",    img:"https://images.unsplash.com/photo-1534367610401-9f5ed68180aa?w=80&q=80",  interventionBy:null },
@@ -74,21 +70,6 @@ const gradeLbl = (s) => { if(s==null) return "Not Graded"; if(s>=8.5) return "Ex
 const stars5   = (s) => s==null ? 0 : Math.round((s/10)*5);
 const hoursAgo = (ts) => ts ? (Date.now()-ts)/3600000 : 999;
 
-const seedGrades = () => {
-  const g = {};
-  TRAINERS.forEach(t => {
-    g[t.id] = {};
-    MONTHS.forEach((_,mi) => {
-      if (mi < 9) {
-        const base = 6.2 + Math.random()*2.6;
-        const row  = { notes:"", submittedAt: Date.now()-(MONTHS.length-mi)*30*24*3600*1000, finalised:true };
-        CRITERIA.forEach(c => { row[c.key] = Math.min(10,Math.max(1,+(base+(Math.random()*1.8-0.9)).toFixed(1))); });
-        g[t.id][mi] = row;
-      }
-    });
-  });
-  return g;
-};
 
 /* ─────────────────────────────────────────────
    TINY ICONS
@@ -493,7 +474,9 @@ function ReviewCard({ r }) {
    MAIN PAGE
 ───────────────────────────────────────────── */
 export default function SeniorTrainerPage() {
-  const [grades, setGrades]         = useState(seedGrades);
+  const [trainers, setTrainers]     = useState([]);
+  const [grades, setGrades]         = useState({});
+  const [loadingTrainers, setLoadingTrainers] = useState(true);
   const [gradeModal, setGradeModal] = useState(null); // {trainer, mi}
   const [showAllRisk, setShowAllRisk] = useState(false);
   const [interventions, setInterventions] = useState({});
@@ -507,19 +490,85 @@ export default function SeniorTrainerPage() {
     setTimeout(()=>setToast({show:false,msg:""}),2800);
   },[]);
 
+  /* Load trainers + their grades from the API */
+  useEffect(()=>{
+    gradesAPI.getTrainersForGrading()
+      .then(data=>{
+        // data is an array of trainer objects with a `grades` map keyed by month_index
+        // Normalise grades into the same shape the UI expects
+        const gradeMap = {};
+        data.forEach(t=>{
+          gradeMap[t.id] = {};
+          Object.entries(t.grades || {}).forEach(([mi, g])=>{
+            const scores = g.scores || {};
+            gradeMap[t.id][Number(mi)] = {
+              ...scores,
+              notes: g.notes || "",
+              submittedAt: new Date(g.submitted_at).getTime(),
+              finalised: g.finalised,
+              _gradeId: g.id,
+            };
+          });
+        });
+        setTrainers(data);
+        setGrades(gradeMap);
+      })
+      .catch(()=>showToast("⚠ Could not load trainers"))
+      .finally(()=>setLoadingTrainers(false));
+  },[]);
+
   /* senior's own stats */
   const myIntAvg = Math.round(avg(SENIOR.myInternal)*1)||0;
   const myCliAvg = avg(SENIOR.myClient)||0;
   const myOverall= (((myIntAvg/20)+myCliAvg)/2).toFixed(1);
 
-  const saveGrade = (trainerId,mi,data) => {
-    setGrades(p=>({ ...p, [trainerId]:{ ...p[trainerId], [mi]:{...data} } }));
-    showToast("✓ Grade saved!");
+  const saveGrade = async (trainerId, mi, data) => {
+    const existingGradeId = grades[trainerId]?.[mi]?._gradeId;
+    const submittedBy = localStorage.getItem("user_id");
+    const payload = {
+      trainer_id: trainerId,
+      month_index: mi,
+      scores: {
+        performance: data.performance,
+        motivation:  data.motivation,
+        interaction: data.interaction,
+        knowledge:   data.knowledge,
+        punctuality: data.punctuality,
+      },
+      notes: data.notes || null,
+      submitted_by: submittedBy,
+    };
+
+    try {
+      let saved;
+      if (existingGradeId) {
+        saved = await gradesAPI.updateGrade(existingGradeId, payload);
+      } else {
+        saved = await gradesAPI.submitGrade(payload);
+      }
+      // Merge back into local state
+      setGrades(p=>({
+        ...p,
+        [trainerId]: {
+          ...p[trainerId],
+          [mi]: {
+            ...data,
+            submittedAt: new Date(saved.submitted_at).getTime(),
+            finalised: saved.finalised,
+            _gradeId: saved.id,
+          },
+        },
+      }));
+      showToast("✓ Grade saved!");
+    } catch (err) {
+      const msg = err?.detail?.message || err?.detail || "Failed to save grade";
+      showToast(`✗ ${msg}`);
+    }
     setGradeModal(null);
   };
 
   const displayedRisk = showAllRisk ? AT_RISK : AT_RISK.slice(0,5);
-  const reviewOptions = ["All","Marcus Reid",...TRAINERS.map(t=>t.name)];
+  const reviewOptions = ["All","Marcus Reid",...trainers.map(t=>t.name)];
   const filteredReviews = reviewFilter==="All" ? REVIEWS : REVIEWS.filter(r=>r.trainer===reviewFilter);
   const avgReview = (REVIEWS.reduce((a,r)=>a+r.rating,0)/REVIEWS.length).toFixed(1);
 
@@ -637,7 +686,13 @@ export default function SeniorTrainerPage() {
             <div className="sd-panel">
               <div className="sd-panel-hdr"><h3>Team Grading Summary</h3></div>
               <div className="sd-team-summary">
-                {TRAINERS.map(t=>{
+                {trainers.length === 0 ? (
+                  <div className="sd-empty-state sd-empty-state--inline">
+                    <span className="sd-empty-icon">🏋️</span>
+                    <p className="sd-empty-title">No trainers to display</p>
+                    <p className="sd-empty-sub">Trainer data will appear here once loaded.</p>
+                  </div>
+                ) : trainers.map(t=>{
                   const gd    = MONTHS.map((_,mi)=>{ const g=grades[t.id]?.[mi]; return g?.finalised?avgG(g):null; }).filter(v=>v!==null);
                   const tavg  = gd.length?avg(gd):null;
                   const col2  = gradeCol(tavg);
@@ -685,10 +740,23 @@ export default function SeniorTrainerPage() {
               </div>
             </div>
             <div className="sd-trainers-list">
-              {TRAINERS.map(t=>(
-                <TrainerRow key={t.id} trainer={t} grades={grades}
-                  onGrade={(trainer,mi)=>setGradeModal({trainer,mi})}/>
-              ))}
+              {loadingTrainers ? (
+                <div className="sd-empty-state">
+                  <span className="sd-empty-icon">⏳</span>
+                  <p className="sd-empty-title">Loading trainers…</p>
+                </div>
+              ) : trainers.length === 0 ? (
+                <div className="sd-empty-state">
+                  <span className="sd-empty-icon">🏋️</span>
+                  <p className="sd-empty-title">No trainers found</p>
+                  <p className="sd-empty-sub">There are no active non-senior trainers to grade yet.</p>
+                </div>
+              ) : (
+                trainers.map(t=>(
+                  <TrainerRow key={t.id} trainer={t} grades={grades}
+                    onGrade={(trainer,mi)=>setGradeModal({trainer,mi})}/>
+                ))
+              )}
             </div>
           </div>
         )}

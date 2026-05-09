@@ -121,3 +121,74 @@ async def get_grades_for_trainer(db: AsyncSession, trainer_id: str) -> GradeList
         trainer_id=trainer_id,
         grades=[_to_response(g) for g in grades],
     )
+
+
+async def get_all_trainers_with_grades(db: AsyncSession) -> list:
+    """
+    Return every non-senior trainer with:
+      - profile fields (id, name, role, exp, img)
+      - grades keyed by month_index
+      - client ratings per month (avg rating per calendar month, indices 0-10)
+    """
+    from models.models import Trainer, TrainerRating, User
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import extract
+
+    # Load all non-senior trainers with their grades and ratings
+    result = await db.execute(
+        select(Trainer)
+        .where(Trainer.is_senior == False)
+        .options(
+            selectinload(Trainer.grades),
+            selectinload(Trainer.trainer_ratings),
+            selectinload(Trainer.user),
+        )
+    )
+    trainers = result.scalars().all()
+
+    output = []
+    for t in trainers:
+        # Build grades dict keyed by month_index
+        grades_by_month = {}
+        for g in t.grades:
+            locked = _is_locked(g.submitted_at)
+            hrs = _hours_remaining(g.submitted_at) if not locked else None
+            grades_by_month[g.month_index] = {
+                "id": str(g.id),
+                "scores": g.scores,
+                "overall_avg": float(g.overall_avg),
+                "notes": g.notes,
+                "submitted_by": str(g.submitted_by) if g.submitted_by else None,
+                "submitted_at": g.submitted_at.isoformat(),
+                "finalised": g.finalised,
+                "locked": locked,
+                "hours_remaining": hrs,
+            }
+
+        # Build per-month client ratings array (indices 0-10 = Jan-Nov)
+        # Group ratings by month of created_at, average per month slot
+        monthly_buckets: dict[int, list[float]] = {i: [] for i in range(11)}
+        for r in t.trainer_ratings:
+            # month 1-11 maps to index 0-10
+            m = r.created_at.month  # 1-12
+            idx = m - 1             # 0-11
+            if 0 <= idx <= 10:
+                monthly_buckets[idx].append(float(r.rating))
+
+        client_ratings = [
+            round(sum(v) / len(v), 2) if v else None
+            for v in monthly_buckets.values()
+        ]
+
+        output.append({
+            "id": str(t.id),
+            "name": t.name,
+            "role": t.bio or "",          # bio used as role/specialty label
+            "specialties": t.specialties or [],
+            "exp": f"{t.experience_years} yrs" if t.experience_years else "—",
+            "img": t.profile_image or "",
+            "grades": grades_by_month,
+            "clientRatings": client_ratings,
+        })
+
+    return output

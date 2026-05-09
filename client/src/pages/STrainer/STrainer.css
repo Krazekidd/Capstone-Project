@@ -1047,6 +1047,50 @@ button {
 }
 
 /* ─────────────────────────────────────────────
+   EMPTY STATE
+───────────────────────────────────────────── */
+.sd-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 56px 24px;
+    text-align: center;
+    border: 1px dashed rgba(255,255,255,0.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.02);
+}
+
+.sd-empty-state--inline {
+    padding: 32px 24px;
+}
+
+.sd-empty-icon {
+    font-size: 36px;
+    line-height: 1;
+    opacity: 0.6;
+}
+
+.sd-empty-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.55);
+    margin: 0;
+}
+
+.sd-empty-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0;
+    max-width: 320px;
+    line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────
    GRADING MODAL
 ───────────────────────────────────────────── */
 .sd-overlay {

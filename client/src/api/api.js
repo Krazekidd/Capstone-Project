@@ -1354,3 +1354,45 @@ export const consultationsAPI = {
     }
   },
 };
+
+export const gradesAPI = {
+  // GET /api/grades/trainers — all non-senior trainers with grades + client ratings
+  getTrainersForGrading: async () => {
+    try {
+      const response = await axiosInstance.get('/api/grades/trainers');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch trainers' };
+    }
+  },
+
+  // GET /api/grades?trainer_id=<uuid>
+  getGradesForTrainer: async (trainerId) => {
+    try {
+      const response = await axiosInstance.get('/api/grades', { params: { trainer_id: trainerId } });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch grades' };
+    }
+  },
+
+  // POST /api/grades
+  submitGrade: async (payload) => {
+    try {
+      const response = await axiosInstance.post('/api/grades', payload);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to submit grade' };
+    }
+  },
+
+  // PUT /api/grades/:id
+  updateGrade: async (gradeId, payload) => {
+    try {
+      const response = await axiosInstance.put(`/api/grades/${gradeId}`, payload);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update grade' };
+    }
+  },
+};

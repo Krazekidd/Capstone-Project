@@ -114,8 +114,8 @@ async def init_db():
         NutritionGoals, ActivityData, TrainingSchedule, ClientBadge,
         Client, Trainer, Admin, ClientGoal, ClientHealthCondition,
         ClientWaterIntake, ClientStrengthRecord, TrainerRating,
-        TrainerAssessment, Excursion, ExcursionBooking, ClientStatus,
-        ShopOrder, ShopOrderItem
+        TrainerAssessment, TrainerEvaluation, Excursion, ExcursionBooking, 
+        ClientStatus, ShopOrder, ShopOrderItem
     )  # noqa: F401
 
     async with engine.begin() as conn:

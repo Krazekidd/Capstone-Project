@@ -16,6 +16,7 @@ from routers.ml.ml.food import router as ml_food_router
 from routers.users.account import router as account_router
 from routers.users.user_profile import router as user_profile_router
 from routers.trainers.trainer_api import router as trainer_api_router
+from routers.evaluations.evaluation import router as evaluation_router
 from database import init_db, check_db_connection
 from config.config import PROFILE_IMAGES_DIR, PROGRESS_PHOTOS_DIR
 import logging
@@ -92,6 +93,7 @@ app.include_router(auth_router)
 app.include_router(account_router)
 app.include_router(user_profile_router)
 app.include_router(trainer_api_router)
+app.include_router(evaluation_router)
 app.include_router(booking_router)
 app.include_router(shop_router)
 app.include_router(membership_router)

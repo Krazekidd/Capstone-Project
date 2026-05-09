@@ -932,6 +932,68 @@ class TrainerAssessment(Base):
 
 
 # =============================================================
+# TRAINER EVALUATION SYSTEM
+# =============================================================
+
+class TrainerEvaluation(Base):
+    __tablename__ = "trainer_evaluations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("trainers.id", ondelete="CASCADE"), nullable=False)
+    evaluation_month = Column(Integer, nullable=False)  # 1-12
+    evaluation_year = Column(Integer, nullable=False)
+    evaluator_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # Admin or Senior Trainer
+    evaluator_role = Column(String(20), nullable=False)  # 'admin' or 'senior_trainer'
+    
+    # Evaluation criteria scores (1-10 scale, supports 0.5 increments)
+    performance_score = Column(Numeric(3, 1))  # Performance & Results
+    motivation_score = Column(Numeric(3, 1))  # Motivation & Energy
+    interaction_score = Column(Numeric(3, 1))  # Client Interaction
+    knowledge_score = Column(Numeric(3, 1))  # Technical Knowledge
+    punctuality_score = Column(Numeric(3, 1))  # Punctuality
+    
+    # Calculated fields
+    weighted_mean = Column(Numeric(5, 4))  # For trainer evaluations with multiple raters
+    weighted_sd = Column(Numeric(5, 4))  # Weighted standard deviation
+    final_score = Column(Numeric(5, 2))  # Final score out of 10
+    
+    # Performance classification
+    performance_flag = Column(String(10))  # 'green', 'yellow', 'red'
+    rater_agreement = Column(String(50))  # Agreement message between raters
+    
+    # Metadata
+    notes = Column(Text)  # Optional notes from evaluator
+    submitted_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    finalised = Column(Boolean, nullable=False, default=True)  # Whether evaluation is locked
+    is_editable = Column(Boolean, nullable=False, default=True)  # Can be edited within 24h window
+    
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    trainer = relationship("Trainer", back_populates="evaluations")
+    evaluator = relationship("User", foreign_keys=[evaluator_id])
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_trainer_evaluations_trainer_id', 'trainer_id'),
+        Index('idx_trainer_evaluations_evaluator_id', 'evaluator_id'),
+        Index('idx_trainer_evaluations_month_year', 'evaluation_month', 'evaluation_year'),
+        Index('idx_trainer_evaluations_unique', 'trainer_id', 'evaluation_month', 'evaluation_year', 'evaluator_id', unique=True),
+        CheckConstraint('evaluation_month BETWEEN 1 AND 12', name='check_evaluation_month'),
+        CheckConstraint('performance_score BETWEEN 1 AND 10', name='check_performance_score_range'),
+        CheckConstraint('motivation_score BETWEEN 1 AND 10', name='check_motivation_score_range'),
+        CheckConstraint('interaction_score BETWEEN 1 AND 10', name='check_interaction_score_range'),
+        CheckConstraint('knowledge_score BETWEEN 1 AND 10', name='check_knowledge_score_range'),
+        CheckConstraint('punctuality_score BETWEEN 1 AND 10', name='check_punctuality_score_range'),
+    )
+
+
+# Add evaluations relationship to Trainer model
+Trainer.evaluations = relationship("TrainerEvaluation", back_populates="trainer", cascade="all, delete-orphan")
+
+
+# =============================================================
 # EXCURSIONS & EVENTS
 # =============================================================
 

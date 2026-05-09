@@ -1104,25 +1104,25 @@ async def get_today_water_intake(
     client_result = await db.execute(select(Client).where(Client.id == user_id))
     client = client_result.scalar_one_or_none()
     
-    # Create client profile if it doesn't exist
-    if not client:
-        logger.info(f"Creating client profile for user {user_id}")
-        user = current_user.get("user")
-        if user:
-            new_client = Client(
-                id=user_id,
-                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
-                phone_number=getattr(user, 'phone', None)
-            )
-        else:
-            # Fallback if user object not available
-            new_client = Client(
-                id=user_id,
-                name="Client"
-            )
-        db.add(new_client)
-        await db.commit()
-        await db.refresh(new_client)
+    # # Create client profile if it doesn't exist
+    # if not client:
+    #     logger.info(f"Creating client profile for user {user_id}")
+    #     user = current_user.get("user")
+    #     if user:
+    #         new_client = Client(
+    #             id=user_id,
+    #             name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+    #             phone_number=getattr(user, 'phone', None)
+    #         )
+    #     else:
+    #         # Fallback if user object not available
+    #         new_client = Client(
+    #             id=user_id,
+    #             name="Client"
+    #         )
+    #     db.add(new_client)
+    #     await db.commit()
+    #     await db.refresh(new_client)
     
     today = datetime.utcnow().date()
     
@@ -1154,24 +1154,24 @@ async def log_water_intake(
     client = client_result.scalar_one_or_none()
     
     # Create client profile if it doesn't exist
-    if not client:
-        logger.info(f"Creating client profile for user {user_id}")
-        user = current_user.get("user")
-        if user:
-            new_client = Client(
-                id=user_id,
-                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
-                phone_number=getattr(user, 'phone', None)
-            )
-        else:
-            # Fallback if user object not available
-            new_client = Client(
-                id=user_id,
-                name="Client"
-            )
-        db.add(new_client)
-        await db.commit()
-        await db.refresh(new_client)
+    # if not client:
+    #     logger.info(f"Creating client profile for user {user_id}")
+    #     user = current_user.get("user")
+    #     if user:
+    #         new_client = Client(
+    #             id=user_id,
+    #             name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+    #             phone_number=getattr(user, 'phone', None)
+    #         )
+    #     else:
+    #         # Fallback if user object not available
+    #         new_client = Client(
+    #             id=user_id,
+    #             name="Client"
+    #         )
+    #     db.add(new_client)
+    #     await db.commit()
+    #     await db.refresh(new_client)
     
     today = datetime.utcnow().date()
     
@@ -1218,24 +1218,24 @@ async def get_strength_records(
     client = client_result.scalar_one_or_none()
     
     # Create client profile if it doesn't exist
-    if not client:
-        logger.info(f"Creating client profile for user {user_id}")
-        user = current_user.get("user")
-        if user:
-            new_client = Client(
-                id=user_id,
-                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
-                phone_number=getattr(user, 'phone', None)
-            )
-        else:
-            # Fallback if user object not available
-            new_client = Client(
-                id=user_id,
-                name="Client"
-            )
-        db.add(new_client)
-        await db.commit()
-        await db.refresh(new_client)
+    # if not client:
+    #     logger.info(f"Creating client profile for user {user_id}")
+    #     user = current_user.get("user")
+    #     if user:
+    #         new_client = Client(
+    #             id=user_id,
+    #             name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+    #             phone_number=getattr(user, 'phone', None)
+    #         )
+    #     else:
+    #         # Fallback if user object not available
+    #         new_client = Client(
+    #             id=user_id,
+    #             name="Client"
+    #         )
+    #     db.add(new_client)
+    #     await db.commit()
+    #     await db.refresh(new_client)
     
     result = await db.execute(
         select(ClientStrengthRecord)
@@ -1278,24 +1278,24 @@ async def update_strength_record(
     client = client_result.scalar_one_or_none()
     
     # Create client profile if it doesn't exist
-    if not client:
-        logger.info(f"Creating client profile for user {user_id}")
-        user = current_user.get("user")
-        if user:
-            new_client = Client(
-                id=user_id,
-                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
-                phone_number=getattr(user, 'phone', None)
-            )
-        else:
-            # Fallback if user object not available
-            new_client = Client(
-                id=user_id,
-                name="Client"
-            )
-        db.add(new_client)
-        await db.commit()
-        await db.refresh(new_client)
+    # if not client:
+    #     logger.info(f"Creating client profile for user {user_id}")
+    #     user = current_user.get("user")
+    #     if user:
+    #         new_client = Client(
+    #             id=user_id,
+    #             name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+    #             phone_number=getattr(user, 'phone', None)
+    #         )
+    #     else:
+    #         # Fallback if user object not available
+    #         new_client = Client(
+    #             id=user_id,
+    #             name="Client"
+    #         )
+    #     db.add(new_client)
+    #     await db.commit()
+    #     await db.refresh(new_client)
     
     result = await db.execute(
         select(ClientStrengthRecord)

@@ -43,15 +43,15 @@ export const AuthProvider = ({ children }) => {
         const isSenior = userData.is_senior ?? userData.user?.is_senior ?? false;
         const userObj = {
             id: userData.user?.id || userData.user_id,
-            role,
-            is_senior: isSenior,
             token: userData.access_token,
             firstName: userData.user?.first_name || userData.first_name,
             lastName: userData.user?.last_name || userData.last_name,
             email: userData.user?.email || userData.email,
             membership: userData.user?.membership || userData.membership,
             avatar: userData.user?.avatar_url || userData.avatar_url || userData.avatar,
-            ...userData
+            // role and is_senior last so they are never overwritten by the spread
+            role,
+            is_senior: isSenior,
         };
         setUser(userObj);
         
@@ -68,8 +68,6 @@ export const AuthProvider = ({ children }) => {
         };
         localStorage.setItem('userData', JSON.stringify(dataToStore));
         localStorage.setItem('user_role', userObj.role);
-        
-        // Tokens are already stored by the API functions
     };
     
     const logout = () => {

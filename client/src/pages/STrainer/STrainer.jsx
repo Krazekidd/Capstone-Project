@@ -511,7 +511,7 @@ export default function SeniorTrainerPage() {
           bio:      d.bio || prev.bio,
         }));
       })
-      .catch(()=>{}); // silently fall back to defaults
+      .catch((err)=>{ console.error('/account/me failed:', err?.response?.data || err); }); // silently fall back to defaults
   },[user]);
 
   /* Load trainers + their grades from the API */

@@ -78,17 +78,23 @@ export default function Login() {
   useEffect(() => {
     // Check auth context first
     if (isLoggedIn && user) {
-      const redirectPath = getRedirectPath(user.role);
+      const isSenior = user.role === 'trainer' && !!user.is_senior;
+      const redirectPath = isSenior ? '/STrainer' : getRedirectPath(user.role);
       navigate(redirectPath);
       return;
     }
     
-    // Fallback to token check
+    // Fallback to token check via localStorage
     const token = authAPI.getToken();
     const role = authAPI.getUserRole();
     
     if (token && role) {
-      const redirectPath = getRedirectPath(role);
+      let isSenior = false;
+      try {
+        const stored = JSON.parse(localStorage.getItem('userData') || '{}');
+        isSenior = role === 'trainer' && !!stored.is_senior;
+      } catch (_) {}
+      const redirectPath = isSenior ? '/STrainer' : getRedirectPath(role);
       navigate(redirectPath);
     }
     

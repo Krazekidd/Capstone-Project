@@ -812,6 +812,10 @@ class TrainerAccount(BaseModel):
     rating: Optional[float] = None
     trainer_level: Optional[str] = None
     is_senior: Optional[bool] = None
+    bio: Optional[str] = None
+    specialties: Optional[list] = None
+    experience_years: Optional[int] = None
+    profile_image: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

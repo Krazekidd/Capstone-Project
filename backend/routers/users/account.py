@@ -86,7 +86,7 @@ async def get_my_account(
             ccreated_at = client.created_at if client.created_at else datetime.utcnow()
             cupdated_at = client.updated_at if client.updated_at else ccreated_at
             return ClientAccount(
-                id=uuid.UUID(bytes=client.id),
+                id=client.id,
                 name=client.name,
                 gender=client.gender,
                 email=email,
@@ -109,13 +109,17 @@ async def get_my_account(
             
             trainer, email = row
             return TrainerAccount(
-                id=uuid.UUID(bytes=trainer.id),
+                id=trainer.id,
                 name=trainer.name,
                 email=email,
                 certification=trainer.certification,
                 rating=trainer.rating,
                 trainer_level=trainer.trainer_level,
                 is_senior=trainer.is_senior,
+                bio=trainer.bio,
+                specialties=trainer.specialties or [],
+                experience_years=trainer.experience_years,
+                profile_image=trainer.profile_image,
                 created_at=trainer.created_at,
                 updated_at=trainer.updated_at
             )
@@ -131,7 +135,7 @@ async def get_my_account(
             
             admin, email = row
             return AdminAccount(
-                id=uuid.UUID(bytes=admin.id),
+                id=admin.id,
                 name=admin.name,
                 email=email,
                 phone_number=admin.phone_number,
@@ -1722,7 +1726,7 @@ async def get_training_schedule(
     return [
         TrainingScheduleResponse(
             id=s.id,
-            client_id=uuid.UUID(bytes=s.client_id),
+            client_id=s.client_id,
             day_of_week=s.day_of_week,
             day_number=s.day_number,
             workout_type=s.workout_type,
@@ -1837,7 +1841,7 @@ async def update_training_schedule(
         
         return TrainingScheduleResponse(
             id=updated_schedule.id,
-            client_id=uuid.UUID(bytes=updated_schedule.client_id),
+            client_id=updated_schedule.client_id,
             day_of_week=updated_schedule.day_of_week,
             day_number=updated_schedule.day_number,
             workout_type=updated_schedule.workout_type,
@@ -1886,7 +1890,7 @@ async def get_all_clients(
         clients = []
         for client, email in rows:
             clients.append(ClientAccount(
-                id=uuid.UUID(bytes=client.id),
+                id=client.id,
                 name=client.name,
                 gender=client.gender,
                 email=email,
@@ -1932,7 +1936,7 @@ async def admin_get_all_clients(
     clients = []
     for client, email in rows:
         clients.append(ClientAccount(
-            id=uuid.UUID(bytes=client.id),
+            id=client.id,
             name=client.name,
             email=email,
             phone_number=client.phone_number,
@@ -1964,7 +1968,7 @@ async def admin_get_all_trainers(
     trainers = []
     for trainer, email in rows:
         trainers.append(TrainerAccount(
-            id=uuid.UUID(bytes=trainer.id),
+            id=trainer.id,
             name=trainer.name,
             email=email,
             certification=trainer.certification,
@@ -2156,7 +2160,7 @@ async def search_users(
         
         for client, email in clients:
             results.append({
-                "id": str(uuid.UUID(bytes=client.id)),
+                "id": str(client.id),
                 "name": client.name,
                 "email": email,
                 "role": "client"
@@ -2164,7 +2168,7 @@ async def search_users(
         
         for trainer, email in trainers:
             results.append({
-                "id": str(uuid.UUID(bytes=trainer.id)),
+                "id": str(trainer.id),
                 "name": trainer.name,
                 "email": email,
                 "role": "trainer"
@@ -2172,7 +2176,7 @@ async def search_users(
         
         for admin, email in admins:
             results.append({
-                "id": str(uuid.UUID(bytes=admin.id)),
+                "id": str(admin.id),
                 "name": admin.name,
                 "email": email,
                 "role": "admin"
@@ -2263,7 +2267,7 @@ async def get_trainer_assessments(
     return [
         TrainerAssessmentResponse(
             id=a.id,
-            trainer_id=uuid.UUID(bytes=a.trainer_id),
+            trainer_id=a.trainer_id,
             trainer_name=a.trainer_name,
             performance_score=float(a.performance_score) if a.performance_score else 0,
             motivation_score=float(a.motivation_score) if a.motivation_score else 0,
@@ -2305,7 +2309,7 @@ async def admin_get_clients_with_status(
     clients = []
     for client, email, status in rows:
         clients.append(ClientWithStatusResponse(
-            id=uuid.UUID(bytes=client.id),
+            id=client.id,
             name=client.name,
             email=email,
             phone_number=client.phone_number,
@@ -2405,7 +2409,7 @@ async def admin_get_orders(
         items = items_result.scalars().all()
         
         order_list.append({
-            "id": str(uuid.UUID(bytes=order.id)),
+            "id": str(order.id),
             "order_reference": order.order_number,
             "client_name": "",  # TODO: Get from user relationship
             "client_email": "",  # TODO: Get from user relationship
@@ -2538,7 +2542,7 @@ async def get_today_birthdays(
     for client, email in rows:
         age = today.year - client.birthday.year if client.birthday else None
         birthdays.append({
-            "id": str(uuid.UUID(bytes=client.id)),
+            "id": str(client.id),
             "name": client.name,
             "email": email,
             "birthday": client.birthday.isoformat() if client.birthday else None,
@@ -2764,7 +2768,7 @@ async def check_in_attendance(
         await db.refresh(new_attendance)
         
         return AttendanceResponse(
-            id=uuid.UUID(bytes=new_attendance.id),
+            id=new_attendance.id,
             user_id=user_id,
             check_in_time=new_attendance.check_in_time,
             check_out_time=new_attendance.check_out_time,
@@ -2817,7 +2821,7 @@ async def check_out_attendance(
         await db.refresh(active_session)
         
         return AttendanceResponse(
-            id=uuid.UUID(bytes=active_session.id),
+            id=active_session.id,
             user_id=user_id,
             check_in_time=active_session.check_in_time,
             check_out_time=active_session.check_out_time,
@@ -2865,7 +2869,7 @@ async def get_attendance_history(
         
         attendance_responses = [
             AttendanceResponse(
-                id=uuid.UUID(bytes=att.id),
+                id=att.id,
                 user_id=user_id,
                 check_in_time=att.check_in_time,
                 check_out_time=att.check_out_time,
@@ -3082,7 +3086,7 @@ async def get_nutrition_plan(
             plan = new_plan
         
         return NutritionPlanResponse(
-            id=uuid.UUID(bytes=plan.id),
+            id=plan.id,
             user_id=user_id,
             daily_calories=float(plan.daily_calories),
             daily_protein_g=float(plan.daily_protein_g),
@@ -3140,7 +3144,7 @@ async def get_activity_data(
         
         activity_responses = [
             ActivityDataResponse(
-                id=uuid.UUID(bytes=activity.id),
+                id=activity.id,
                 user_id=user_id,
                 date=activity.date,
                 steps=activity.steps,
@@ -3214,7 +3218,7 @@ async def update_activity_data(
         await db.refresh(activity_obj)
         
         return ActivityDataResponse(
-            id=uuid.UUID(bytes=activity_obj.id),
+            id=activity_obj.id,
             user_id=user_id,
             date=activity_obj.date,
             steps=activity_obj.steps,
@@ -4129,7 +4133,7 @@ async def get_account_by_id(
             
             client, email = row
             return ClientAccount(
-                id=uuid.UUID(bytes=client.id),
+                id=client.id,
                 name=client.name,
                 gender=client.gender,
                 email=email,
@@ -4153,13 +4157,17 @@ async def get_account_by_id(
             
             trainer, email = row
             return TrainerAccount(
-                id=uuid.UUID(bytes=trainer.id),
+                id=trainer.id,
                 name=trainer.name,
                 email=email,
                 certification=trainer.certification,
                 rating=trainer.rating,
                 trainer_level=trainer.trainer_level,
                 is_senior=trainer.is_senior,
+                bio=trainer.bio,
+                specialties=trainer.specialties or [],
+                experience_years=trainer.experience_years,
+                profile_image=trainer.profile_image,
                 created_at=trainer.created_at,
                 updated_at=trainer.updated_at
             )
@@ -4175,7 +4183,7 @@ async def get_account_by_id(
             
             admin, email = row
             return AdminAccount(
-                id=uuid.UUID(bytes=admin.id),
+                id=admin.id,
                 name=admin.name,
                 email=email,
                 phone_number=admin.phone_number,

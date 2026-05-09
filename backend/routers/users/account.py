@@ -2997,7 +2997,7 @@ async def get_nutrition_plan(
             
             client, goals = client_data
             
-            # Default macros (can be enhanced with actual calculation logic)
+            # Default macros (can be enhanced with actual calculation logic)test
             daily_calories = 2000
             daily_protein_g = 150
             daily_carbs_g = 250

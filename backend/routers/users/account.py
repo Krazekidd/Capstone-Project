@@ -879,7 +879,7 @@ async def get_my_goals(
     
     return ClientGoalsResponse(
         id=goals.id,
-        client_id=uuid.UUID(bytes=goals.client_id),
+        client_id=goals.client_id,
         goal_type=goals.goal_type,
         primary_goal=goals.primary_goal,
         target_weight_kg=float(goals.target_weight_kg) if goals.target_weight_kg else None,
@@ -965,7 +965,7 @@ async def get_goals_history(
     return [
         ClientGoalsResponse(
             id=goal.id,
-            client_id=uuid.UUID(bytes=goal.client_id),
+            client_id=goal.client_id,
             goal_type=goal.goal_type,
             primary_goal=goal.primary_goal,
             target_weight_kg=float(goal.target_weight_kg) if goal.target_weight_kg else None,

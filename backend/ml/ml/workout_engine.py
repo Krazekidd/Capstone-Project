@@ -94,6 +94,6 @@ def recommend_workout(age, gender_str, weight_kg, height_m, bmi, fat_pct,
         "predicted_calories_per_session": round(predicted_calories, 0),
         "disclaimer": (
             "These workouts are suggestions only. Ask your trainer to review "
-            "and confirm they are suitable for you."
+            "and confirm if they are suitable for you."
         ),
     }

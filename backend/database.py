@@ -109,13 +109,16 @@ async def init_db():
         User, AuthToken, MembershipPlan, UserMembership, Coach,
         CoachAvailabilitySchedule, CoachAvailabilityOverride,
         ConsultationType, Booking, Product, ProductReview, 
-        Wishlist, SavedConversation, ConversationMessage,
+         SavedConversation, ConversationMessage,
         Attendance, BodyMeasurement, ProgressPhoto, NutritionPlan, 
         NutritionGoals, ActivityData, TrainingSchedule, ClientBadge,
         Client, Trainer, Admin, ClientGoal, ClientHealthCondition,
         ClientWaterIntake, ClientStrengthRecord, TrainerRating,
         TrainerAssessment, Excursion, ExcursionBooking, ClientStatus,
-        ShopOrder, ShopOrderItem
+        ShopCartItem, 
+    ShopWishlistItem, 
+    ShopOrder, 
+    ShopOrderItem
     )  # noqa: F401
 
     async with engine.begin() as conn:

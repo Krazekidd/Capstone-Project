@@ -13,7 +13,7 @@ from models import (
     User, Client, Trainer, Admin, ProgressPhoto, Attendance, NutritionPlan, NutritionGoals, 
     BodyMeasurement, ClientBadge, TrainingSchedule, SavedConversation, ConversationMessage,
     ClientGoal, ClientHealthCondition, ClientWaterIntake, ClientStrengthRecord, 
-    TrainerRating, ActivityData
+    TrainerRating, ActivityData, Product
 )
 from schemas import (
     ClientAccount, TrainerAccount, AdminAccount, 
@@ -23,7 +23,7 @@ from schemas import (
     HealthConditionResponse,WaterIntakeResponse,UpdateWaterIntakeRequest,
     StrengthRecordResponse, UpdateStrengthRecordRequest,TrainerRatingResponse,TrainerRatingsSummaryResponse,UpdateTrainerRatingRequest,
     TrainingScheduleResponse, UpdateTrainingScheduleRequest, BadgeResponse, BadgeCheckResponse,
-    TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,ShopOrderItemResponse,AdminOrderResponse,
+    TrainerAssessmentScores, TrainerAssessmentRequest,TrainerAssessmentResponse,AdminOrderResponse,
     ClientStatusResponse,ClientWithStatusResponse,UpdateOrderStatusRequest,
     DashboardStatsResponse, ProgressPhotoResponse, ProgressPhotoCreate,
     AttendanceCheckIn, AttendanceCheckOut, AttendanceResponse, AttendanceHistoryResponse, SessionStatsResponse,
@@ -31,7 +31,24 @@ from schemas import (
     ProgressAnalyticsResponse, ProgressComparisonResponse, ProgressSummaryResponse,
     ActivityDataCreate, ActivityDataResponse, ActivityDataListResponse,
     AccountConversationRequest, AccountConversationResponse, AccountConversationHistoryResponse,
-    ProfileImageResponse, UpdateMultipleHealthConditionsRequest
+    ProfileImageResponse, UpdateMultipleHealthConditionsRequest,
+    ShopProductResponse,
+    ShopProductDetailResponse,
+    AddToCartRequest,
+    UpdateCartRequest,
+    CartResponse,
+    CartItemResponse,
+    CartSummaryResponse,
+    CartValidationResponse,
+    WishlistItemResponse,
+    WishlistResponse,
+    PlaceOrderRequest,
+    OrderResponse,
+    OrderItemResponse,
+    OrdersListResponse,
+    APIResponse,
+    BulkAddResponse,
+    MergeCartResponse
 )
 from ..auth.auth import get_current_user
 from config.config import settings

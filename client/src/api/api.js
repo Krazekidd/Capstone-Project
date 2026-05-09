@@ -810,6 +810,61 @@ export const shopAPI = {
       throw error.response?.data || { detail: 'Failed to fetch orders' };
     }
   },
+  getCartSummary: async () => {
+    try {
+      const response = await axiosInstance.get('/shop/cart/summary');
+      return response.data;
+    } catch (error) {
+      console.error('Get cart summary error:', error);
+      return { item_count: 0, subtotal: 0, currency: 'JMD' };
+    }
+  },
+  
+  validateCart: async () => {
+    try {
+      const response = await axiosInstance.post('/shop/cart/validate');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to validate cart' };
+    }
+  },
+  
+  bulkAddToCart: async (items) => {
+    try {
+      const response = await axiosInstance.post('/shop/cart/bulk-add', items);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to add items to cart' };
+    }
+  },
+  
+  mergeCart: async (items) => {
+    try {
+      const response = await axiosInstance.post('/shop/cart/merge', items);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to merge cart' };
+    }
+  },
+  
+  moveWishlistToCart: async (productId, quantity = 1) => {
+    try {
+      const response = await axiosInstance.post(`/shop/wishlist/move-to-cart/${productId}?quantity=${quantity}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to move item to cart' };
+    }
+  },
+  
+  getOrderById: async (orderId) => {
+    try {
+      const response = await axiosInstance.get(`/shop/orders/${orderId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch order' };
+    }
+  },
+
 };
 
 export const adminAPI = {

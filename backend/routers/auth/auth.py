@@ -60,7 +60,12 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 def create_refresh_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
+    # Add random jti (JWT ID) and iat (issued at) to ensure uniqueness
+    to_encode.update({
+        "exp": expire,
+        "jti": str(uuid.uuid4()),  # Unique identifier
+        "iat": datetime.utcnow()  # Issued at time
+    })
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -184,6 +189,7 @@ async def register(
         last_name=new_user.last_name,
         phone=new_user.phone,
         avatar_url=new_user.avatar_url,
+        role=getattr(new_user, 'role', 'client') or 'client',
         is_email_verified=new_user.is_email_verified,
         is_active=new_user.is_active,
         created_at=new_user.created_at,
@@ -235,6 +241,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_user_db)):
         last_name=user.last_name,
         phone=user.phone,
         avatar_url=user.avatar_url,
+        role=getattr(user, 'role', 'client') or 'client',
         is_email_verified=user.is_email_verified,
         is_active=user.is_active,
         created_at=user.created_at,
@@ -452,6 +459,10 @@ async def refresh_token(
         new_token_hash = hashlib.sha256(new_refresh_token_str.encode()).hexdigest()
         new_expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         
+        # Check if token is already revoked (race condition)
+        if stored_token.revoked:
+            raise HTTPException(status_code=401, detail="Refresh token already used")
+        
         # Revoke old refresh token
         stored_token.revoked = True
         stored_token.revoked_at = datetime.utcnow()
@@ -473,6 +484,7 @@ async def refresh_token(
             last_name=user.last_name,
             phone=user.phone,
             avatar_url=user.avatar_url,
+            role=getattr(user, 'role', 'client') or 'client',
             is_email_verified=user.is_email_verified,
             is_active=user.is_active,
             created_at=user.created_at,
@@ -515,6 +527,7 @@ async def get_user_info(
         last_name=user.last_name,
         phone=user.phone,
         avatar_url=user.avatar_url,
+        role=getattr(user, 'role', 'client') or 'client',
         is_email_verified=user.is_email_verified,
         is_active=user.is_active,
         created_at=user.created_at,

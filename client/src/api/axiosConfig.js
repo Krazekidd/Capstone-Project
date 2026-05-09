@@ -32,6 +32,18 @@ axiosInstance.interceptors.request.use(
     }
 );
 
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function addRefreshSubscriber(callback) {
+    refreshSubscribers.push(callback);
+}
+
+function notifyRefreshSubscribers(token) {
+    refreshSubscribers.forEach((callback) => callback(token));
+    refreshSubscribers = [];
+}
+
 // Response interceptor to handle token expiration
 axiosInstance.interceptors.response.use(
     (response) => {
@@ -42,6 +54,18 @@ axiosInstance.interceptors.response.use(
         
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
+            
+            if (isRefreshing) {
+                // If already refreshing, queue the request
+                return new Promise((resolve, reject) => {
+                    addRefreshSubscriber((token) => {
+                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                        resolve(axiosInstance(originalRequest));
+                    });
+                });
+            }
+            
+            isRefreshing = true;
             
             try {
                 // Try to refresh the token
@@ -56,24 +80,42 @@ axiosInstance.interceptors.response.use(
                         localStorage.setItem('refresh_token', data.refresh_token);
                     }
                     localStorage.setItem('user_id', data.user?.id || data.user_id);
+                    // Store user role if available
+                    if (data.user?.role) {
+                        localStorage.setItem('user_role', data.user.role);
+                    }
+                    
+                    // Notify all queued requests
+                    notifyRefreshSubscribers(data.access_token);
                     
                     // Retry the original request with new token
                     originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
-                    return axiosInstance(originalRequest);
+                    return axiosInstance(originalRequest); // Use axiosInstance for retry
                 }
             } catch (refreshError) {
+                // Notify all queued requests of failure
+                notifyRefreshSubscribers(null);
+                
                 // Refresh failed, clear tokens and redirect to login
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user_role');
                 localStorage.removeItem('user_id');
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userData');
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
             }
         }
         
         return Promise.reject(error);
     }
 );
+
+// Create instances
+export const api = axiosInstance;
+export const refreshAxios = refreshAxiosInstance;
 
 export default axiosInstance;

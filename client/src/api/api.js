@@ -14,7 +14,7 @@ export const authAPI = {
       if (data.refresh_token) {
         localStorage.setItem('refresh_token', data.refresh_token);
       }
-      localStorage.setItem('user_role', data.user?.id ? 'client' : 'client'); // Fallback role
+      localStorage.setItem('user_role', data.user?.role || data.role || 'client'); // Use actual role
       localStorage.setItem('user_id', data.user?.id || data.user_id);
       return data;
     } catch (error) {
@@ -31,7 +31,7 @@ export const authAPI = {
       if (data.refresh_token) {
         localStorage.setItem('refresh_token', data.refresh_token);
       }
-      localStorage.setItem('user_role', data.user?.id ? 'client' : 'client'); // Fallback role
+      localStorage.setItem('user_role', data.user?.role || data.role || 'client'); // Use actual role
       localStorage.setItem('user_id', data.user?.id || data.user_id);
       return data;
     } catch (error) {

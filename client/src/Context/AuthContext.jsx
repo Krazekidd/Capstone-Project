@@ -7,35 +7,48 @@ export const AuthProvider = ({ children }) => {
 
     // Initialize auth state from localStorage on mount
     useEffect(() => {
-        const token = localStorage.getItem('authToken');
-        const storedUser = localStorage.getItem('userData');
+        const token = localStorage.getItem('access_token');
+        const userId = localStorage.getItem('user_id');
+        const userRole = localStorage.getItem('user_role');
         
-        if (token && storedUser) {
+        if (token && userId) {
             try {
-                const userData = JSON.parse(storedUser);
+                const userData = {
+                    id: userId,
+                    role: userRole || 'client',
+                    token: token
+                };
                 setUser(userData);
             } catch (error) {
                 console.error('Failed to parse stored user data:', error);
-                localStorage.removeItem('authToken');
-                localStorage.removeItem('userData');
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('user_role');
             }
         }
     }, []);
 
     const login = (userData) => {
-        setUser(userData);
-        localStorage.setItem('authToken', userData.token);
-        localStorage.setItem('userData', JSON.stringify(userData));
+        const userObj = {
+            id: userData.user?.id || userData.user_id,
+            role: userData.user?.role || userData.role || 'client',
+            token: userData.access_token,
+            ...userData
+        };
+        setUser(userObj);
+        // Tokens are already stored by the API functions
     };
     
     const logout = () => {
         setUser(null);
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('userData');
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user_id');
         localStorage.removeItem('user_role');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userData');
+        localStorage.removeItem('remembered_email');
     };
     
     return (

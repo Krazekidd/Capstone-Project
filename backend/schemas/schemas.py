@@ -144,6 +144,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     id: uuid.UUID
+    role: str
     is_email_verified: bool
     is_active: bool
     created_at: datetime

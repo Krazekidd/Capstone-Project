@@ -422,13 +422,14 @@ export default function Account() {
 
   const currentBMI = calcBMI(parseFloat(meas.weight)||84, parseFloat(meas.height)||178);
 
-  // Goals
+  // Goals - fetched from API
   const [goals, setGoals] = useState({ weight:80, chest:100, waist:80, hips:98, thigh:58, arm:38 });
   const [goalIn, setGoalIn] = useState({ weight:80, chest:100, waist:80, hips:98, thigh:58, arm:38 });
   const [goalType, setGoalType] = useState("Bulk Up");
   const [goalHist, setGoalHist] = useState([]);
   const [showGoalHist, setShowGoalHist] = useState(false);
   const [confirmGoal, setConfirmGoal] = useState(false);
+  const [goalsLoading, setGoalsLoading] = useState(false);
 
   // Health
   const [health, setHealth] = useState([]);
@@ -451,15 +452,8 @@ export default function Account() {
   const [waterCups, setWaterCups] = useState(0);
   const WGOAL = 8;
 
-  // Charts
-  const [history] = useState([
-    { month:"Oct", weight:88, chest:100, waist:88, hips:100, thigh:58, arm:37 },
-    { month:"Nov", weight:87, chest:100, waist:87, hips:99,  thigh:58, arm:37 },
-    { month:"Dec", weight:86, chest:99,  waist:86, hips:99,  thigh:57, arm:37 },
-    { month:"Jan", weight:85, chest:98,  waist:85, hips:98,  thigh:57, arm:37 },
-    { month:"Feb", weight:84, chest:97,  waist:84, hips:97,  thigh:56, arm:37 },
-    { month:"Mar", weight:84, chest:96,  waist:84, hips:96,  thigh:56, arm:37 },
-  ]);
+  // Charts - fetched from API
+  const [history, setHistory] = useState([]);
   const [chartTab, setChartTab] = useState("weight");
 
   // AI
@@ -674,6 +668,34 @@ export default function Account() {
   };
 
   // Load progress history on component mount
+  const fetchProgressHistory = async () => {
+    try {
+      const historyData = await progressAPI.getProgressHistory();
+      
+      // Transform backend data to frontend format
+      const formattedHistory = historyData.map(entry => {
+        const date = new Date(entry.recorded_at);
+        return {
+          month: date.toLocaleDateString('en-US', { month: 'short' }),
+          weight: entry.weight || 0,
+          chest: entry.measurements?.chest || 0,
+          waist: entry.measurements?.waist || 0,
+          hips: entry.measurements?.hips || 0,
+          thigh: entry.measurements?.thigh_left || entry.measurements?.thigh_right || 0,
+          arm: entry.measurements?.arm_left || entry.measurements?.arm_right || 0,
+          recorded_at: date
+        };
+      }).filter(h => h.weight > 0); // Only include entries with weight
+      
+      setHistory(formattedHistory);
+    } catch (error) {
+      console.error('Error fetching progress history:', error);
+      // Set empty array to prevent errors
+      setHistory([]);
+    }
+  };
+
+  // Load data on component mount
   useEffect(() => {
     fetchProgressHistory();
     fetchGoals();
@@ -708,25 +730,60 @@ export default function Account() {
     return       { label:"Caloric Deficit",      protein:40, carbs:25, fat:35, cals:1700, note:"Whole foods and low-GI carbs. Medical guidance recommended." };
   })();
 
-  // Chart data
-  const labels = history.map(h=>h.month);
-  const wData = { labels, datasets:[
-    { label:"Weight (kg)", data:history.map(h=>h.weight), borderColor:"#ff6b1a", backgroundColor:"rgba(255,107,26,0.12)", borderWidth:2.5, tension:0.4, fill:true, pointBackgroundColor:"#ff6b1a", pointRadius:5, pointHoverRadius:7 },
-    { label:"Goal",        data:history.map(()=>goals.weight), borderColor:"rgba(255,255,255,0.3)", borderWidth:1.5, borderDash:[6,4], fill:false, pointRadius:0 },
-  ]};
-  const bData = { labels, datasets:[
-    { label:"Chest", data:history.map(h=>h.chest), borderColor:"#ff6b1a", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
-    { label:"Waist", data:history.map(h=>h.waist), borderColor:"#ffa040", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
-    { label:"Hips",  data:history.map(h=>h.hips),  borderColor:"#f0eeea", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
-    { label:"Thigh", data:history.map(h=>h.thigh), borderColor:"#6b6b7a", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
-  ]};
-  const compareItems = [
-    { label:"Weight", current:history[history.length-1].weight, goal:goals.weight, unit:"kg" },
-    { label:"Chest",  current:history[history.length-1].chest,  goal:goals.chest,  unit:"cm" },
-    { label:"Waist",  current:history[history.length-1].waist,  goal:goals.waist,  unit:"cm" },
-    { label:"Hips",   current:history[history.length-1].hips,   goal:goals.hips,   unit:"cm" },
+  // Chart data - use real user data or fallback to empty arrays
+  const labels = history.map(h => h.month);
+  const hasData = history.length > 0;
+  
+  const wData = { 
+    labels, 
+    datasets: [
+      { 
+        label:"Weight (kg)", 
+        data:history.map(h => h.weight || 0), 
+        borderColor:"#ff6b1a", 
+        backgroundColor:"rgba(255,107,26,0.12)", 
+        borderWidth:2.5, 
+        tension:0.4, 
+        fill:true, 
+        pointBackgroundColor:"#ff6b1a", 
+        pointRadius:5, 
+        pointHoverRadius:7 
+      },
+      { 
+        label:"Goal", 
+        data:history.map(() => goals.weight), 
+        borderColor:"rgba(255,255,255,0.3)", 
+        borderWidth:1.5, 
+        borderDash:[6,4], 
+        fill:false, 
+        pointRadius:0 
+      },
+    ]
+  };
+  
+  const bData = { 
+    labels, 
+    datasets: [
+      { label:"Chest", data:history.map(h => h.chest || 0), borderColor:"#ff6b1a", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
+      { label:"Waist", data:history.map(h => h.waist || 0), borderColor:"#ffa040", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
+      { label:"Hips",  data:history.map(h => h.hips || 0), borderColor:"#f0eeea", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
+      { label:"Thigh", data:history.map(h => h.thigh || 0), borderColor:"#6b6b7a", tension:0.4, borderWidth:2, fill:false, pointRadius:4 },
+    ]
+  };
+  
+  const compareItems = hasData ? [
+    { label:"Weight", current:history[history.length-1].weight || 0, goal:goals.weight, unit:"kg" },
+    { label:"Chest",  current:history[history.length-1].chest || 0, goal:goals.chest,  unit:"cm" },
+    { label:"Waist",  current:history[history.length-1].waist || 0, goal:goals.waist,  unit:"cm" },
+    { label:"Hips",   current:history[history.length-1].hips || 0, goal:goals.hips,   unit:"cm" },
+  ] : [
+    { label:"Weight", current:0, goal:goals.weight, unit:"kg" },
+    { label:"Chest",  current:0, goal:goals.chest,  unit:"cm" },
+    { label:"Waist",  current:0, goal:goals.waist,  unit:"cm" },
+    { label:"Hips",   current:0, goal:goals.hips,   unit:"cm" },
   ];
-  const cMax = Math.max(...compareItems.map(i=>Math.max(i.current,i.goal)));
+  
+  const cMax = Math.max(...compareItems.map(i => Math.max(i.current, i.goal)), 1);
 
   const mlChartData = mlProgress ? {
     labels: mlProgress.projections.map(p => p.label),
@@ -770,46 +827,6 @@ export default function Account() {
     } catch (error) {
       console.error('Error saving goals:', error);
       showToast("⚠️ Failed to save goals");
-    }
-  };
-
-  // Fetch progress history from backend
-  const fetchProgressHistory = async () => {
-    try {
-      const historyData = await progressAPI.getProgressHistory();
-      
-      // Transform backend data to frontend format
-      const formattedHistory = historyData.map(entry => ({
-        date: new Date(entry.recorded_at).toLocaleDateString("en-GB", { 
-          day: "numeric", 
-          month: "short", 
-          year: "numeric" 
-        }),
-        data: {
-          weight: entry.weight ? `${entry.weight}kg` : undefined,
-          waist: entry.measurements?.waist ? `${entry.measurements.waist}cm` : undefined,
-          chest: entry.measurements?.chest ? `${entry.measurements.chest}cm` : undefined,
-          bmi: entry.weight && entry.height ? 
-            (entry.weight / ((entry.height / 100) ** 2)).toFixed(1) : undefined,
-          // Include other measurements if available
-          ...(entry.measurements?.body_fat && { body_fat: `${entry.measurements.body_fat}%` }),
-          ...(entry.measurements?.shoulders && { shoulders: `${entry.measurements.shoulders}cm` }),
-          ...(entry.measurements?.arm_left && { arm_left: `${entry.measurements.arm_left}cm` }),
-          ...(entry.measurements?.arm_right && { arm_right: `${entry.measurements.arm_right}cm` }),
-          ...(entry.measurements?.neck && { neck: `${entry.measurements.neck}cm` }),
-          ...(entry.measurements?.hips && { hips: `${entry.measurements.hips}cm` }),
-          ...(entry.measurements?.thigh_left && { thigh_left: `${entry.measurements.thigh_left}cm` }),
-          ...(entry.measurements?.thigh_right && { thigh_right: `${entry.measurements.thigh_right}cm` }),
-          ...(entry.measurements?.calf_left && { calf_left: `${entry.measurements.calf_left}cm` }),
-          ...(entry.measurements?.calf_right && { calf_right: `${entry.measurements.calf_right}cm` }),
-          ...(entry.measurements?.glutes && { glutes: `${entry.measurements.glutes}cm` })
-        }
-      })).filter(entry => Object.values(entry.data).some(val => val !== undefined));
-
-      setMeasHist(formattedHistory);
-    } catch (error) {
-      console.error('Error fetching progress history:', error);
-      // Keep existing local state if fetch fails
     }
   };
 

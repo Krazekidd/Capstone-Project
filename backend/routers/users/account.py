@@ -247,25 +247,14 @@ async def save_progress(
         if role != "client":
             raise HTTPException(status_code=403, detail="Only clients can save progress measurements")
         
-        # Ensure user has a client profile
+        # Verify that client profile exists
         from models import Client
         
-        # Check if client profile exists
         client_result = await db.execute(select(Client).where(Client.id == user_id))
         client = client_result.scalar_one_or_none()
         
-        # Create client profile if it doesn't exist
         if not client:
-            logger.info(f"Creating client profile for user {user_id}")
-            user = current_user["user"]
-            new_client = Client(
-                id=user_id,
-                name=f"{user.first_name} {user.last_name}",
-                phone_number=user.phone
-            )
-            db.add(new_client)
-            await db.commit()
-            await db.refresh(new_client)
+            raise HTTPException(status_code=404, detail="Client profile not found. Please complete your registration first.")
         
         # Create new progress entry using body_measurements table
         from models import BodyMeasurement
@@ -1107,9 +1096,33 @@ async def get_today_water_intake(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Get today's water intake"""
-    from models import ClientWaterIntake
+    from models import ClientWaterIntake, Client
     
     user_id = current_user["user_id"]
+    
+    # Ensure user has a client profile
+    client_result = await db.execute(select(Client).where(Client.id == user_id))
+    client = client_result.scalar_one_or_none()
+    
+    # Create client profile if it doesn't exist
+    if not client:
+        logger.info(f"Creating client profile for user {user_id}")
+        user = current_user.get("user")
+        if user:
+            new_client = Client(
+                id=user_id,
+                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+                phone_number=getattr(user, 'phone', None)
+            )
+        else:
+            # Fallback if user object not available
+            new_client = Client(
+                id=user_id,
+                name="Client"
+            )
+        db.add(new_client)
+        await db.commit()
+        await db.refresh(new_client)
     
     today = datetime.utcnow().date()
     
@@ -1132,9 +1145,33 @@ async def log_water_intake(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Log water intake for today"""
-    from models import ClientWaterIntake
+    from models import ClientWaterIntake, Client
     
     user_id = current_user["user_id"]
+    
+    # Ensure user has a client profile
+    client_result = await db.execute(select(Client).where(Client.id == user_id))
+    client = client_result.scalar_one_or_none()
+    
+    # Create client profile if it doesn't exist
+    if not client:
+        logger.info(f"Creating client profile for user {user_id}")
+        user = current_user.get("user")
+        if user:
+            new_client = Client(
+                id=user_id,
+                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+                phone_number=getattr(user, 'phone', None)
+            )
+        else:
+            # Fallback if user object not available
+            new_client = Client(
+                id=user_id,
+                name="Client"
+            )
+        db.add(new_client)
+        await db.commit()
+        await db.refresh(new_client)
     
     today = datetime.utcnow().date()
     
@@ -1169,12 +1206,36 @@ async def get_strength_records(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Get current user's strength records"""
-    from models import ClientStrengthRecord
+    from models import ClientStrengthRecord, Client
     
     user_id = current_user["user_id"]
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Strength records only available for clients")
+    
+    # Ensure user has a client profile
+    client_result = await db.execute(select(Client).where(Client.id == user_id))
+    client = client_result.scalar_one_or_none()
+    
+    # Create client profile if it doesn't exist
+    if not client:
+        logger.info(f"Creating client profile for user {user_id}")
+        user = current_user.get("user")
+        if user:
+            new_client = Client(
+                id=user_id,
+                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+                phone_number=getattr(user, 'phone', None)
+            )
+        else:
+            # Fallback if user object not available
+            new_client = Client(
+                id=user_id,
+                name="Client"
+            )
+        db.add(new_client)
+        await db.commit()
+        await db.refresh(new_client)
     
     result = await db.execute(
         select(ClientStrengthRecord)
@@ -1205,12 +1266,36 @@ async def update_strength_record(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Update a strength record"""
-    from models import ClientStrengthRecord
+    from models import ClientStrengthRecord, Client
     
     user_id = current_user["user_id"]
     
     if current_user["role"] != "client":
         raise HTTPException(status_code=400, detail="Strength records only available for clients")
+    
+    # Ensure user has a client profile
+    client_result = await db.execute(select(Client).where(Client.id == user_id))
+    client = client_result.scalar_one_or_none()
+    
+    # Create client profile if it doesn't exist
+    if not client:
+        logger.info(f"Creating client profile for user {user_id}")
+        user = current_user.get("user")
+        if user:
+            new_client = Client(
+                id=user_id,
+                name=f"{user.first_name} {user.last_name}" if user.first_name and user.last_name else "Unknown",
+                phone_number=getattr(user, 'phone', None)
+            )
+        else:
+            # Fallback if user object not available
+            new_client = Client(
+                id=user_id,
+                name="Client"
+            )
+        db.add(new_client)
+        await db.commit()
+        await db.refresh(new_client)
     
     result = await db.execute(
         select(ClientStrengthRecord)

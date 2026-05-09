@@ -14,7 +14,7 @@ import httpx
 import hashlib
 import logging
 from database import get_user_db
-from models import User, AuthToken
+from models import User, AuthToken, Client, Trainer, Admin
 from schemas import (
     LoginRequest,
     RegisterRequest,
@@ -119,6 +119,43 @@ async def register(
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
+
+    # Create role-specific profile based on user's role
+    if new_user.role == 'client':
+        logger.info(f"Creating client profile for user {new_user.id}")
+        client_profile = Client(
+            id=new_user.id,
+            name=f"{new_user.first_name} {new_user.last_name}",
+            phone_number=new_user.phone
+        )
+        db.add(client_profile)
+        await db.commit()
+        await db.refresh(client_profile)
+        logger.info(f"Client profile created for user {new_user.id}")
+    
+    elif new_user.role == 'trainer':
+        logger.info(f"Creating trainer profile for user {new_user.id}")
+        trainer_profile = Trainer(
+            id=new_user.id,
+            name=f"{new_user.first_name} {new_user.last_name}",
+            phone_number=new_user.phone
+        )
+        db.add(trainer_profile)
+        await db.commit()
+        await db.refresh(trainer_profile)
+        logger.info(f"Trainer profile created for user {new_user.id}")
+    
+    elif new_user.role == 'admin':
+        logger.info(f"Creating admin profile for user {new_user.id}")
+        admin_profile = Admin(
+            id=new_user.id,
+            name=f"{new_user.first_name} {new_user.last_name}",
+            phone_number=new_user.phone
+        )
+        db.add(admin_profile)
+        await db.commit()
+        await db.refresh(admin_profile)
+        logger.info(f"Admin profile created for user {new_user.id}")
 
     # Send welcome email in background (disabled for testing)
     # background_tasks.add_task(send_welcome_email, request.email, f"{request.first_name} {request.last_name}")

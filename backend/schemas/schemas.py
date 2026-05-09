@@ -677,7 +677,7 @@ class TrainerEvaluationRequest(BaseModel):
     trainer_id: uuid.UUID
     evaluation_month: int = Field(..., ge=1, le=12, description="Month of evaluation (1-12)")
     evaluation_year: int = Field(..., ge=2020, le=2030, description="Year of evaluation")
-    evaluator_role: str = Field(..., regex="^(admin|senior_trainer)$", description="Role of evaluator")
+    evaluator_role: str = Field(..., pattern="^(admin|senior_trainer)$", description="Role of evaluator")
     
     # Evaluation criteria scores (1-10 scale, supports 0.5 increments)
     performance_score: Decimal = Field(..., ge=1.0, le=10.0, description="Performance & Results score")
@@ -1410,7 +1410,7 @@ class TrainerEvaluationRequest(BaseModel):
     trainer_id: uuid.UUID
     evaluation_month: int = Field(..., ge=1, le=12, description="Month of evaluation (1-12)")
     evaluation_year: int = Field(..., ge=2020, le=2030, description="Year of evaluation")
-    evaluator_role: str = Field(..., regex="^(admin|senior_trainer)$", description="Role of evaluator")
+    evaluator_role: str = Field(..., pattern="^(admin|senior_trainer)$", description="Role of evaluator")
     
     # Evaluation criteria scores (1-10 scale, supports 0.5 increments)
     performance_score: Decimal = Field(..., ge=1.0, le=10.0, description="Performance & Results score")
@@ -1551,3 +1551,4 @@ class GradeResponse(BaseModel):
 class GradeListResponse(BaseModel):
     trainer_id: str
     grades: List[GradeResponse]
+

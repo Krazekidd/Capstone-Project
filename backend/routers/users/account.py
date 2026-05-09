@@ -508,7 +508,7 @@ async def get_latest_progress(
 
 @router.get("/progress/analytics", response_model=ProgressAnalyticsResponse)
 async def get_progress_analytics(
-    period: str = Query("month", regex="^(week|month|quarter|year)$"),
+    period: str = Query("month", pattern="^(week|month|quarter|year)$"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):

@@ -81,22 +81,11 @@ export default function Navbar() {
   const [activeMenu, setActiveMenu] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [isSenior, setIsSenior] = useState(user?.is_senior ?? false);
   const closeTimer = useRef(null);
   const userDropdownRef = useRef(null);
 
-  /* For trainers, fetch is_senior from /account/me if not already known */
-  useEffect(()=>{
-    if (user?.role === "trainer" && user?.is_senior == null) {
-      import("../api/axiosConfig").then(({ default: axiosInstance }) => {
-        axiosInstance.get("/account/me")
-          .then(res => setIsSenior(!!res.data?.is_senior))
-          .catch(()=>{});
-      });
-    } else {
-      setIsSenior(!!user?.is_senior);
-    }
-  }, [user]);
+  const isSenior = user?.role === "trainer" && !!user?.is_senior;
+  const profilePath = getProfilePath(user, isSenior);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -128,7 +117,6 @@ export default function Navbar() {
   const displayName = user?.firstName || user?.name || (user?.email ? user.email.split('@')[0] : 'User');
   const userAvatar = user?.avatar || displayName.charAt(0).toUpperCase();
   const membershipType = user?.membership || "Member";
-  const profilePath = getProfilePath(user, isSenior);
 
   return (
     <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>

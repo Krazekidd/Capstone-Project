@@ -118,7 +118,8 @@ async def init_db():
         ShopCartItem, 
     ShopWishlistItem, 
     ShopOrder, 
-    ShopOrderItem
+    ShopOrderItem, TrainerEvaluation, Excursion, ExcursionBooking, 
+        ClientStatus, ShopOrder, ShopOrderItem, TrainerGrade
     )  # noqa: F401
 
     async with engine.begin() as conn:

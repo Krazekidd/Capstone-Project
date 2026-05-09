@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, Field, validator
 from typing import List, Optional
 from datetime import datetime, date
 import uuid
+from decimal import Decimal
 
 
 class WorkoutPlan(BaseModel):
@@ -669,6 +670,109 @@ class BadgeCheckResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# TRAINER EVALUATION SCHEMAS
+# ---------------------------------------------------------------------------
+
+class TrainerEvaluationRequest(BaseModel):
+    trainer_id: uuid.UUID
+    evaluation_month: int = Field(..., ge=1, le=12, description="Month of evaluation (1-12)")
+    evaluation_year: int = Field(..., ge=2020, le=2030, description="Year of evaluation")
+    evaluator_role: str = Field(..., regex="^(admin|senior_trainer)$", description="Role of evaluator")
+    
+    # Evaluation criteria scores (1-10 scale, supports 0.5 increments)
+    performance_score: Decimal = Field(..., ge=1.0, le=10.0, description="Performance & Results score")
+    motivation_score: Decimal = Field(..., ge=1.0, le=10.0, description="Motivation & Energy score")
+    interaction_score: Decimal = Field(..., ge=1.0, le=10.0, description="Client Interaction score")
+    knowledge_score: Decimal = Field(..., ge=1.0, le=10.0, description="Technical Knowledge score")
+    punctuality_score: Decimal = Field(..., ge=1.0, le=10.0, description="Punctuality score")
+    
+    notes: Optional[str] = Field(None, max_length=1000, description="Optional notes from evaluator")
+
+    @validator('performance_score', 'motivation_score', 'interaction_score', 'knowledge_score', 'punctuality_score')
+    def validate_score_increments(cls, v):
+        """Validate that scores are in 0.5 increments"""
+        if float(v) * 2 != int(float(v) * 2):
+            raise ValueError('Score must be a whole number or .5 increment')
+        return v
+
+
+class TrainerEvaluationResponse(BaseModel):
+    id: uuid.UUID
+    trainer_id: uuid.UUID
+    evaluation_month: int
+    evaluation_year: int
+    evaluator_id: uuid.UUID
+    evaluator_role: str
+    
+    # Evaluation criteria scores
+    performance_score: Optional[Decimal] = None
+    motivation_score: Optional[Decimal] = None
+    interaction_score: Optional[Decimal] = None
+    knowledge_score: Optional[Decimal] = None
+    punctuality_score: Optional[Decimal] = None
+    
+    # Calculated fields
+    weighted_mean: Optional[Decimal] = None
+    weighted_sd: Optional[Decimal] = None
+    final_score: Optional[Decimal] = None
+    
+    # Performance classification
+    performance_flag: Optional[str] = None
+    rater_agreement: Optional[str] = None
+    
+    # Metadata
+    notes: Optional[str] = None
+    submitted_at: datetime
+    finalised: bool
+    is_editable: bool
+    
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TrainerEvaluationSummary(BaseModel):
+    """Summary of evaluation results for a trainer"""
+    trainer_id: uuid.UUID
+    trainer_name: str
+    evaluation_month: int
+    evaluation_year: int
+    
+    # Individual evaluator scores
+    admin_score: Optional[Decimal] = None
+    senior1_score: Optional[Decimal] = None
+    senior2_score: Optional[Decimal] = None
+    
+    # Final calculated results
+    final_score: Optional[Decimal] = None
+    weighted_mean: Optional[Decimal] = None
+    weighted_sd: Optional[Decimal] = None
+    performance_flag: Optional[str] = None
+    rater_agreement: Optional[str] = None
+    
+    # Status
+    is_complete: bool = False
+    is_editable: bool = True
+    hours_until_lock: Optional[float] = None
+    
+    model_config = {"from_attributes": True}
+
+
+class TrainerEvaluationListResponse(BaseModel):
+    """Response for listing trainer evaluations"""
+    evaluations: List[TrainerEvaluationSummary]
+    total_count: int
+
+
+class EvaluationCriteriaResponse(BaseModel):
+    """Response showing evaluation criteria definitions"""
+    criteria: List[dict]
+    score_ranges: dict
+    performance_flags: dict
+
+
+# ---------------------------------------------------------------------------
 # Profile Image Schemas
 # ---------------------------------------------------------------------------
 
@@ -1296,3 +1400,154 @@ class BadgeCheckResponse(BaseModel):
     new_badges: List[BadgeResponse]
     total_badges: int
     message: str
+
+
+# ---------------------------------------------------------------------------
+# TRAINER EVALUATION SCHEMAS
+# ---------------------------------------------------------------------------
+
+class TrainerEvaluationRequest(BaseModel):
+    trainer_id: uuid.UUID
+    evaluation_month: int = Field(..., ge=1, le=12, description="Month of evaluation (1-12)")
+    evaluation_year: int = Field(..., ge=2020, le=2030, description="Year of evaluation")
+    evaluator_role: str = Field(..., regex="^(admin|senior_trainer)$", description="Role of evaluator")
+    
+    # Evaluation criteria scores (1-10 scale, supports 0.5 increments)
+    performance_score: Decimal = Field(..., ge=1.0, le=10.0, description="Performance & Results score")
+    motivation_score: Decimal = Field(..., ge=1.0, le=10.0, description="Motivation & Energy score")
+    interaction_score: Decimal = Field(..., ge=1.0, le=10.0, description="Client Interaction score")
+    knowledge_score: Decimal = Field(..., ge=1.0, le=10.0, description="Technical Knowledge score")
+    punctuality_score: Decimal = Field(..., ge=1.0, le=10.0, description="Punctuality score")
+    
+    notes: Optional[str] = Field(None, max_length=1000, description="Optional notes from evaluator")
+
+    @validator('performance_score', 'motivation_score', 'interaction_score', 'knowledge_score', 'punctuality_score')
+    def validate_score_increments(cls, v):
+        """Validate that scores are in 0.5 increments"""
+        if float(v) * 2 != int(float(v) * 2):
+            raise ValueError('Score must be a whole number or .5 increment')
+        return v
+
+
+class TrainerEvaluationResponse(BaseModel):
+    id: uuid.UUID
+    trainer_id: uuid.UUID
+    evaluation_month: int
+    evaluation_year: int
+    evaluator_id: uuid.UUID
+    evaluator_role: str
+    
+    # Evaluation criteria scores
+    performance_score: Optional[Decimal] = None
+    motivation_score: Optional[Decimal] = None
+    interaction_score: Optional[Decimal] = None
+    knowledge_score: Optional[Decimal] = None
+    punctuality_score: Optional[Decimal] = None
+    
+    # Calculated fields
+    weighted_mean: Optional[Decimal] = None
+    weighted_sd: Optional[Decimal] = None
+    final_score: Optional[Decimal] = None
+    
+    # Performance classification
+    performance_flag: Optional[str] = None
+    rater_agreement: Optional[str] = None
+    
+    # Metadata
+    notes: Optional[str] = None
+    submitted_at: datetime
+    finalised: bool
+    is_editable: bool
+    
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TrainerEvaluationSummary(BaseModel):
+    """Summary of evaluation results for a trainer"""
+    trainer_id: uuid.UUID
+    trainer_name: str
+    evaluation_month: int
+    evaluation_year: int
+    
+    # Individual evaluator scores
+    admin_score: Optional[Decimal] = None
+    senior1_score: Optional[Decimal] = None
+    senior2_score: Optional[Decimal] = None
+    
+    # Final calculated results
+    final_score: Optional[Decimal] = None
+    weighted_mean: Optional[Decimal] = None
+    weighted_sd: Optional[Decimal] = None
+    performance_flag: Optional[str] = None
+    rater_agreement: Optional[str] = None
+    
+    # Status
+    is_complete: bool = False
+    is_editable: bool = True
+    hours_until_lock: Optional[float] = None
+    
+    model_config = {"from_attributes": True}
+
+
+class TrainerEvaluationListResponse(BaseModel):
+    """Response for listing trainer evaluations"""
+    evaluations: List[TrainerEvaluationSummary]
+    total_count: int
+
+
+class EvaluationCriteriaResponse(BaseModel):
+    """Response showing evaluation criteria definitions"""
+    criteria: List[dict]
+    score_ranges: dict
+    performance_flags: dict
+
+
+# =============================================================
+# TRAINER GRADES
+# =============================================================
+
+class GradeScores(BaseModel):
+    performance: float
+    motivation: float
+    interaction: float
+    knowledge: float
+    punctuality: float
+
+
+class GradeSubmitRequest(BaseModel):
+    trainer_id: uuid.UUID
+    month_index: int
+    scores: GradeScores
+    notes: Optional[str] = None
+    submitted_by: uuid.UUID
+
+    @validator("month_index")
+    def validate_month_index(cls, v):
+        if v < 0 or v > 10:
+            raise ValueError("month_index must be between 0 and 10 (Jan–Nov)")
+        return v
+
+
+class GradeResponse(BaseModel):
+    id: str
+    trainer_id: str
+    month_index: int
+    scores: GradeScores
+    overall_avg: float
+    notes: Optional[str]
+    submitted_by: str
+    submitted_at: str
+    finalised: bool
+    locked: bool
+    hours_remaining: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GradeListResponse(BaseModel):
+    trainer_id: str
+    grades: List[GradeResponse]

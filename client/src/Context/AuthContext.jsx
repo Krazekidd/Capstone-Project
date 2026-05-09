@@ -10,21 +10,30 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('access_token');
         const userId = localStorage.getItem('user_id');
         const userRole = localStorage.getItem('user_role');
+        const userData = localStorage.getItem('userData');
         
         if (token && userId) {
             try {
-                const userData = {
+                let userObj = {
                     id: userId,
                     role: userRole || 'client',
                     token: token
                 };
-                setUser(userData);
+                
+                // Parse stored user data if available
+                if (userData) {
+                    const parsedUserData = JSON.parse(userData);
+                    userObj = { ...userObj, ...parsedUserData };
+                }
+                
+                setUser(userObj);
             } catch (error) {
                 console.error('Failed to parse stored user data:', error);
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
                 localStorage.removeItem('user_id');
                 localStorage.removeItem('user_role');
+                localStorage.removeItem('userData');
             }
         }
     }, []);
@@ -34,9 +43,27 @@ export const AuthProvider = ({ children }) => {
             id: userData.user?.id || userData.user_id,
             role: userData.user?.role || userData.role || 'client',
             token: userData.access_token,
+            firstName: userData.user?.first_name || userData.first_name,
+            lastName: userData.user?.last_name || userData.last_name,
+            email: userData.user?.email || userData.email,
+            membership: userData.user?.membership || userData.membership,
+            avatar: userData.user?.avatar_url || userData.avatar_url || userData.avatar,
             ...userData
         };
         setUser(userObj);
+        
+        // Store complete user data in localStorage
+        const dataToStore = {
+            id: userObj.id,
+            role: userObj.role,
+            firstName: userObj.firstName,
+            lastName: userObj.lastName,
+            email: userObj.email,
+            membership: userObj.membership,
+            avatar: userObj.avatar
+        };
+        localStorage.setItem('userData', JSON.stringify(dataToStore));
+        
         // Tokens are already stored by the API functions
     };
     

@@ -33,14 +33,10 @@ const MailIcon = () => (
 ════════════════════════════════════════════════════════════ */
 const getRedirectPath = (role) => {
   switch(role) {
-    case 'admin':
-      return '/admin';
-    case 'trainer':
-      return '/trainer';
-    case 'client':
-      return '/account';
-    default:
-      return '/account';
+    case 'admin':   return '/admin';
+    case 'trainer': return '/trainer';
+    case 'client':  return '/account';
+    default:        return '/account';
   }
 };
 
@@ -122,8 +118,10 @@ export default function Login() {
         localStorage.removeItem('remembered_email');
       }
       
-      // Redirect based on role
-      const redirectPath = getRedirectPath(response.role);
+      // Redirect based on role — role lives in response.user.role
+      const role = response.user?.role || response.role || 'client';
+      const isSenior = response.is_senior ?? false;
+      const redirectPath = role === 'trainer' && isSenior ? '/STrainer' : getRedirectPath(role);
       navigate(redirectPath);
     } catch (err) {
       let errorMessage = "Login failed. Please check your credentials.";

@@ -145,6 +145,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     id: uuid.UUID
+    role: str = "client"
     is_email_verified: bool
     is_active: bool
     created_at: datetime
@@ -168,6 +169,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: Optional[int] = None
     user: Optional[UserResponse] = None
+    is_senior: Optional[bool] = None
 
 
 class RefreshTokenRequest(BaseModel):

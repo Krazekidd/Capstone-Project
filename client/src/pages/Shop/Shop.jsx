@@ -598,12 +598,14 @@ export default function Shop() {
       const grouped = {
         merch: [],
         essentials: [],
-        supplements: []
+        supplements: [],
+        apparel: [],
+        equipment:[]
       };
       
       allProducts.forEach(product => {
-        if (grouped[product.category_id]) {
-          grouped[product.category_id].push(product);
+        if (grouped[product.category]) {
+          grouped[product.category].push(product);
         }
       });
       

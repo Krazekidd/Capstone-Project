@@ -36,7 +36,7 @@ membership_tier_enum = Enum('basic', 'pro', 'elite', name='membership_tier')
 membership_status_enum = Enum('active', 'inactive', 'suspended', 'cancelled', name='membership_status')
 consultation_format_enum = Enum('in_person', 'video_call', name='consultation_format')
 booking_status_enum = Enum('pending', 'confirmed', 'cancelled', 'completed', 'no_show', name='booking_status')
-product_category_enum = Enum('merch', 'essentials', 'supplements', name='product_category')
+product_category_enum = Enum('merch', 'essentials', 'supplements','apparel','equipment','accessories', name='product_category')
 order_status_enum = Enum('pending', 'paid', 'shipped', 'delivered', 'refunded', 'cancelled', name='order_status')
 token_type_enum = Enum('refresh', 'password_reset', 'email_verify', name='token_type')
 
@@ -67,8 +67,8 @@ class User(Base):
     bookings = relationship("Booking", back_populates="user", cascade="all, delete-orphan")
     shop_orders = relationship("ShopOrder", back_populates="user", cascade="all, delete-orphan")
     product_reviews = relationship("ProductReview", back_populates="user", cascade="all, delete-orphan")
-    wishlists = relationship("Wishlist", back_populates="user", cascade="all, delete-orphan")
-    
+    cart_items = relationship("ShopCartItem", back_populates="user", cascade="all, delete-orphan")
+    wishlist_items = relationship("ShopWishlistItem", back_populates="user", cascade="all, delete-orphan")   
     excursion_bookings = relationship("ExcursionBooking", back_populates="user", cascade="all, delete-orphan")
     
     # Role-specific relationships
@@ -414,8 +414,8 @@ class Product(Base):
     # Relationships
     product_reviews = relationship("ProductReview", back_populates="product", cascade="all, delete-orphan")
     shop_order_items = relationship("ShopOrderItem", back_populates="product")
-    wishlists = relationship("Wishlist", back_populates="product", cascade="all, delete-orphan")
-
+    cart_items = relationship("ShopCartItem", back_populates="product", cascade="all, delete-orphan")
+    wishlist_items = relationship("ShopWishlistItem", back_populates="product", cascade="all, delete-orphan")
     # Indexes
     __table_args__ = (
         Index('idx_products_category', 'category'),
@@ -457,7 +457,7 @@ class ProductReview(Base):
 # WISHLIST / FAVOURITES
 # =============================================================
 
-class Wishlist(Base):
+class ShopWishlistItem(Base):
     __tablename__ = "wishlists"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -466,12 +466,13 @@ class Wishlist(Base):
     added_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     # Relationships
-    user = relationship("User", back_populates="wishlists")
-    product = relationship("Product", back_populates="wishlists")
+    user = relationship("User", back_populates="wishlist_items")
+    product = relationship("Product", back_populates="wishlist_items")
 
     # Constraints
     __table_args__ = (
         Index('idx_wishlists_user_id', 'user_id'),
+        Index('idx_wishlists_product_id', 'product_id'),
         Index('idx_wishlists_unique', 'user_id', 'product_id', unique=True),
     )
 
@@ -1157,3 +1158,29 @@ class TrainerGrade(Base):
         Index('idx_trainer_grades_trainer_id', 'trainer_id'),
         Index('idx_trainer_grades_submitted_by', 'submitted_by'),
     )
+
+class ShopCartItem(Base):
+    """Shopping cart items model"""
+    __tablename__ = "shop_cart_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    quantity = Column(Integer, nullable=False, default=1)
+    added_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="cart_items")
+    product = relationship("Product", back_populates="cart_items")
+
+    # Indexes
+    __table_args__ = (
+        Index('idx_shop_cart_user_id', 'user_id'),
+        Index('idx_shop_cart_product_id', 'product_id'),
+        Index('idx_shop_cart_unique', 'user_id', 'product_id', unique=True),
+    )
+
+
+
+

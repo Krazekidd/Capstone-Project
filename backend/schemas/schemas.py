@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, Field, validator
 from typing import List, Optional
 from datetime import datetime, date
 import uuid
@@ -145,7 +145,6 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     id: uuid.UUID
-    role: str
     is_email_verified: bool
     is_active: bool
     created_at: datetime
@@ -296,30 +295,6 @@ class BookingResponse(BookingBase):
 # Shop Schemas
 # ---------------------------------------------------------------------------
 
-class ProductBase(BaseModel):
-    name: str
-    slug: str
-    category: str
-    description: Optional[str] = None
-    price: float
-    currency: str = "JMD"
-    image_url: Optional[str] = None
-    badge_label: Optional[str] = None
-    badge_color: Optional[str] = None
-    stock_qty: int = 0
-    is_active: bool = True
-    sort_order: int = 0
-
-
-class ProductResponse(ProductBase):
-    id: uuid.UUID
-    average_rating: float
-    review_count: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
 
 class ProductReviewBase(BaseModel):
     rating: int
@@ -335,15 +310,6 @@ class ProductReviewResponse(ProductReviewBase):
     model_config = {"from_attributes": True}
 
 
-
-class WishlistResponse(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    product_id: uuid.UUID
-    product: Optional[ProductResponse] = None
-    added_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 # ---------------------------------------------------------------------------
@@ -1066,55 +1032,271 @@ class ClientWithStatusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Shop Order Schemas
 # ---------------------------------------------------------------------------
+# ========== PRODUCT SCHEMAS ==========
 
-class ShopOrderItemBase(BaseModel):
-    product_id: uuid.UUID
-    quantity: int
-    unit_price: float
+class ShopProductResponse(BaseModel):
+    """Response schema for shop product list"""
+    id: str
+    name: str
+    description: Optional[str] = None
+    price: float
+    category: str
+    image_url: Optional[str] = None
+    badge_label: Optional[str] = None
+    badge_color: Optional[str] = None
+    average_rating: float = 0
+    review_count: int = 0
+    stock_qty: int = 0
+    is_active: bool = True
+    featured: bool = False
+    
+    
 
-class ShopOrderItemResponse(ShopOrderItemBase):
-    id: uuid.UUID
-    shop_order_id: uuid.UUID
-    product_name: str
-    line_total: float
-    product: Optional[ProductResponse] = None
+
+class ShopProductDetailResponse(ShopProductResponse):
+    """Response schema for detailed product view"""
+    slug: str
+    currency: str = "JMD"
+    description: Optional[str] = None
     created_at: datetime
+    updated_at: datetime
 
-    model_config = {"from_attributes": True}
+
+# ========== CART SCHEMAS ==========
+
+class AddToCartRequest(BaseModel):
+    """Request schema for adding item to cart"""
+    product_id: str
+    quantity: int = Field(default=1, ge=1, le=99)
 
 
-class ShopOrderBase(BaseModel):
-    items: List[ShopOrderItemBase]
-    shipping_address: dict
+class UpdateCartRequest(BaseModel):
+    """Request schema for updating cart item"""
+    product_id: str
+    quantity: int = Field(ge=0)
+
+
+class CartItemResponse(BaseModel):
+    """Response schema for cart items"""
+    product_id: str
+    name: str
+    price: float
+    quantity: int
+    total: float
+    image_url: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    @field_validator('price', 'total', mode='before')
+    @classmethod
+    def convert_decimal(cls, v):
+        return float(v) if v is not None else 0.0
+
+
+class CartResponse(BaseModel):
+    """Response schema for full cart"""
+    items: List[CartItemResponse]
+    subtotal: float
+    tax: float
+    shipping_cost: float
+    total: float
+    item_count: int
+    
+    @field_validator('subtotal', 'tax', 'shipping_cost', 'total', mode='before')
+    @classmethod
+    def convert_decimals(cls, v):
+        return float(v) if v is not None else 0.0
+
+
+class CartSummaryResponse(BaseModel):
+    """Lightweight cart summary for navbar/badges"""
+    item_count: int
+    subtotal: float
+    currency: str = "JMD"
+    
+    @field_validator('subtotal', mode='before')
+    @classmethod
+    def convert_decimal(cls, v):
+        return float(v) if v is not None else 0.0
+
+
+class CartValidationResponse(BaseModel):
+    """Response for cart validation before checkout"""
+    is_valid: bool
+    errors: List[str] = []
+    warnings: List[str] = []
+    out_of_stock_items: List[str] = []
+    quantity_exceeds_stock: List[dict] = []
+    price_changes: List[dict] = []
+    original_total: float = 0.0
+    updated_total: float = 0.0
+
+
+# ========== WISHLIST SCHEMAS ==========
+
+class WishlistItemResponse(BaseModel):
+    """Response schema for wishlist items"""
+    product_id: str
+    name: str
+    price: float
+    image_url: Optional[str] = None
+    
+    @field_validator('price', mode='before')
+    @classmethod
+    def convert_decimal(cls, v):
+        return float(v) if v is not None else 0.0
+
+
+class WishlistResponse(BaseModel):
+    """Response schema for full wishlist"""
+    items: List[WishlistItemResponse]
+    total: int
+
+
+# ========== ORDER SCHEMAS ==========
+
+class OrderAddress(BaseModel):
+    """Shipping/Billing address schema"""
+    customer_name: str = Field(min_length=1, max_length=200)
+    email: str = Field(pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    phone: str = Field(min_length=5, max_length=20)
+    address: str = Field(min_length=5, max_length=500)
+    city: str = Field(min_length=2, max_length=100)
     notes: Optional[str] = None
 
 
-class AdminOrderResponse(BaseModel):
+class PlaceOrderRequest(OrderAddress):
+    """Request schema for placing an order"""
+    payment_method: str = Field(default="card", pattern="^(card|cash|wallet)$")
+
+
+class OrderItemResponse(BaseModel):
+    """Response schema for order items"""
+    product_id: str
+    product_name: str
+    product_price: float
+    quantity: int
+    total: float
+    
+    @field_validator('product_price', 'total', mode='before')
+    @classmethod
+    def convert_decimal(cls, v):
+        return float(v) if v is not None else 0.0
+
+
+class OrderResponse(BaseModel):
+    """Response schema for orders"""
     id: uuid.UUID
-    user_id: uuid.UUID
     order_number: str
     status: str
     subtotal: float
     tax_amount: float
     shipping_amount: float
     total_amount: float
-    currency: str
-    shipping_address: Optional[dict] = None
-    billing_address: Optional[dict] = None
+    shipping_address: dict
     notes: Optional[str] = None
-    shipped_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
+    items: List[OrderItemResponse]
     created_at: datetime
-    updated_at: datetime
-    shop_order_items: List[ShopOrderItemResponse] = []
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    @field_validator('subtotal', 'tax_amount', 'shipping_amount', 'total_amount', mode='before')
+    @classmethod
+    def convert_decimals(cls, v):
+        return float(v) if v is not None else 0.0
 
-    model_config = {"from_attributes": True}
 
+class OrdersListResponse(BaseModel):
+    """Response schema for list of orders"""
+    orders: List[OrderResponse]
+    total: int
+
+
+# ========== UTILITY SCHEMAS ==========
+
+class APIResponse(BaseModel):
+    """Generic API response wrapper"""
+    success: bool
+    message: str
+    data: Optional[dict] = None
+    error: Optional[str] = None
+
+
+class BulkAddResponse(BaseModel):
+    """Response for bulk add to cart"""
+    message: str
+    added_count: int
+    errors: Optional[List[str]] = None
+    success: bool
+
+
+class MergeCartResponse(BaseModel):
+    """Response for cart merge operation"""
+    message: str
+    merged_count: int
+    conflicts: Optional[List[dict]] = None
+    success: bool
+
+
+# ==========  ADMIN SCHEMAS (if needed) ==========
 
 class UpdateOrderStatusRequest(BaseModel):
-    status: str
+    """Request schema for updating order status (admin)"""
+    status: str = Field(..., pattern="^(pending|processing|shipped|delivered|cancelled|refunded)$")
     notes: Optional[str] = None
+    tracking_number: Optional[str] = None
 
+
+class UpdateOrderStatusResponse(BaseModel):
+    """Response schema for order status update"""
+    id: uuid.UUID
+    order_number: str
+    previous_status: str
+    new_status: str
+    updated_at: datetime
+    success: bool
+
+
+class AdminOrderResponse(OrderResponse):
+    """Extended order response for admin"""
+    user_id: uuid.UUID
+    user_email: Optional[str] = None
+    user_name: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class ProductCreateRequest(BaseModel):
+    """Request schema for creating a product (admin)"""
+    name: str = Field(min_length=1, max_length=200)
+    slug: str = Field(min_length=1, max_length=200)
+    category: str
+    description: Optional[str] = None
+    price: float = Field(gt=0)
+    currency: str = "JMD"
+    image_url: Optional[str] = None
+    badge_label: Optional[str] = None
+    badge_color: Optional[str] = None
+    stock_qty: int = Field(default=0, ge=0)
+    is_active: bool = True
+    sort_order: int = 0
+    featured: bool = False
+
+
+class ProductUpdateRequest(BaseModel):
+    """Request schema for updating a product (admin)"""
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    slug: Optional[str] = Field(None, min_length=1, max_length=200)
+    category: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = Field(None, gt=0)
+    currency: Optional[str] = None
+    image_url: Optional[str] = None
+    badge_label: Optional[str] = None
+    badge_color: Optional[str] = None
+    stock_qty: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+    featured: Optional[bool] = None
 
 # ---------------------------------------------------------------------------
 # Dashboard Stats Schema

@@ -170,6 +170,7 @@ class Trainer(Base):
     trainer_ratings = relationship("TrainerRating", back_populates="trainer", cascade="all, delete-orphan")
     trainer_assessments = relationship("TrainerAssessment", back_populates="trainer", cascade="all, delete-orphan")
     training_schedules = relationship("TrainingSchedule", back_populates="trainer", cascade="all, delete-orphan")
+    grades = relationship("TrainerGrade", foreign_keys="TrainerGrade.trainer_id", back_populates="trainer", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
@@ -1127,4 +1128,32 @@ class ShopOrderItem(Base):
     __table_args__ = (
         Index('idx_shop_order_items_order_id', 'shop_order_id'),
         Index('idx_shop_order_items_product_id', 'product_id'),
+    )
+
+
+# =============================================================
+# TRAINER GRADES
+# =============================================================
+
+class TrainerGrade(Base):
+    __tablename__ = "trainer_grades"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trainer_id = Column(UUID(as_uuid=True), ForeignKey("trainers.id", ondelete="CASCADE"), nullable=False)
+    month_index = Column(Integer, nullable=False)  # 0–10 (Jan–Nov)
+    scores = Column(JSONB, nullable=False)          # {performance, motivation, interaction, knowledge, punctuality}
+    overall_avg = Column(Numeric(4, 2), nullable=False)
+    notes = Column(Text)
+    submitted_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    submitted_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    finalised = Column(Boolean, nullable=False, default=True)
+
+    # Relationships
+    trainer = relationship("Trainer", foreign_keys=[trainer_id], back_populates="grades")
+    submitter = relationship("User", foreign_keys=[submitted_by])  # senior trainer or admin
+
+    __table_args__ = (
+        CheckConstraint('month_index BETWEEN 0 AND 10', name='check_grade_month_index'),
+        Index('idx_trainer_grades_trainer_id', 'trainer_id'),
+        Index('idx_trainer_grades_submitted_by', 'submitted_by'),
     )

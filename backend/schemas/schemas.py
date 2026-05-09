@@ -1321,3 +1321,51 @@ class EvaluationCriteriaResponse(BaseModel):
     criteria: List[dict]
     score_ranges: dict
     performance_flags: dict
+
+
+# =============================================================
+# TRAINER GRADES
+# =============================================================
+
+class GradeScores(BaseModel):
+    performance: float
+    motivation: float
+    interaction: float
+    knowledge: float
+    punctuality: float
+
+
+class GradeSubmitRequest(BaseModel):
+    trainer_id: uuid.UUID
+    month_index: int
+    scores: GradeScores
+    notes: Optional[str] = None
+    submitted_by: uuid.UUID
+
+    @validator("month_index")
+    def validate_month_index(cls, v):
+        if v < 0 or v > 10:
+            raise ValueError("month_index must be between 0 and 10 (Jan–Nov)")
+        return v
+
+
+class GradeResponse(BaseModel):
+    id: str
+    trainer_id: str
+    month_index: int
+    scores: GradeScores
+    overall_avg: float
+    notes: Optional[str]
+    submitted_by: str
+    submitted_at: str
+    finalised: bool
+    locked: bool
+    hours_remaining: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GradeListResponse(BaseModel):
+    trainer_id: str
+    grades: List[GradeResponse]

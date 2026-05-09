@@ -115,7 +115,7 @@ async def init_db():
         Client, Trainer, Admin, ClientGoal, ClientHealthCondition,
         ClientWaterIntake, ClientStrengthRecord, TrainerRating,
         TrainerAssessment, TrainerEvaluation, Excursion, ExcursionBooking, 
-        ClientStatus, ShopOrder, ShopOrderItem
+        ClientStatus, ShopOrder, ShopOrderItem, TrainerGrade
     )  # noqa: F401
 
     async with engine.begin() as conn:

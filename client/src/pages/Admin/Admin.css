@@ -1038,3 +1038,27 @@ tbody tr:hover { background: rgba(242, 101, 34, 0.05); }
   color: #4caf50;
   font-size: 13px;
 }
+/* ── Grade button & month label ── */
+.btn-grade {
+    background: var(--orange);
+    border-color: var(--orange);
+    color: var(--white);
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+.btn-grade:hover {
+    background: var(--orange-light);
+    border-color: var(--orange-light);
+    transform: translateY(-1px);
+}
+.assess-month-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--cyan);
+    padding: 6px 0 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+}

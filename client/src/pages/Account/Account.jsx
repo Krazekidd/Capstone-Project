@@ -1595,7 +1595,7 @@ export default function Account() {
                     </div>
                   ))}
                 </div>
-                <p style={{fontSize:11,color:"var(--sub,#6b6b7a)",marginTop:8}}>{mlWorkout?.disclaimer}</p>
+                <p style={{ fontSize: 11, color: "var(--sub,#6b6b7a)", marginTop: 8, fontWeight: 'bold' }}> {mlWorkout?.disclaimer}</p>
               </div>
             )}
           </div>

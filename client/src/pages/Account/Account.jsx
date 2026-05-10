@@ -509,7 +509,7 @@ export default function Account() {
     logout();
     setShowSettings(false);
     showToast("Logged out — see you next time! 👋");
-    navigate("/login");
+    navigate("/");
   };
 
   // ML data fetch — calls all 3 ML endpoints in parallel

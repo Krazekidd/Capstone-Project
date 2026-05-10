@@ -1,6 +1,6 @@
 // src/components/Navbar.jsx
 import { useState, useEffect, useRef } from "react";
-import { NavLink, Link } from "react-router-dom";
+import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 
 /* Resolve the "My Profile" destination based on role */
@@ -76,6 +76,7 @@ const NAV_ITEMS = [
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const isLoggedIn = !!user;
   const [scrolled, setScrolled] = useState(false);
   const [activeMenu, setActiveMenu] = useState(null);
@@ -108,6 +109,12 @@ export default function Navbar() {
 
   const handleMouseLeave = () => {
     closeTimer.current = setTimeout(() => setActiveMenu(null), 180);
+  };
+
+  // Logout handler that navigates to home page
+  const handleLogout = () => {
+    logout();
+    navigate("/");
   };
 
   // Mock cart item count – replace with actual cart context later
@@ -194,7 +201,7 @@ export default function Navbar() {
                       <span className="ndi-label">My Profile</span>
                       <span className="ndi-desc">Profile & settings</span>
                     </Link>
-                    <button onClick={() => { logout(); setUserDropdownOpen(false); }} className="nav-user-dropdown-item nav-user-dropdown-logout">
+                    <button onClick={() => { handleLogout(); setUserDropdownOpen(false); }} className="nav-user-dropdown-item nav-user-dropdown-logout">
                       <span className="ndi-label">Log Out</span>
                       <span className="ndi-desc">Sign out of GymPro</span>
                     </button>
@@ -255,7 +262,7 @@ export default function Navbar() {
             {isLoggedIn && (
               <>
                 <Link to={profilePath} className="nav-btn-solid">My Profile</Link>
-                <button onClick={logout} className="nav-btn-ghost">Log Out</button>
+                <button onClick={handleLogout} className="nav-btn-ghost">Log Out</button>
               </>
             )}
             <Link to="/shop" className="nav-btn-solid nav-cart-mobile">

@@ -18,8 +18,9 @@ from routers.users.user_profile import router as user_profile_router
 from routers.trainers.trainer_api import router as trainer_api_router
 from routers.evaluations.evaluation import router as evaluation_router
 from routers.grades.grades import router as grades_router
-from database import init_db, check_db_connection
+from database import init_db, check_db_connection, get_db
 from config.config import PROFILE_IMAGES_DIR, PROGRESS_PHOTOS_DIR
+from config.seed import run_seed
 import logging
 import os
 
@@ -59,6 +60,12 @@ async def lifespan(app: FastAPI):
     
     # Initialize database tables
     await init_db()
+
+    # Insert seed test accounts (skips if already present)
+    async for db in get_db():
+        await run_seed(db)
+        break
+
     logger.info("✅ Application started successfully")
     yield
     logger.info("👋 Shutting down application...")

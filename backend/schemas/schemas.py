@@ -145,6 +145,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     id: uuid.UUID
+    role: str = "client"
     is_email_verified: bool
     is_active: bool
     created_at: datetime
@@ -168,6 +169,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: Optional[int] = None
     user: Optional[UserResponse] = None
+    is_senior: Optional[bool] = None
 
 
 class RefreshTokenRequest(BaseModel):
@@ -677,7 +679,7 @@ class TrainerEvaluationRequest(BaseModel):
     trainer_id: uuid.UUID
     evaluation_month: int = Field(..., ge=1, le=12, description="Month of evaluation (1-12)")
     evaluation_year: int = Field(..., ge=2020, le=2030, description="Year of evaluation")
-    evaluator_role: str = Field(..., regex="^(admin|senior_trainer)$", description="Role of evaluator")
+    evaluator_role: str = Field(..., pattern="^(admin|senior_trainer)$", description="Role of evaluator")
     
     # Evaluation criteria scores (1-10 scale, supports 0.5 increments)
     performance_score: Decimal = Field(..., ge=1.0, le=10.0, description="Performance & Results score")
@@ -810,6 +812,10 @@ class TrainerAccount(BaseModel):
     rating: Optional[float] = None
     trainer_level: Optional[str] = None
     is_senior: Optional[bool] = None
+    bio: Optional[str] = None
+    specialties: Optional[list] = None
+    experience_years: Optional[int] = None
+    profile_image: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -1410,7 +1416,7 @@ class TrainerEvaluationRequest(BaseModel):
     trainer_id: uuid.UUID
     evaluation_month: int = Field(..., ge=1, le=12, description="Month of evaluation (1-12)")
     evaluation_year: int = Field(..., ge=2020, le=2030, description="Year of evaluation")
-    evaluator_role: str = Field(..., regex="^(admin|senior_trainer)$", description="Role of evaluator")
+    evaluator_role: str = Field(..., pattern="^(admin|senior_trainer)$", description="Role of evaluator")
     
     # Evaluation criteria scores (1-10 scale, supports 0.5 increments)
     performance_score: Decimal = Field(..., ge=1.0, le=10.0, description="Performance & Results score")
@@ -1551,3 +1557,4 @@ class GradeResponse(BaseModel):
 class GradeListResponse(BaseModel):
     trainer_id: str
     grades: List[GradeResponse]
+

@@ -27,7 +27,8 @@ from schemas.schemas import (
     TrainerEvaluationRequest, 
     TrainerEvaluationResponse,
     TrainerEvaluationSummary,
-    TrainerEvaluationListResponse
+    TrainerEvaluationListResponse,
+    EvaluationCriteriaResponse
 )
 
 

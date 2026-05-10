@@ -3,6 +3,15 @@ import { useState, useEffect, useRef } from "react";
 import { NavLink, Link } from "react-router-dom";
 import { useAuth } from "../Context/AuthContext";
 
+/* Resolve the "My Profile" destination based on role */
+function getProfilePath(user, isSenior = false) {
+  if (!user) return "/account";
+  const role = user.role;
+  if (role === "admin") return "/admin";
+  if (role === "trainer") return isSenior ? "/STrainer" : "/trainer";
+  return "/account";
+}
+
 /* ─────────────────────────────────────────
    ICONS
 ───────────────────────────────────────── */
@@ -74,6 +83,9 @@ export default function Navbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const closeTimer = useRef(null);
   const userDropdownRef = useRef(null);
+
+  const isSenior = user?.role === "trainer" && !!user?.is_senior;
+  const profilePath = getProfilePath(user, isSenior);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -178,8 +190,8 @@ export default function Navbar() {
               {userDropdownOpen && (
                 <div className="nav-user-dropdown">
                   <div className="nav-user-dropdown-inner">
-                    <Link to="/account" className="nav-user-dropdown-item" onClick={() => setUserDropdownOpen(false)}>
-                      <span className="ndi-label">My Account</span>
+                    <Link to={profilePath} className="nav-user-dropdown-item" onClick={() => setUserDropdownOpen(false)}>
+                      <span className="ndi-label">My Profile</span>
                       <span className="ndi-desc">Profile & settings</span>
                     </Link>
                     <button onClick={() => { logout(); setUserDropdownOpen(false); }} className="nav-user-dropdown-item nav-user-dropdown-logout">
@@ -242,7 +254,7 @@ export default function Navbar() {
             )}
             {isLoggedIn && (
               <>
-                <Link to="/account" className="nav-btn-solid">My Account</Link>
+                <Link to={profilePath} className="nav-btn-solid">My Profile</Link>
                 <button onClick={logout} className="nav-btn-ghost">Log Out</button>
               </>
             )}

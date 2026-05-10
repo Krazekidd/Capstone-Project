@@ -234,6 +234,15 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_user_db)):
     db.add(auth_token)
     await db.commit()
 
+    role = getattr(user, 'role', 'client') or 'client'
+
+    # Fetch is_senior for trainer accounts
+    is_senior = None
+    if role == 'trainer':
+        trainer_result = await db.execute(select(Trainer).where(Trainer.id == user.id))
+        trainer = trainer_result.scalar_one_or_none()
+        is_senior = bool(trainer.is_senior) if trainer else False
+
     user_response = UserResponse(
         id=user.id,
         email=user.email,
@@ -241,7 +250,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_user_db)):
         last_name=user.last_name,
         phone=user.phone,
         avatar_url=user.avatar_url,
-        role=getattr(user, 'role', 'client') or 'client',
+        role=role,
         is_email_verified=user.is_email_verified,
         is_active=user.is_active,
         created_at=user.created_at,
@@ -253,7 +262,8 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_user_db)):
         refresh_token=refresh_token_str,
         token_type="bearer",
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=user_response
+        user=user_response,
+        is_senior=is_senior,
     )
 
 

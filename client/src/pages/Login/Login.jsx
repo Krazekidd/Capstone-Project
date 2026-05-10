@@ -33,14 +33,10 @@ const MailIcon = () => (
 ════════════════════════════════════════════════════════════ */
 const getRedirectPath = (role) => {
   switch(role) {
-    case 'admin':
-      return '/admin';
-    case 'trainer':
-      return '/trainer';
-    case 'client':
-      return '/account';
-    default:
-      return '/account';
+    case 'admin':   return '/admin';
+    case 'trainer': return '/trainer';
+    case 'client':  return '/account';
+    default:        return '/account';
   }
 };
 
@@ -82,17 +78,23 @@ export default function Login() {
   useEffect(() => {
     // Check auth context first
     if (isLoggedIn && user) {
-      const redirectPath = getRedirectPath(user.role);
+      const isSenior = user.role === 'trainer' && !!user.is_senior;
+      const redirectPath = isSenior ? '/STrainer' : getRedirectPath(user.role);
       navigate(redirectPath);
       return;
     }
     
-    // Fallback to token check
+    // Fallback to token check via localStorage
     const token = authAPI.getToken();
     const role = authAPI.getUserRole();
     
     if (token && role) {
-      const redirectPath = getRedirectPath(role);
+      let isSenior = false;
+      try {
+        const stored = JSON.parse(localStorage.getItem('userData') || '{}');
+        isSenior = role === 'trainer' && !!stored.is_senior;
+      } catch (_) {}
+      const redirectPath = isSenior ? '/STrainer' : getRedirectPath(role);
       navigate(redirectPath);
     }
     
@@ -122,8 +124,10 @@ export default function Login() {
         localStorage.removeItem('remembered_email');
       }
       
-      // Redirect based on role
-      const redirectPath = getRedirectPath(response.role);
+      // Redirect based on role — role lives in response.user.role
+      const role = response.user?.role || response.role || 'client';
+      const isSenior = response.is_senior ?? false;
+      const redirectPath = role === 'trainer' && isSenior ? '/STrainer' : getRedirectPath(role);
       navigate(redirectPath);
     } catch (err) {
       let errorMessage = "Login failed. Please check your credentials.";

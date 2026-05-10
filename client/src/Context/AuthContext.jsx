@@ -39,16 +39,19 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = (userData) => {
+        const role = userData.user?.role || userData.role || 'client';
+        const isSenior = userData.is_senior ?? userData.user?.is_senior ?? false;
         const userObj = {
             id: userData.user?.id || userData.user_id,
-            role: userData.user?.role || userData.role || 'client',
             token: userData.access_token,
             firstName: userData.user?.first_name || userData.first_name,
             lastName: userData.user?.last_name || userData.last_name,
             email: userData.user?.email || userData.email,
             membership: userData.user?.membership || userData.membership,
             avatar: userData.user?.avatar_url || userData.avatar_url || userData.avatar,
-            ...userData
+            // role and is_senior last so they are never overwritten by the spread
+            role,
+            is_senior: isSenior,
         };
         setUser(userObj);
         
@@ -56,15 +59,15 @@ export const AuthProvider = ({ children }) => {
         const dataToStore = {
             id: userObj.id,
             role: userObj.role,
+            is_senior: userObj.is_senior,
             firstName: userObj.firstName,
             lastName: userObj.lastName,
             email: userObj.email,
             membership: userObj.membership,
-            avatar: userObj.avatar
+            avatar: userObj.avatar,
         };
         localStorage.setItem('userData', JSON.stringify(dataToStore));
-        
-        // Tokens are already stored by the API functions
+        localStorage.setItem('user_role', userObj.role);
     };
     
     const logout = () => {

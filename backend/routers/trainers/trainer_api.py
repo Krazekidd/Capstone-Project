@@ -635,7 +635,7 @@ async def get_trainer_performance(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Get trainer performance metrics (placeholder)"""
+    """Get trainer performance metrics"""
     try:
         user_id = current_user["user_id"]
         role = current_user.get("role", "client")
@@ -643,15 +643,11 @@ async def get_trainer_performance(
         if role != "trainer":
             raise HTTPException(status_code=403, detail="Access denied. Trainer role required.")
         
-        # Placeholder performance data
-        performance_data = {
-            "total_clients": 0,
-            "active_clients": 0,
-            "average_rating": 0.0,
-            "total_sessions": 0,
-            "this_month_sessions": 0,
-            "client_retention_rate": 0.0
-        }
+        # Import the grades service
+        from services.grades_service import get_senior_trainer_performance
+        
+        # Get real performance data for senior trainers
+        performance_data = await get_senior_trainer_performance(db, str(user_id))
         
         return APIResponse(
             success=True,

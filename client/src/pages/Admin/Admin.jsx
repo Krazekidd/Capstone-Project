@@ -177,27 +177,44 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   const [scores, setScores] = useState({ perf: 8, motiv: 8, interact: 8, knowledge: 8, punct: 8 });
   const [loading, setLoading] = useState(false);
   const [trainerAssessments, setTrainerAssessments] = useState({});
+  const [showAddTrainer, setShowAddTrainer] = useState(false);
+  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "" });
+  const [gradeLog, setGradeLog] = useState({});
+
+  // Load gradeLog from backend on mount so it persists across sessions
+  // When backend is ready, uncomment this:
+  // useEffect(() => {
+  //   adminAPI.getGradeLogs().then(data => {
+  //     const log = {};
+  //     data.forEach(g => { log[g.trainer_id] = { date: g.graded_at }; });
+  //     setGradeLog(log);
+  //   }).catch(err => console.error("Failed to load grade logs:", err));
+  // }, []);
 
   const avg = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
   const standing = getStanding(avg.toFixed(1));
 
-  const openAssess = async (t) => {
-    setScores({
-      perf: t.rating || 8,
-      motiv: 8,
-      interact: 8,
-      knowledge: 8,
-      punct: 8
-    });
-    setAssessTrainer(t);
+  const getGradeStatus = (trainerId) => {
+    const log = gradeLog[trainerId];
+    if (!log) return { canGrade: true, canEdit: false, label: "Grade Trainer" };
+    const graded = new Date(log.date);
+    const now = new Date();
+    const hoursDiff = (now - graded) / (1000 * 60 * 60);
+    const sameMonth = graded.getMonth() === now.getMonth() && graded.getFullYear() === now.getFullYear();
+    if (sameMonth && hoursDiff > 24) return { canGrade: false, canEdit: false, label: "Graded This Month" };
+    if (sameMonth && hoursDiff <= 24) return { canGrade: true, canEdit: true, label: "Edit Grade" };
+    return { canGrade: true, canEdit: false, label: "Grade Trainer" };
+  };
 
-    // Load existing assessments for this trainer
+  const openAssess = async (t) => {
+    const status = getGradeStatus(t.id);
+    if (!status.canGrade) { toast("This trainer has already been graded this month."); return; }
+    setScores({ perf: t.rating || 8, motiv: 8, interact: 8, knowledge: 8, punct: 8 });
+    setAssessTrainer(t);
     try {
       const assessments = await adminAPI.getTrainerAssessments(t.id);
       setTrainerAssessments(prev => ({ ...prev, [t.id]: assessments }));
-    } catch (err) {
-      console.error("Failed to load assessments:", err);
-    }
+    } catch (err) { console.error("Failed to load assessments:", err); }
   };
 
   const submitAssess = async () => {
@@ -205,52 +222,84 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     try {
       const a = parseFloat(avg.toFixed(1));
       const s = getStanding(a);
-
+      const now = new Date();
       await adminAPI.saveTrainerAssessment({
-        trainer_id: assessTrainer.id,
-        trainer_name: assessTrainer.name,
-        scores: scores,
-        average: a,
-        standing: s.label,
-        notes: ""
+        trainer_id: assessTrainer.id, trainer_name: assessTrainer.name,
+        scores, average: a, standing: s.label, notes: ""
       });
-
-      // Refresh assessments for this trainer
       const updatedAssessments = await adminAPI.getTrainerAssessments(assessTrainer.id);
       setTrainerAssessments(prev => ({ ...prev, [assessTrainer.id]: updatedAssessments }));
-
-      // Add to history display
+      setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
+      // When backend is ready, also persist the grade log so it survives refresh:
+      // await adminAPI.saveGradeLog({ trainer_id: assessTrainer.id, graded_at: now.toISOString() });
       setAssessHistory(prev => [{
-        trainer: assessTrainer.name,
-        perf: scores.perf,
-        motiv: scores.motiv,
-        interact: scores.interact,
-        avg: a,
-        standing: s.label,
-        date: new Date().toLocaleDateString()
+        trainer: assessTrainer.name, perf: scores.perf, motiv: scores.motiv,
+        interact: scores.interact, avg: a, standing: s.label,
+        month: now.toLocaleString("default", { month: "long", year: "numeric" }),
+        date: now.toLocaleDateString()
       }, ...prev]);
-
       toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
       setAssessTrainer(null);
     } catch (err) {
       console.error("Failed to save assessment:", err);
       toast("Failed to save assessment: " + (err.detail || err.message));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
-  // Display assessment history from loaded data
-  const displayHistory = assessHistory.length > 0 ? assessHistory :
+  const submitAddTrainer = async () => {
+    if (!addForm.firstName.trim() || !addForm.lastName.trim()) { toast("Please enter first and last name"); return; }
+    const newTrainer = {
+      id: Date.now(),
+      name: `${addForm.firstName.trim()} ${addForm.lastName.trim()}`,
+      certification: addForm.role,
+      trainer_level: addForm.role === "Senior Trainer" ? 2 : 1,
+      experience_years: parseInt(addForm.experience) || 0,
+      certification_date: addForm.certDate,
+      rating: 0,
+    };
+    // When backend is ready, uncomment this and remove the id: Date.now() above (backend will assign id):
+    // const saved = await adminAPI.createTrainer(newTrainer);
+    // newTrainer.id = saved.id;
+    setTrainers(prev => [...prev, newTrainer]);
+    toast(`Trainer ${newTrainer.name} added successfully`);
+    setShowAddTrainer(false);
+    setAddForm({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "" });
+  };
+
+  const allHistory = assessHistory.length > 0 ? assessHistory :
     Object.values(trainerAssessments).flat().map(a => ({
-      trainer: a.trainer_name,
-      perf: a.performance_score,
-      motiv: a.motivation_score,
-      interact: a.interaction_score,
-      avg: a.average_score,
-      standing: a.standing,
+      trainer: a.trainer_name, perf: a.performance_score, motiv: a.motivation_score,
+      interact: a.interaction_score, avg: a.average_score, standing: a.standing,
+      month: new Date(a.assessment_date).toLocaleString("default", { month: "long", year: "numeric" }),
       date: new Date(a.assessment_date).toLocaleDateString()
     }));
+
+  const historyByMonth = {};
+  allHistory.forEach(a => {
+    const m = a.month || "Unknown";
+    if (!historyByMonth[m]) historyByMonth[m] = [];
+    historyByMonth[m].push(a);
+  });
+
+  const AddTrainerModal = () => (
+    <Modal title="Add <span style='color:var(--cyan)'>New Trainer</span>" onClose={() => setShowAddTrainer(false)}>
+      <div className="form-row">
+        <div className="form-group"><label>First Name</label><input value={addForm.firstName} onChange={e => setAddForm(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" /></div>
+        <div className="form-group"><label>Last Name</label><input value={addForm.lastName} onChange={e => setAddForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" /></div>
+      </div>
+      <div className="form-row">
+        <div className="form-group"><label>Role</label>
+          <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value }))}>
+            <option value="Trainer">Trainer</option>
+            <option value="Senior Trainer">Senior Trainer</option>
+          </select>
+        </div>
+        <div className="form-group"><label>Certification Date</label><input type="date" value={addForm.certDate} onChange={e => setAddForm(p => ({ ...p, certDate: e.target.value }))} /></div>
+      </div>
+      <div className="form-group"><label>Experience (yrs)</label><input type="number" min="0" max="50" value={addForm.experience} onChange={e => setAddForm(p => ({ ...p, experience: e.target.value }))} placeholder="Years of experience" /></div>
+      <button className="btn btn-cyan" style={{ width: "100%", marginTop: 16, padding: 12 }} onClick={submitAddTrainer}>Add Trainer</button>
+    </Modal>
+  );
 
   if (!trainers || trainers.length === 0) {
     return (
@@ -258,8 +307,12 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
         <div className="section-label">Trainer <span>Assessments</span></div>
         <div className="card">
           <p style={{ textAlign: "center", padding: "40px", color: "var(--muted)" }}>No trainers found in database.</p>
-          <button className="btn btn-primary" onClick={onRefresh}>Refresh</button>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+            <button className="btn btn-cyan btn-sm" onClick={() => setShowAddTrainer(true)}>+ Add Trainer</button>
+            <button className="btn btn-green btn-sm" onClick={onRefresh}>⟳ Refresh</button>
+          </div>
         </div>
+        {showAddTrainer && <AddTrainerModal />}
       </div>
     );
   }
@@ -273,13 +326,17 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: 2, color: "var(--cyan)" }}>
               Select Trainer to Assess
             </span>
-            <button className="btn btn-green btn-sm" onClick={onRefresh}>⟳ Refresh</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-cyan btn-sm" onClick={() => setShowAddTrainer(true)}>+ Add Trainer</button>
+              <button className="btn btn-green btn-sm" onClick={onRefresh}>⟳ Refresh</button>
+            </div>
           </div>
           {trainers.map(t => {
             const a = t.rating || 0;
             const s = getStanding(a);
+            const status = getGradeStatus(t.id);
             return (
-              <div key={t.id} className="trainer-assess-card" onClick={() => openAssess(t)}>
+              <div key={t.id} className="trainer-assess-card">
                 <div className="trainer-avatar" style={{ background: "var(--bg3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
                   {t.name?.charAt(0) || "T"}
                 </div>
@@ -287,44 +344,58 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
                   <div className="trainer-card-name">{t.name}</div>
                   <div className="trainer-card-sub">{t.certification || "Certified Trainer"} · Level {t.trainer_level || 1}</div>
                 </div>
-                <div style={{ textAlign: "right" }}>
+                <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
                   <div className="trainer-score" style={{ color: a >= 7 ? "var(--green)" : a >= 5 ? "var(--orange)" : "var(--red)" }}>{a}</div>
                   <Badge cls={s.cls}>{s.label}</Badge>
+                  <button
+                    className={`btn btn-sm ${status.canGrade ? "btn-grade" : "btn-ghost"}`}
+                    onClick={() => status.canGrade && openAssess(t)}
+                    disabled={!status.canGrade}
+                  >
+                    {status.canEdit ? "✏️ " : "⭐ "}{status.label}
+                  </button>
                 </div>
               </div>
             );
           })}
         </div>
+
         <div className="card">
           <div className="card-title">📋 Assessment History</div>
-          <div className="tbl-wrap">
-            <table>
-              <thead>
-                <tr><th>Trainer</th><th>Perf</th><th>Motiv</th><th>Interact</th><th>Avg</th><th>Standing</th><th>Date</th></tr>
-              </thead>
-              <tbody>
-                {displayHistory.map((a, i) => {
-                  const s = getStanding(a.avg);
-                  return (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 600 }}>{a.trainer}</td>
-                      <td>{a.perf}</td>
-                      <td>{a.motiv}</td>
-                      <td>{a.interact}</td>
-                      <td style={{ fontWeight: 700, color: "var(--cyan)" }}>{a.avg}</td>
-                      <td><Badge cls={s.cls}>{s.label}</Badge></td>
-                      <td style={{ fontSize: 11 }}>{a.date}</td>
-                    </tr>
-                  );
-                })}
-                {displayHistory.length === 0 && (
-                  <tr><td colSpan="7" style={{ textAlign: "center", padding: "20px", color: "var(--muted)" }}>No assessments yet</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {Object.keys(historyByMonth).length === 0 ? (
+            <p style={{ textAlign: "center", padding: "20px", color: "var(--muted)" }}>No assessments yet</p>
+          ) : (
+            Object.entries(historyByMonth).map(([month, entries]) => (
+              <div key={month} style={{ marginBottom: 20 }}>
+                <div className="assess-month-label">{month}</div>
+                <div className="tbl-wrap">
+                  <table>
+                    <thead>
+                      <tr><th>Trainer</th><th>Perf</th><th>Motiv</th><th>Interact</th><th>Avg</th><th>Standing</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                      {entries.map((a, i) => {
+                        const st = getStanding(a.avg);
+                        return (
+                          <tr key={i}>
+                            <td style={{ fontWeight: 600 }}>{a.trainer}</td>
+                            <td>{a.perf}</td><td>{a.motiv}</td><td>{a.interact}</td>
+                            <td style={{ fontWeight: 700, color: "var(--cyan)" }}>{a.avg}</td>
+                            <td><Badge cls={st.cls}>{st.label}</Badge></td>
+                            <td style={{ fontSize: 11 }}>{a.date}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
+
+      {showAddTrainer && <AddTrainerModal />}
 
       {assessTrainer && (
         <Modal title={`Assess: <span style="color:var(--cyan)">${assessTrainer.name}</span>`} onClose={() => setAssessTrainer(null)}>
@@ -355,9 +426,6 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   );
 };
 
-// ═══════════════════════════════════════════════════════════
-// REVIEWS PAGE
-// ═══════════════════════════════════════════════════════════
 const ReviewsPage = () => (
   <div className="page-content">
     <div className="section-label">Client <span>Reviews</span></div>

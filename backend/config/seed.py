@@ -7,16 +7,18 @@ Test credentials
 Senior Trainer : senior@badpeople.fit  / password123
 Trainer        : trainer@badpeople.fit / password123
 Admin          : admin@badpeople.fit   / password123
+Client         : client@badpeople.fit  / password123
 """
 
 import uuid
 import logging
 import bcrypt
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.models import User, Trainer, Admin
+from models.models import User, Trainer, Admin, Client
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +76,25 @@ SEED_USERS = [
             "access_level": "full",
         },
     },
+    {
+        "email":      "client@badpeople.fit",
+        "first_name": "Alex",
+        "last_name":  "Johnson",
+        "role":       "client",
+        "profile": {
+            "type":        "client",
+            "name":        "Alex Johnson",
+            "gender":      "other",
+            "phone_number": "555-0123",
+            "birthday":    "1990-05-15",
+            "height":      175.0,
+            "weight":      70.0,
+            "emergency_contact_name": "Jamie Johnson",
+            "emergency_contact_phone": "555-0124",
+            "medical_conditions": "None",
+            "fitness_goals": "Build muscle and improve cardiovascular health",
+        },
+    },
 ]
 
 
@@ -113,6 +134,25 @@ async def run_seed(db: AsyncSession) -> None:
                 specialties=p.get("specialties", []),
                 bio=p.get("bio"),
                 experience_years=p.get("experience_years", 0),
+            )
+        elif p["type"] == "client":
+            # Parse birthday string to date object
+            birthday = None
+            if p.get("birthday"):
+                birthday = date.fromisoformat(p["birthday"])
+            
+            profile = Client(
+                id=user_id,
+                name=p["name"],
+                gender=p.get("gender"),
+                phone_number=p.get("phone_number"),
+                birthday=birthday,
+                height=p.get("height"),
+                weight=p.get("weight"),
+                emergency_contact_name=p.get("emergency_contact_name"),
+                emergency_contact_phone=p.get("emergency_contact_phone"),
+                medical_conditions=p.get("medical_conditions"),
+                fitness_goals=p.get("fitness_goals"),
             )
         else:
             profile = Admin(

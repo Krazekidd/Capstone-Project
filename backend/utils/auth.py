@@ -22,7 +22,10 @@ def require_trainer(current_user=Depends(get_current_user)):
     return current_user
 
 
-def require_admin_or_senior_trainer(current_user=Depends(get_current_user)):
+async def require_admin_or_senior_trainer(
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
     """Require user to be admin or senior trainer."""
     user = current_user["user"]
     role = current_user["role"]
@@ -30,8 +33,16 @@ def require_admin_or_senior_trainer(current_user=Depends(get_current_user)):
     if role == "admin":
         return current_user
     
-    if role == "trainer" and hasattr(user, 'trainer_profile') and user.trainer_profile.is_senior:
-        return current_user
+    if role == "trainer":
+        # Load trainer profile explicitly to avoid lazy loading issues
+        from models import Trainer
+        from sqlalchemy import select
+        
+        result = await db.execute(select(Trainer).where(Trainer.id == user.id))
+        trainer = result.scalar_one_or_none()
+        
+        if trainer and trainer.is_senior:
+            return current_user
     
     raise HTTPException(
         status_code=403, 

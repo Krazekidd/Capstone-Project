@@ -327,81 +327,88 @@ function WishlistDrawer({ open, onClose, wishlist, onRemove, onMoveToCart }) {
   );
 }
 /* ═══════════════════════════════════════
-   CHECKOUT MODAL
+   CHECKOUT MODAL (FIXED)
 ═══════════════════════════════════════ */
-function CheckoutModal({ open, onClose, cartItems, taxRate, shippingThreshold, shippingCost, onOrderPlaced }) {
+function CheckoutModal({ open, onClose, cartItems, taxRate, shippingThreshold, shippingCost, onOrderPlaced, addToast }) {
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ customer_name:"", email:"", phone:"", address:"", city:"", notes:"" });
+  const [form, setForm] = useState({ customer_name: "", email: "", phone: "", address: "", city: "", notes: "" });
   const [errors, setErrors] = useState({});
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(false);
   const [orderRef, setOrderRef] = useState("");
   const [orderDetails, setOrderDetails] = useState(null);
 
-  // Calculate totals properly
-  const subtotal = cartItems.reduce((s,i) => s + (i.price * i.quantity), 0);
-  const tax = Math.round(subtotal * taxRate);
-  const shipping = subtotal >= shippingThreshold ? 0 : shippingCost;
+  // Calculate totals properly with safe fallbacks
+  const subtotal = cartItems?.reduce((s, i) => s + (i?.price || 0) * (i?.quantity || 0), 0) || 0;
+  const tax = Math.round(subtotal * (taxRate || 0.15));
+  const shipping = subtotal >= (shippingThreshold || 10000) ? 0 : (shippingCost || 500);
   const total = subtotal + tax + shipping;
 
   const fc = e => {
-    setForm(f=>({...f,[e.target.name]:e.target.value}));
-    setErrors(p=>({...p,[e.target.name]:""}));
+    setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+    setErrors(p => ({ ...p, [e.target.name]: "" }));
   };
 
   const validate1 = () => {
-    const e={};
-    if (!form.customer_name.trim()) e.customer_name="Required";
-    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email="Valid email required";
-    if (!form.phone.trim()) e.phone="Required";
-    if (!form.address.trim()) e.address="Required";
-    if (!form.city.trim()) e.city="Required";
-    setErrors(e); 
+    const e = {};
+    if (!form.customer_name?.trim()) e.customer_name = "Required";
+    if (!form.email?.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.phone?.trim()) e.phone = "Required";
+    if (!form.address?.trim()) e.address = "Required";
+    if (!form.city?.trim()) e.city = "Required";
+    setErrors(e);
     return !Object.keys(e).length;
   };
 
   const placeOrder = async () => {
-    if (!validate1()) return;
-    setPlacing(true);
+  if (!validate1()) return;
+  setPlacing(true);
+
+  try {
+    const orderData = {
+      customer_name: form.customer_name,
+      email: form.email,
+      phone: form.phone,
+      address: form.address,
+      city: form.city,
+      notes: form.notes,
+      payment_method: "card"
+    };
+
+    console.log("Placing order with data:", orderData);
     
-    try {
-      const orderData = {
-        customer_name: form.customer_name,
-        email: form.email,
-        phone: form.phone,
-        address: form.address,
-        city: form.city,
-        notes: form.notes,
-        payment_method: "card"
-      };
-      
-      const response = await shopAPI.placeOrder(orderData);
-      setOrderRef(response.order_reference);
-      
-      // Store the complete order details with correct totals
-      setOrderDetails({
-        reference: response.order_reference,
-        subtotal: response.subtotal,
-        tax: response.tax,
-        shipping: response.shipping_cost,
-        total: response.total,
-        items: cartItems,
-        placed_at: new Date().toLocaleString()
-      });
-      
-      setPlaced(true);
-      
-      // Call onOrderPlaced to refresh cart
-      if (onOrderPlaced) {
-        await onOrderPlaced();
-      }
-    } catch (err) {
-      console.error("Order failed:", err);
-      addToast({ type: "error", title: "Failed to place order", sub: err.detail || "Please try again" });
-    } finally {
-      setPlacing(false);
+    const response = await shopAPI.placeOrder(orderData);
+    
+    console.log("Order response:", response); // Check what's coming back
+    const orderRefValue = response?.order_reference || response?.order_number || `ORD-${Date.now()}`;
+    const subtotalValue = response?.subtotal ?? 0;
+    const taxValue = response?.tax ?? response?.tax_amount ?? 0;
+    const shippingValue = response?.shipping_cost ?? response?.shipping_amount ?? 0;
+    const totalValue = response?.total ?? response?.total_amount ?? 0;
+    
+    setOrderRef(orderRefValue);
+    
+    setOrderDetails({
+      reference: orderRefValue,
+      subtotal: subtotalValue,
+      tax: taxValue,
+      shipping: shippingValue,
+      total: totalValue,
+      items: cartItems || [],
+      placed_at: new Date().toLocaleString()
+    });
+    
+    setPlaced(true);
+
+    if (onOrderPlaced) {
+      await onOrderPlaced();
     }
-  };
+  } catch (err) {
+    console.error("Order failed - full error:", err);
+    console.error("Error response:", err.response?.data);
+    alert(`Failed to place order: ${err?.response?.data?.detail || err?.message || "Please try again"}`);
+  }
+};
 
   // Reset modal state when closed
   const handleClose = () => {
@@ -409,69 +416,78 @@ function CheckoutModal({ open, onClose, cartItems, taxRate, shippingThreshold, s
     setPlaced(false);
     setOrderRef("");
     setOrderDetails(null);
-    setForm({ customer_name:"", email:"", phone:"", address:"", city:"", notes:"" });
+    setForm({ customer_name: "", email: "", phone: "", address: "", city: "", notes: "" });
     setErrors({});
     onClose();
   };
 
   if (!open) return null;
 
+  // Safely render order summary with checks
+  const renderOrderSummary = () => {
+    if (!orderDetails) return null;
+    
+    return (
+      <div className="order-success">
+        <div className="os-ring" /><div className="os-check"><CheckIcon /></div>
+        <h2 className="os-title">ORDER PLACED!</h2>
+        <p className="os-sub">Thank you for your order. Check your email for confirmation.</p>
+
+        <div className="os-ref-box">
+          <span>Order Reference</span>
+          <span className="os-ref">{orderDetails.reference || "Pending"}</span>
+        </div>
+
+        <div className="os-items">
+          {orderDetails?.items?.map(i => (
+            <div key={i.product_id} className="os-item">
+              <img src={i.image_url} alt={i.name} onError={e => { e.target.style.display = "none"; }} />
+              <span>{i.name} × {i.quantity}</span>
+              <span>${((i.price || 0) * (i.quantity || 0)).toLocaleString()} JMD</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Order Summary with safe values */}
+        <div className="os-summary">
+          <div className="os-summary-row">
+            <span>Subtotal:</span>
+            <span>${(orderDetails.subtotal || 0).toLocaleString()} JMD</span>
+          </div>
+          <div className="os-summary-row">
+            <span>Tax (15%):</span>
+            <span>${(orderDetails.tax || 0).toLocaleString()} JMD</span>
+          </div>
+          <div className="os-summary-row">
+            <span>Shipping:</span>
+            <span>{(orderDetails.shipping || 0) === 0 ? "Free" : `$${(orderDetails.shipping || 0).toLocaleString()} JMD`}</span>
+          </div>
+          <div className="os-summary-row os-total-row">
+            <span>Total Paid:</span>
+            <span className="os-total-amount">${(orderDetails.total || 0).toLocaleString()} JMD</span>
+          </div>
+        </div>
+
+        <button className="os-done-btn" onClick={handleClose}>Continue Shopping</button>
+      </div>
+    );
+  };
+
   return (
-    <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget) handleClose();}}>
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) handleClose(); }}>
       <div className="checkout-modal">
-        <button className="modal-close-btn" onClick={handleClose}><CloseIcon/></button>
+        <button className="modal-close-btn" onClick={handleClose}><CloseIcon /></button>
 
         {placed && orderDetails ? (
-          <div className="order-success">
-            <div className="os-ring"/><div className="os-check"><CheckIcon/></div>
-            <h2 className="os-title">ORDER PLACED!</h2>
-            <p className="os-sub">Thank you for your order. Check your email for confirmation.</p>
-            
-            <div className="os-ref-box">
-              <span>Order Reference</span>
-              <span className="os-ref">{orderDetails.reference}</span>
-            </div>
-            
-            <div className="os-items">
-              {orderDetails.items.map(i=>(
-                <div key={i.product_id} className="os-item">
-                  <img src={i.image_url} alt={i.name} onError={e=>{e.target.style.display="none";}}/>
-                  <span>{i.name} × {i.quantity}</span>
-                  <span>${(i.price * i.quantity).toLocaleString()} JMD</span>
-                </div>
-              ))}
-            </div>
-            
-            {/* Order Summary with correct totals */}
-            <div className="os-summary">
-              <div className="os-summary-row">
-                <span>Subtotal:</span>
-                <span>${orderDetails.subtotal.toLocaleString()} JMD</span>
-              </div>
-              <div className="os-summary-row">
-                <span>Tax (15%):</span>
-                <span>${orderDetails.tax.toLocaleString()} JMD</span>
-              </div>
-              <div className="os-summary-row">
-                <span>Shipping:</span>
-                <span>{orderDetails.shipping === 0 ? "Free" : `$${orderDetails.shipping.toLocaleString()} JMD`}</span>
-              </div>
-              <div className="os-summary-row os-total-row">
-                <span>Total Paid:</span>
-                <span className="os-total-amount">${orderDetails.total.toLocaleString()} JMD</span>
-              </div>
-            </div>
-            
-            <button className="os-done-btn" onClick={handleClose}>Continue Shopping</button>
-          </div>
+          renderOrderSummary()
         ) : (
           <>
             <div className="checkout-steps">
-              {["Delivery","Review"].map((s,i)=>(
-                <div key={s} className={`cs-node${step>i+1?" cs-node--done":step===i+1?" cs-node--active":""}`}>
-                  <div className="cs-num">{step>i+1?<CheckIcon/>:i+1}</div>
+              {["Delivery", "Review"].map((s, i) => (
+                <div key={s} className={`cs-node${step > i + 1 ? " cs-node--done" : step === i + 1 ? " cs-node--active" : ""}`}>
+                  <div className="cs-num">{step > i + 1 ? <CheckIcon /> : i + 1}</div>
                   <span>{s}</span>
-                  {i<1 && <div className={`cs-line${step>i+1?" cs-line--done":""}`}/>}
+                  {i < 1 && <div className={`cs-line${step > i + 1 ? " cs-line--done" : ""}`} />}
                 </div>
               ))}
             </div>
@@ -482,41 +498,41 @@ function CheckoutModal({ open, onClose, cartItems, taxRate, shippingThreshold, s
                 <div className="cf-grid">
                   <div className="cf-field cf-field--full">
                     <label>Full Name</label>
-                    <input name="customer_name" placeholder="John Doe" value={form.customer_name} onChange={fc}/>
+                    <input name="customer_name" placeholder="John Doe" value={form.customer_name} onChange={fc} />
                     {errors.customer_name && <span className="cf-err">{errors.customer_name}</span>}
                   </div>
                   <div className="cf-field cf-field--full">
                     <label>Email</label>
-                    <input name="email" type="email" placeholder="you@email.com" value={form.email} onChange={fc}/>
+                    <input name="email" type="email" placeholder="you@email.com" value={form.email} onChange={fc} />
                     {errors.email && <span className="cf-err">{errors.email}</span>}
                   </div>
                   <div className="cf-field cf-field--full">
                     <label>Phone</label>
-                    <input name="phone" type="tel" placeholder="+1 (876) 000-0000" value={form.phone} onChange={fc}/>
+                    <input name="phone" type="tel" placeholder="+1 (876) 000-0000" value={form.phone} onChange={fc} />
                     {errors.phone && <span className="cf-err">{errors.phone}</span>}
                   </div>
                   <div className="cf-field cf-field--full">
                     <label>City / Parish</label>
-                    <input name="city" placeholder="Kingston" value={form.city} onChange={fc}/>
+                    <input name="city" placeholder="Kingston" value={form.city} onChange={fc} />
                     {errors.city && <span className="cf-err">{errors.city}</span>}
                   </div>
                   <div className="cf-field cf-field--full">
                     <label>Delivery Address</label>
-                    <input name="address" placeholder="123 Harbour Street" value={form.address} onChange={fc}/>
+                    <input name="address" placeholder="123 Harbour Street" value={form.address} onChange={fc} />
                     {errors.address && <span className="cf-err">{errors.address}</span>}
                   </div>
                   <div className="cf-field cf-field--full">
                     <label>Notes (optional)</label>
-                    <textarea name="notes" rows={3} placeholder="Special delivery instructions..." value={form.notes} onChange={fc}/>
+                    <textarea name="notes" rows={3} placeholder="Special delivery instructions..." value={form.notes} onChange={fc} />
                   </div>
                 </div>
 
                 <div className="cf-order-summary">
                   <p className="cf-os-title">Order Summary</p>
-                  {cartItems.map(i=>(
+                  {cartItems?.map(i => (
                     <div key={i.product_id} className="cf-os-row">
                       <span>{i.name} × {i.quantity}</span>
-                      <span>${(i.price * i.quantity).toLocaleString()} JMD</span>
+                      <span>${((i.price || 0) * (i.quantity || 0)).toLocaleString()} JMD</span>
                     </div>
                   ))}
                   <div className="cf-os-row"><span>Tax (15%)</span><span>${tax.toLocaleString()} JMD</span></div>
@@ -525,8 +541,8 @@ function CheckoutModal({ open, onClose, cartItems, taxRate, shippingThreshold, s
                 </div>
 
                 <div className="cf-actions">
-                  <button className={`cf-place-btn${placing?" cf-place-btn--loading":""}`} onClick={placeOrder} disabled={placing}>
-                    {placing ? "Processing…" : <><ShieldIcon/> Place Order — ${total.toLocaleString()} JMD</>}
+                  <button className={`cf-place-btn${placing ? " cf-place-btn--loading" : ""}`} onClick={placeOrder} disabled={placing}>
+                    {placing ? "Processing…" : <><ShieldIcon /> Place Order — ${total.toLocaleString()} JMD</>}
                   </button>
                 </div>
               </div>
@@ -537,7 +553,6 @@ function CheckoutModal({ open, onClose, cartItems, taxRate, shippingThreshold, s
     </div>
   );
 }
-
 /* ═══════════════════════════════════════
    SECTION HEADER
 ═══════════════════════════════════════ */
@@ -557,7 +572,7 @@ function SectionHeader({ title, count }) {
    MAIN SHOP PAGE
 ═══════════════════════════════════════ */
 export default function Shop() {
-  const [products, setProducts] = useState({ merch: [], essentials: [], supplements: [] });
+  const [products, setProducts] = useState({ merch: [], essentials: [], supplements: [], apparel: [], accessories: [], equipment: [] });
   const [cart, setCart] = useState({});   // { product_id: quantity }
   const [wishlist, setWishlist] = useState([]);
   const [cartOpen, setCartOpen] = useState(false);
@@ -600,6 +615,7 @@ export default function Shop() {
         essentials: [],
         supplements: [],
         apparel: [],
+        accessories: [],
         equipment:[]
       };
       
@@ -700,16 +716,23 @@ export default function Shop() {
 
   /* ── Wishlist helpers ── */
   const toggleWishlist = async (product) => {
-    const inList = wishlist.some(w => w.product_id === product.id);
+    // Get the product ID from either `id` or `product_id`
+    const productId = product.id || product.product_id;
+    
+    // Check if product is in wishlist using the correct ID field
+    const inList = wishlist.some(w => (w.product_id === productId) || (w.id === productId));
+    
     try {
       if (inList) {
-        await shopAPI.removeFromWishlist(product.id);
-        setWishlist(w => w.filter(x => x.product_id !== product.id));
+        console.log('Removing from wishlist:', productId);
+        await shopAPI.removeFromWishlist(productId);
+        setWishlist(w => w.filter(x => x.product_id !== productId && x.id !== productId));
         addToast({ type: "wish-remove", title: `Removed from wishlist`, sub: product.name });
       } else {
-        await shopAPI.addToWishlist(product.id);
+        console.log('Adding to wishlist:', productId);
+        await shopAPI.addToWishlist(productId);
         setWishlist(w => [...w, {
-          product_id: product.id,
+          product_id: productId,
           name: product.name,
           price: product.price,
           image_url: product.image_url
@@ -718,6 +741,11 @@ export default function Shop() {
       }
     } catch (err) {
       console.error("Failed to update wishlist:", err);
+      addToast({ 
+        type: "error", 
+        title: "Wishlist update failed", 
+        sub: err?.detail || "Please try again" 
+      });
     }
   };
 
@@ -735,7 +763,7 @@ export default function Shop() {
 
   /* ── Build cart items list ── */
   const cartItems = Object.entries(cart).map(([id, qty]) => {
-    const allProducts = [...products.merch, ...products.essentials, ...products.supplements];
+    const allProducts = [...products.merch, ...products.essentials, ...products.supplements, ...products.accessories, ...products.apparel, ...products.equipment];
     const p = allProducts.find(x => x.id === id);
     return p ? { ...p, quantity: qty } : null;
   }).filter(Boolean);
@@ -755,11 +783,17 @@ export default function Shop() {
   const merch = filterAndSort(products.merch);
   const essentials = filterAndSort(products.essentials);
   const supplements = filterAndSort(products.supplements);
+  const apparel = filterAndSort(products.apparel);
+  const equipment = filterAndSort(products.equipment);
+  const accessories = filterAndSort(products.accessories);
 
   const allFiltered = [
     ...(activeFilter==="all"||activeFilter==="merch" ? merch : []),
     ...(activeFilter==="all"||activeFilter==="essentials" ? essentials : []),
     ...(activeFilter==="all"||activeFilter==="supplements" ? supplements : []),
+    ...(activeFilter==="all"||activeFilter==="apparel" ? apparel : []),
+    ...(activeFilter==="all"||activeFilter==="equipment" ? equipment : []),
+    ...(activeFilter==="all"||activeFilter==="accessories" ? accessories : []),
   ];
 
   const noResults = search && allFiltered.length === 0;
@@ -826,6 +860,9 @@ export default function Shop() {
               { id:"merch", label:"Merch" },
               { id:"essentials", label:"Essentials" },
               { id:"supplements", label:"Supplements" },
+              { id:"apparel", label:"Apparel" },
+              { id:"equipment", label:"Equipment" },
+              { id:"accessories", label:"Accessories" }
             ].map(f=>(
               <button
                 key={f.id}
@@ -897,6 +934,45 @@ export default function Shop() {
                   </div>
                 </section>
               )}
+              {(activeFilter==="all"||activeFilter==="equipment") && equipment.length>0 && (
+                <section className="shop-section" id="equipment">
+                  <SectionHeader title="Equipment" count={equipment.length}/>
+                  <div className="shop-product-grid">
+                    {equipment.map(p=>(
+                      <ProductCard key={p.id} product={p} qty={cart[p.id]||0}
+                        onAdd={addToCart} onRemove={removeFromCart}
+                        isWishlisted={wishlist.some(w=>w.product_id===p.id)}
+                        onToggleWishlist={toggleWishlist}/>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {(activeFilter==="all"||activeFilter==="accessories") && accessories.length>0 && (
+                <section className="shop-section" id="accessories">
+                  <SectionHeader title="Accessories" count={accessories.length}/>
+                  <div className="shop-product-grid">
+                    {accessories.map(p=>(
+                      <ProductCard key={p.id} product={p} qty={cart[p.id]||0}
+                        onAdd={addToCart} onRemove={removeFromCart}
+                        isWishlisted={wishlist.some(w=>w.product_id===p.id)}
+                        onToggleWishlist={toggleWishlist}/>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {(activeFilter==="all"||activeFilter==="apparel") && apparel.length>0 && (
+                <section className="shop-section" id="apparel">
+                  <SectionHeader title="Apparel" count={apparel.length}/>
+                  <div className="shop-product-grid">
+                    {apparel.map(p=>(
+                      <ProductCard key={p.id} product={p} qty={cart[p.id]||0}
+                        onAdd={addToCart} onRemove={removeFromCart}
+                        isWishlisted={wishlist.some(w=>w.product_id===p.id)}
+                        onToggleWishlist={toggleWishlist}/>
+                    ))}
+                  </div>
+                </section>
+              )}
             </>
           )}
         </main>
@@ -916,7 +992,7 @@ export default function Shop() {
             <>
               <ul className="scs-items">
                 {cartItems.map(item=>(
-                  <li key={item.product_id} className="scs-item">
+                  <li key={item.id} className="scs-item">
                     <img src={item.image_url} alt={item.name} onError={e=>{e.target.style.display="none";}}/>
                     <div className="scs-item-info">
                       <p className="scs-item-name">{item.name}</p>
@@ -985,6 +1061,7 @@ export default function Shop() {
         shippingThreshold={SHIPPING_THRESHOLD}
         shippingCost={SHIPPING_COST}
         onOrderPlaced={handleOrderPlaced}
+        addToast = {addToast}
       />
 
       <footer className="shop-footer">

@@ -551,7 +551,7 @@ function MyBookings({ bookings, onCancel }) {
           const dateStr = new Date(booking.excursion_date).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
           return (
             <div key={booking.id} className="mbs-card">
-              <div className="mbs-img" style={{ backgroundImage:`url(${booking.thumb_url || ''})` }}/>
+              <div className="mbs-img" style={{ backgroundImage:`url(${booking.thumb_url})` }}/>
               <div className="mbs-body">
                 <p className="mbs-name">{booking.excursion_name}</p>
                 <p className="mbs-meta"><MapPinIcon/>{booking.location}</p>
@@ -756,6 +756,7 @@ export default function ExcursionPage() {
 
       {myBookings.length > 0 && (
         <MyBookings
+          exc
           bookings={myBookings}
           onCancel={handleCancelBooking}
         />

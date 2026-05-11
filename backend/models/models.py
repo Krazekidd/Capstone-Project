@@ -35,7 +35,7 @@ user_role_enum = Enum('client', 'trainer', 'admin', name='user_role')
 membership_tier_enum = Enum('basic', 'pro', 'elite', name='membership_tier')
 membership_status_enum = Enum('active', 'inactive', 'suspended', 'cancelled', name='membership_status')
 consultation_format_enum = Enum('in_person', 'video_call', name='consultation_format')
-booking_status_enum = Enum('pending', 'confirmed', 'cancelled', 'completed', 'no_show', name='booking_status')
+booking_status_enum = Enum('pending', 'confirmed', 'cancelled', 'completed', 'no_show','rescheduled', name='booking_status')
 product_category_enum = Enum('merch', 'essentials', 'supplements','apparel','equipment','accessories', name='product_category')
 order_status_enum = Enum('pending', 'paid', 'shipped', 'delivered', 'refunded', 'cancelled', name='order_status')
 token_type_enum = Enum('refresh', 'password_reset', 'email_verify', name='token_type')
@@ -69,7 +69,8 @@ class User(Base):
     product_reviews = relationship("ProductReview", back_populates="user", cascade="all, delete-orphan")
     cart_items = relationship("ShopCartItem", back_populates="user", cascade="all, delete-orphan")
     wishlist_items = relationship("ShopWishlistItem", back_populates="user", cascade="all, delete-orphan")   
-    
+    waitlist_entries = relationship("Waitlist", back_populates="user", cascade="all, delete-orphan")
+
     # Role-specific relationships
     client_profile = relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
     trainer_profile = relationship("Trainer", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -296,7 +297,8 @@ class ConsultationType(Base):
 
     # Relationships
     bookings = relationship("Booking", back_populates="consultation_type")
-
+    waitlist_entries = relationship("Waitlist", back_populates="consultation_type", cascade="all, delete-orphan")
+    cancellation_policies = relationship("CancellationPolicy", back_populates="consultation_type", cascade="all, delete-orphan")
 
 # =============================================================
 # COACH AVAILABILITY
@@ -376,7 +378,9 @@ class Booking(Base):
     user = relationship("User", back_populates="bookings")
     consultation_type = relationship("ConsultationType", back_populates="bookings")
     coach = relationship("Coach", back_populates="bookings")
-
+    feedback = relationship("ConsultationFeedback", back_populates="booking", uselist=False, cascade="all, delete-orphan")
+    history = relationship("BookingHistory", back_populates="booking", cascade="all, delete-orphan")
+    email_logs = relationship("EmailNotificationLog", back_populates="booking", cascade="all, delete-orphan")
     # Indexes
     __table_args__ = (
         Index('idx_bookings_user_id', 'user_id'),
@@ -384,6 +388,182 @@ class Booking(Base):
         Index('idx_bookings_coach_id', 'coach_id'),
         Index('idx_bookings_status', 'status'),
     )
+
+
+# =============================================================
+# EMAIL NOTIFICATIONS LOG
+# =============================================================
+
+class EmailNotificationLog(Base):
+    __tablename__ = "email_notification_logs"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False)
+    email_type = Column(String(50), nullable=False)  # confirmation, reminder, cancellation, reschedule
+    recipient_email = Column(String(255), nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    status = Column(String(20), nullable=False, default='sent')  # sent, failed, bounced
+    error_message = Column(Text)
+    
+    booking = relationship("Booking", back_populates="email_logs")
+
+    __table_args__ = (
+        Index('idx_email_notifications_booking', 'booking_id'),
+        Index('idx_email_notifications_sent_at', 'sent_at'),
+    )
+
+
+# =============================================================
+# BOOKING HISTORY (Audit log)
+# =============================================================
+
+class BookingHistory(Base):
+    __tablename__ = "booking_history"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False)
+    action = Column(String(50), nullable=False)  # created, updated, cancelled, rescheduled, completed
+    previous_status = Column(String(50))
+    new_status = Column(String(50))
+    notes = Column(Text)
+    changed_by = Column(String(100))  # user_id or system
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    
+    booking = relationship("Booking", back_populates="history")
+
+    __table_args__ = (
+        Index('idx_booking_history_booking', 'booking_id'),
+        Index('idx_booking_history_created', 'created_at'),
+    )
+
+
+# =============================================================
+# WAITLIST (For fully booked consultations)
+# =============================================================
+
+class Waitlist(Base):
+    __tablename__ = "waitlist"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    consultation_type_id = Column(UUID(as_uuid=True), ForeignKey("consultation_types.id", ondelete="CASCADE"), nullable=False)
+    preferred_date_start = Column(Date)
+    preferred_date_end = Column(Date)
+    status = Column(String(20), nullable=False, default='waiting')  # waiting, notified, booked, expired
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    notified_at = Column(DateTime(timezone=True))
+    
+    consultation_type = relationship("ConsultationType", back_populates="waitlist_entries")
+    user = relationship("User", back_populates="waitlist_entries")
+   
+    __table_args__ = (
+        Index('idx_waitlist_user_type', 'user_id', 'consultation_type_id'),
+        Index('idx_waitlist_status', 'status'),
+    )
+
+
+# =============================================================
+# CONSULTATION FEEDBACK
+# =============================================================
+
+class ConsultationFeedback(Base):
+    __tablename__ = "consultation_feedback"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    booking_id = Column(UUID(as_uuid=True), ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False, unique=True)
+    rating = Column(Integer, nullable=False)  # 1-5
+    review = Column(Text)
+    would_recommend = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    
+    booking = relationship("Booking", back_populates="feedback")
+
+    __table_args__ = (
+        CheckConstraint('rating BETWEEN 1 AND 5', name='check_rating_range'),
+        Index('idx_feedback_booking', 'booking_id'),
+    )
+
+
+# =============================================================
+# CANCELLATION POLICIES
+# =============================================================
+
+class CancellationPolicy(Base):
+    __tablename__ = "cancellation_policies"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    consultation_type_id = Column(UUID(as_uuid=True), ForeignKey("consultation_types.id", ondelete="CASCADE"), nullable=False)
+    hours_before_required = Column(Integer, nullable=False, default=24)  # Hours before booking
+    refund_percentage = Column(Integer, nullable=False, default=100)  # % refund if cancelled in time
+    no_show_fee = Column(Numeric(10, 2), nullable=False, default=0)
+    policy_text = Column(Text, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    
+    consultation_type = relationship("ConsultationType", back_populates="cancellation_policies")
+
+    __table_args__ = (
+        Index('idx_policy_type_active', 'consultation_type_id', 'is_active'),
+    )
+
+
+# =============================================================
+# CALENDAR SYNC (For external calendars - Google, Outlook)
+# =============================================================
+
+class CalendarSync(Base):
+    __tablename__ = "calendar_sync"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    calendar_provider = Column(String(50), nullable=False)  # google, outlook, apple
+    access_token = Column(Text)
+    refresh_token = Column(Text)
+    calendar_id = Column(String(255))
+    sync_enabled = Column(Boolean, nullable=False, default=True)
+    last_sync_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    
+    __table_args__ = (
+        Index('idx_calendar_sync_user_provider', 'user_id', 'calendar_provider', unique=True),
+    )
+
+
+# ============================================================
+# BUSINESS HOURS
+# ============================================================
+
+class BusinessHours(Base):
+    __tablename__ = "business_hours"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    day_of_week = Column(Integer, nullable=False)  # 0=Sunday, 1=Monday, ..., 6=Saturday
+    is_open = Column(Boolean, default=True)
+    start_time = Column(Time, nullable=True)
+    end_time = Column(Time, nullable=True)
+    slot_interval_minutes = Column(Integer, default=60)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    
+    __table_args__ = (
+        CheckConstraint('day_of_week >= 0 AND day_of_week <= 6', name='check_business_hours_day_of_week'),
+    )
+
+
+# ============================================================
+# HOLIDAYS
+# ============================================================
+
+class Holiday(Base):
+    __tablename__ = "holidays"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    holiday_date = Column(Date, nullable=False, unique=True)
+    name = Column(String(100))
+    is_closed = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
 # =============================================================
 # SHOP – PRODUCTS & ORDERS

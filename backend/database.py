@@ -106,10 +106,14 @@ async def init_db():
     """Initialize database connection and create tables if they don't exist."""
     # Import models so SQLAlchemy registers them against Base.metadata
     from models import (
-        User, AuthToken, MembershipPlan, UserMembership, Coach,
-        CoachAvailabilitySchedule, CoachAvailabilityOverride,
-        ConsultationType, Booking, Product, ProductReview, 
-         SavedConversation, ConversationMessage,
+        User, AuthToken, MembershipPlan, UserMembership,
+        Holiday, Product, ProductReview, 
+         ConsultationType, Booking, Coach, 
+    CoachAvailabilitySchedule, CoachAvailabilityOverride,
+    BusinessHours, Holiday, BookingHistory, ConsultationFeedback,
+    Waitlist, EmailNotificationLog
+
+    ,SavedConversation, ConversationMessage,
         Attendance, BodyMeasurement, ProgressPhoto, NutritionPlan, 
         NutritionGoals, ActivityData, TrainingSchedule, ClientBadge,
         Client, Trainer, Admin, ClientGoal, ClientHealthCondition,
@@ -119,7 +123,7 @@ async def init_db():
     ShopWishlistItem, 
     ShopOrder, 
     ShopOrderItem, TrainerEvaluation, Excursion, ExcursionTag, ExcursionBringItem, ExcursionBooking,
-        ClientStatus, ShopOrder, ShopOrderItem, TrainerGrade
+        ClientStatus, TrainerGrade
     )  # noqa: F401
 
 

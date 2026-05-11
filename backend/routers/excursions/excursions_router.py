@@ -407,13 +407,16 @@ async def get_my_bookings(
     
     bookings = []
     for booking, excursion in rows:
+        # Convert time to string format
+        excursion_time = excursion.time.strftime("%H:%M:%S") if excursion.time else "TBD"
+        
         bookings.append(BookingResponse(
             id=booking.id,
             booking_reference=booking.booking_reference,
             excursion_id=excursion.id,
             excursion_name=excursion.name,
             excursion_date=excursion.date,
-            excursion_time=excursion.time.strftime("%H:%M:%S"),
+            excursion_time=excursion_time,
             location=excursion.location,
             level=excursion.level,
             thumb_url=excursion.thumb_url,

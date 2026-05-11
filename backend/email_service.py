@@ -910,3 +910,77 @@ async def send_birthday_email(email: str, name: str, message: str):
             f"Error Type: {type(e).__name__}"
         )
         return False
+
+async def send_consultation_reminder_email(
+    client_email: str,
+    client_name: str,
+    consultation_title: str,
+    booking_date: date,
+    booking_time: str,
+    booking_reference: str,
+    coach_name: str = None
+):
+    """Send consultation reminder email"""
+    subject = f"Reminder: Your {consultation_title} Tomorrow"
+    
+    html_content = f"""
+    <h2>Hello {client_name},</h2>
+    <p>This is a reminder for your upcoming consultation:</p>
+    <ul>
+        <li><strong>Type:</strong> {consultation_title}</li>
+        <li><strong>Date:</strong> {booking_date.strftime('%A, %B %d, %Y')}</li>
+        <li><strong>Time:</strong> {booking_time}</li>
+        <li><strong>Reference:</strong> {booking_reference}</li>
+        {f'<li><strong>Coach:</strong> {coach_name}</li>' if coach_name else ''}
+    </ul>
+    <p>Please ensure you join on time. If you need to cancel or reschedule, please do so at least 24 hours in advance.</p>
+    """
+    
+    await send_email(client_email, subject, html_content)
+
+
+async def send_consultation_reschedule_email(
+    client_email: str,
+    client_name: str,
+    consultation_title: str,
+    old_date: date,
+    old_time: str,
+    new_date: date,
+    new_time: str,
+    booking_reference: str
+):
+    """Send consultation reschedule confirmation email"""
+    subject = f"Your {consultation_title} Has Been Rescheduled"
+    
+    html_content = f"""
+    <h2>Hello {client_name},</h2>
+    <p>Your consultation has been successfully rescheduled:</p>
+    <p><strong>Previous time:</strong> {old_date.strftime('%A, %B %d, %Y')} at {old_time}</p>
+    <p><strong>New time:</strong> {new_date.strftime('%A, %B %d, %Y')} at {new_time}</p>
+    <p><strong>Reference:</strong> {booking_reference}</p>
+    <p>Please update your calendar accordingly.</p>
+    """
+    
+    await send_email(client_email, subject, html_content)
+
+
+async def send_waitlist_notification_email(
+    client_email: str,
+    client_name: str,
+    consultation_title: str,
+    available_slots: list
+):
+    """Send waitlist notification email when slot becomes available"""
+    subject = f"Slot Available: {consultation_title}"
+    
+    html_content = f"""
+    <h2>Hello {client_name},</h2>
+    <p>Good news! A slot has become available for {consultation_title}.</p>
+    <p>Available times:</p>
+    <ul>
+        {''.join([f'<li>{slot["date"]} at {slot["time"]}</li>' for slot in available_slots])}
+    </ul>
+    <p>Visit your dashboard to book now before the slot is taken.</p>
+    """
+    
+    await send_email(client_email, subject, html_content)

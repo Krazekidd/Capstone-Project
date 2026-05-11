@@ -1232,81 +1232,106 @@ export const adminAPI = {
     }
   },
 };
-
-// Consultations API - Connected to backend /api/v1/bookings routes
+// Consultations API - Updated for new router structure
 export const consultationsAPI = {
-  getConsultationTypes: async () => {
+  // Get all consultation types
+  getConsultationTypes: async (activeOnly = true) => {
     try {
-      const response = await axiosInstance.get('/api/v1/bookings/consultation-types');
+      const response = await axiosInstance.get('/consultations/types', {
+        params: { active_only: activeOnly }
+      });
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch consultation types' };
     }
   },
 
-  getConsultationType: async (slug) => {
+  // Get consultation type by slug
+  getConsultationTypeBySlug: async (slug) => {
     try {
-      const response = await axiosInstance.get(`/api/v1/bookings/consultation-types/${slug}`);
+      const response = await axiosInstance.get(`/consultations/types/${slug}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch consultation type' };
     }
   },
 
-  getAvailability: async (consultationTypeId, date) => {
+  // Get availability for a date (multi-coach)
+  getAvailability: async (date, consultationTypeId = null) => {
     try {
-      const response = await axiosInstance.get('/api/v1/bookings/availability', {
-        params: { consultation_type_id: consultationTypeId, date }
-      });
+      const params = { date_str: date };
+      if (consultationTypeId) {
+        params.consultation_type_id = consultationTypeId;
+      }
+      const response = await axiosInstance.get('/consultations/availability/{date_str}'.replace('{date_str}', date), { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch availability' };
     }
   },
 
+  // Book a consultation
   bookConsultation: async (bookingData) => {
     try {
-      const response = await axiosInstance.post('/api/v1/bookings', bookingData);
+      // Transform frontend field names to match backend expectations
+      const payload = {
+        consultation_type_id: bookingData.consultation_type_id,
+        coach_id: bookingData.coach_id || null,
+        booking_date: bookingData.booking_date || bookingData.scheduled_date,
+        booking_time: bookingData.booking_time || bookingData.scheduled_time,
+        format: bookingData.format || 'in_person',
+        notes: bookingData.notes || null,
+        agreed_cancellation_policy: bookingData.agreed_cancellation_policy !== undefined ? 
+          bookingData.agreed_cancellation_policy : true,
+        timezone: bookingData.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+      
+      const response = await axiosInstance.post('/consultations/book', payload);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to book consultation' };
     }
   },
 
+  // Get my consultations (with optional status filter)
   getMyConsultations: async (statusFilter = null) => {
     try {
       const params = statusFilter ? { status_filter: statusFilter } : {};
-      const response = await axiosInstance.get('/api/v1/bookings', { params });
+      const response = await axiosInstance.get('/consultations/my-bookings', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch consultations' };
     }
   },
 
+  // Get single booking by ID
   getBooking: async (bookingId) => {
     try {
-      const response = await axiosInstance.get(`/api/v1/bookings/${bookingId}`);
+      // Note: Add this endpoint to router if needed
+      const response = await axiosInstance.get(`/consultations/bookings/${bookingId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch booking' };
     }
   },
 
+  // Cancel a consultation
   cancelConsultation: async (bookingId, reason = null) => {
     try {
-      const response = await axiosInstance.patch(`/api/v1/bookings/${bookingId}/cancel`, { reason });
+      const response = await axiosInstance.patch(`/consultations/bookings/${bookingId}/cancel`, { reason });
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to cancel consultation' };
     }
   },
 
-  // Enhanced consultation functions
-  rescheduleBooking: async (bookingId, newDate, newTime) => {
+  // Reschedule a consultation
+  rescheduleBooking: async (bookingId, newDate, newTime, reason = null) => {
     try {
-      const response = await axiosInstance.patch(`/api/v1/bookings/${bookingId}/reschedule`, {
+      const response = await axiosInstance.patch(`/consultations/bookings/${bookingId}/reschedule`, {
         new_date: newDate,
-        new_time: newTime
+        new_time: newTime,
+        reason: reason
       });
       return response.data;
     } catch (error) {
@@ -1314,102 +1339,145 @@ export const consultationsAPI = {
     }
   },
 
-  confirmBooking: async (bookingId) => {
+  // Submit feedback for a completed consultation
+  submitFeedback: async (bookingId, rating, review = null, wouldRecommend = true) => {
     try {
-      const response = await axiosInstance.patch(`/api/v1/bookings/${bookingId}/confirm`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to confirm booking' };
-    }
-  },
-
-  getBookingHistory: async (limit = 10, offset = 0) => {
-    try {
-      const response = await axiosInstance.get('/api/v1/bookings/history', {
-        params: { limit, offset }
+      const response = await axiosInstance.post(`/consultations/bookings/${bookingId}/feedback`, {
+        rating: rating,
+        review: review,
+        would_recommend: wouldRecommend
       });
       return response.data;
     } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch booking history' };
+      throw error.response?.data || { detail: 'Failed to submit feedback' };
     }
   },
 
-  getUpcomingBookings: async () => {
-    try {
-      const response = await axiosInstance.get('/api/v1/bookings/upcoming');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch upcoming bookings' };
-    }
-  },
-
-  getPastBookings: async () => {
-    try {
-      const response = await axiosInstance.get('/api/v1/bookings/past');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch past bookings' };
-    }
-  },
-
-  addBookingNote: async (bookingId, note) => {
-    try {
-      const response = await axiosInstance.post(`/api/v1/bookings/${bookingId}/notes`, { note });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to add booking note' };
-    }
-  },
-
-  getBookingNotes: async (bookingId) => {
-    try {
-      const response = await axiosInstance.get(`/api/v1/bookings/${bookingId}/notes`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch booking notes' };
-    }
-  },
-
-  rateConsultation: async (bookingId, rating, review) => {
-    try {
-      const response = await axiosInstance.post(`/api/v1/bookings/${bookingId}/rate`, {
-        rating,
-        review
-      });
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to rate consultation' };
-    }
-  },
-
+  // Get consultation statistics
   getConsultationStats: async () => {
     try {
-      const response = await axiosInstance.get('/api/v1/bookings/stats');
+      const response = await axiosInstance.get('/consultations/stats');
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch consultation stats' };
     }
   },
 
+  // Get booking history
+  getBookingHistory: async (bookingId) => {
+    try {
+      const response = await axiosInstance.get(`/consultations/bookings/${bookingId}/history`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch booking history' };
+    }
+  },
+
+  // Add note to booking
+  addBookingNote: async (bookingId, note) => {
+    try {
+      const response = await axiosInstance.post(`/consultations/bookings/${bookingId}/notes`, { note });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to add booking note' };
+    }
+  },
+
+  // Get business hours
+  getBusinessHours: async () => {
+    try {
+      const response = await axiosInstance.get('/consultations/business-hours');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch business hours' };
+    }
+  },
+
+  // Get holidays
+  getHolidays: async (year = null) => {
+    try {
+      const params = year ? { year } : {};
+      const response = await axiosInstance.get('/consultations/holidays', { params });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch holidays' };
+    }
+  },
+
+  // Check eligibility for consultation type
   checkConsultationEligibility: async (consultationTypeId) => {
     try {
-      const response = await axiosInstance.get(`/api/v1/bookings/eligibility/${consultationTypeId}`);
+      const response = await axiosInstance.get(`/consultations/eligibility/${consultationTypeId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to check eligibility' };
     }
   },
 
-  sendConsultationReminder: async (bookingId) => {
+  // Join waitlist for fully booked consultation type
+  joinWaitlist: async (consultationTypeId, preferredDateStart = null, preferredDateEnd = null) => {
     try {
-      const response = await axiosInstance.post(`/api/v1/bookings/${bookingId}/remind`);
+      const response = await axiosInstance.post('/consultations/waitlist', {
+        consultation_type_id: consultationTypeId,
+        preferred_date_start: preferredDateStart,
+        preferred_date_end: preferredDateEnd
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to join waitlist' };
+    }
+  },
+
+  // Get my waitlist entries
+  getMyWaitlist: async () => {
+    try {
+      const response = await axiosInstance.get('/consultations/waitlist');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch waitlist' };
+    }
+  },
+
+  // Send reminder for booking (manual)
+  sendReminder: async (bookingId) => {
+    try {
+      const response = await axiosInstance.post(`/consultations/bookings/${bookingId}/remind`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to send reminder' };
     }
   },
-};
 
+  // Get upcoming bookings (convenience method)
+  getUpcomingBookings: async () => {
+    try {
+      const response = await axiosInstance.get('/consultations/my-bookings');
+      return response.data.upcoming || [];
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch upcoming bookings' };
+    }
+  },
+
+  // Get past bookings (convenience method)
+  getPastBookings: async () => {
+    try {
+      const response = await axiosInstance.get('/consultations/my-bookings');
+      return response.data.past || [];
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch past bookings' };
+    }
+  },
+
+  // Get available coaches for a date (convenience method)
+  getAvailableCoaches: async (date, consultationTypeId = null) => {
+    try {
+      const availability = await consultationsAPI.getAvailability(date, consultationTypeId);
+      return availability.coaches || [];
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch available coaches' };
+    }
+  }
+};
 export const gradesAPI = {
   // GET /api/grades/trainers — all non-senior trainers with grades + client ratings
   getTrainersForGrading: async () => {

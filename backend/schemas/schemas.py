@@ -1,9 +1,40 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, Field, validator
 from typing import List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, time
 import uuid
+from enum import Enum
 from decimal import Decimal
 
+class MembershipTier(str, Enum):
+    """Membership tier enum - matches models.py membership_tier_enum"""
+    BASIC = "basic"
+    PRO = "pro"
+    ELITE = "elite"
+    
+    @classmethod
+    def from_db_value(cls, value):
+        """Convert from database enum value"""
+        if value is None:
+            return None
+        value_str = value.value if hasattr(value, 'value') else str(value)
+        for member in cls:
+            if member.value == value_str:
+                return member
+        return cls.BASIC
+
+class ConsultationFormat(str, Enum):
+    """Consultation format enum"""
+    IN_PERSON = "in_person"
+    VIDEO = "video_call"
+
+class BookingStatus(str, Enum):
+    """Booking status enum"""
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+    NO_SHOW = "no_show"
+    PENDING = "pending"
+    RESCHEDULED = "rescheduled"
 
 class WorkoutPlan(BaseModel):
     name: str
@@ -236,63 +267,287 @@ class UserMembershipResponse(UserMembershipBase):
     model_config = {"from_attributes": True}
 
 
-# ---------------------------------------------------------------------------
-# Consultation Schemas
-# ---------------------------------------------------------------------------
+# ============================================================
+# CONSULTATION TYPES
+# ============================================================
 
-class ConsultationTypeBase(BaseModel):
+class ConsultationTypeResponse(BaseModel):
+    id: uuid.UUID
     name: str
     slug: str
     subtitle: Optional[str] = None
     description: Optional[str] = None
     duration_minutes: int
-    price: float
-    currency: str = "USD"
+    price: Decimal
+    currency: str = "JMD"
     badge_label: Optional[str] = None
     badge_color: Optional[str] = None
     emoji_icon: Optional[str] = None
     what_to_expect: List[str] = []
-    requires_membership: Optional[str] = None
+    requires_membership: Optional[MembershipTier] = None
     is_active: bool = True
     sort_order: int = 0
 
+    class Config:
+        from_attributes = True
 
-class ConsultationTypeResponse(ConsultationTypeBase):
-    id: uuid.UUID
-    created_at: datetime
+class ConsultationTypeListResponse(BaseModel):
+    types: List[ConsultationTypeResponse]
+    total: int
 
-    model_config = {"from_attributes": True}
+# ============================================================
+# AVAILABILITY
+# ============================================================
 
+class TimeSlotResponse(BaseModel):
+    time: str  # Format: "HH:MM:SS"
+    available: bool
+    booked: bool
+    coach_id: Optional[uuid.UUID] = None  # Which coach is available
 
-class BookingBase(BaseModel):
+class AvailableSlotsResponse(BaseModel):
+    date: date
+    slots: List[TimeSlotResponse]
+    is_holiday: bool = False
+    is_closed: bool = False
+    holiday_name: Optional[str] = None
+
+class CoachAvailabilityResponse(BaseModel):
+    coach_id: uuid.UUID
+    coach_name: str
+    slots: List[TimeSlotResponse]
+
+class MultiCoachAvailabilityResponse(BaseModel):
+    date: date
+    coaches: List[CoachAvailabilityResponse]
+
+# ============================================================
+# BOOKING REQUESTS
+# ============================================================
+
+class ConsultationBookingRequest(BaseModel):
     consultation_type_id: uuid.UUID
-    scheduled_date: date
-    scheduled_time: str
-    timezone: str = "America/New_York"
-    format: str = "in_person"
+    coach_id: Optional[uuid.UUID] = None
+    booking_date: date
+    booking_time: time
+    format: ConsultationFormat = ConsultationFormat.IN_PERSON
     notes: Optional[str] = None
-    agreed_cancellation_policy: bool = False
+    agreed_cancellation_policy: bool = True
 
+    @field_validator('booking_date')
+    def validate_future_date(cls, v):
+        if v < datetime.now().date():
+            raise ValueError('Booking date cannot be in the past')
+        return v
 
-class BookingResponse(BookingBase):
+    @field_validator('booking_time')
+    def validate_time_format(cls, v):
+        if not isinstance(v, time):
+            raise ValueError('Invalid time format')
+        return v
+
+    @field_validator('agreed_cancellation_policy')
+    def validate_policy_agreement(cls, v):
+        if not v:
+            raise ValueError('You must agree to the cancellation policy')
+        return v
+
+class RescheduleBookingRequest(BaseModel):
+    new_date: date
+    new_time: time
+    reason: Optional[str] = None
+
+# ============================================================
+# BOOKING RESPONSES
+# ============================================================
+
+class ConsultationBookingResponse(BaseModel):
     id: uuid.UUID
     reference: str
-    user_id: uuid.UUID
-    consultation_type: Optional[ConsultationTypeResponse] = None
+    consultation_type_id: uuid.UUID
+    consultation_type_name: str
     coach_id: Optional[uuid.UUID] = None
-    status: str
-    price_charged: float
-    currency: str
-    confirmed_at: Optional[datetime] = None
-    cancelled_at: Optional[datetime] = None
-    cancellation_reason: Optional[str] = None
-    completed_at: Optional[datetime] = None
+    coach_name: Optional[str] = None
+    booking_date: date
+    booking_time: str  # Format: "HH:MM"
+    format: ConsultationFormat
+    status: BookingStatus
+    price_charged: Decimal
+    currency: str = "JMD"
+    notes: Optional[str] = None
+    scheduled_date: date
+    scheduled_time: time
     created_at: datetime
-    updated_at: datetime
+    cancelled_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
+class MyConsultationsResponse(BaseModel):
+    upcoming: List[ConsultationBookingResponse]
+    past: List[ConsultationBookingResponse]
+    total_upcoming: int
+    total_past: int
 
+class CancelConsultationResponse(BaseModel):
+    message: str
+    booking_id: uuid.UUID
+    refund_amount: Optional[Decimal] = None
+    cancelled_at: datetime = Field(default_factory=datetime.now)
+
+class RescheduleConsultationResponse(BaseModel):
+    message: str
+    booking_id: uuid.UUID
+    old_date: date
+    old_time: time
+    new_date: date
+    new_time: time
+    reference: str
+
+# ============================================================
+# BUSINESS HOURS & HOLIDAYS
+# ============================================================
+
+class BusinessHoursResponse(BaseModel):
+    day_of_week: int  # 0=Sunday, 6=Saturday
+    is_open: bool
+    start_time: Optional[str] = None  # Format: "HH:MM:SS"
+    end_time: Optional[str] = None
+    slot_interval_minutes: int = 60
+
+class BusinessHoursUpdateRequest(BaseModel):
+    day_of_week: int
+    is_open: bool
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    slot_interval_minutes: int = 60
+
+class HolidayResponse(BaseModel):
+    id: uuid.UUID
+    holiday_date: date
+    name: str
+    is_closed: bool = True
+
+class HolidayCreateRequest(BaseModel):
+    holiday_date: date
+    name: str
+    is_closed: bool = True
+
+# ============================================================
+# COACH AVAILABILITY
+# ============================================================
+
+class CoachAvailabilityScheduleResponse(BaseModel):
+    id: uuid.UUID
+    coach_id: uuid.UUID
+    day_of_week: int
+    open_time: str
+    close_time: str
+    is_active: bool
+
+class CoachAvailabilityScheduleRequest(BaseModel):
+    day_of_week: int
+    open_time: str
+    close_time: str
+    is_active: bool = True
+
+    @field_validator('day_of_week')
+    def validate_day(cls, v):
+        if not 0 <= v <= 6:
+            raise ValueError('day_of_week must be between 0 and 6')
+        return v
+
+class CoachAvailabilityOverrideResponse(BaseModel):
+    id: uuid.UUID
+    coach_id: uuid.UUID
+    override_date: date
+    is_closed: bool
+    open_time: Optional[str] = None
+    close_time: Optional[str] = None
+    reason: Optional[str] = None
+
+class CoachAvailabilityOverrideRequest(BaseModel):
+    override_date: date
+    is_closed: bool = False
+    open_time: Optional[str] = None
+    close_time: Optional[str] = None
+    reason: Optional[str] = None
+
+# ============================================================
+# BOOKING HISTORY & FEEDBACK
+# ============================================================
+
+class BookingHistoryResponse(BaseModel):
+    id: uuid.UUID
+    booking_id: uuid.UUID
+    action: str
+    previous_status: Optional[str] = None
+    new_status: Optional[str] = None
+    notes: Optional[str] = None
+    changed_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ConsultationFeedbackRequest(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    review: Optional[str] = None
+    would_recommend: bool = True
+
+    @field_validator('rating')
+    def validate_rating(cls, v):
+        if not 1 <= v <= 5:
+            raise ValueError('Rating must be between 1 and 5')
+        return v
+
+class ConsultationFeedbackResponse(BaseModel):
+    id: uuid.UUID
+    booking_id: uuid.UUID
+    rating: int
+    review: Optional[str] = None
+    would_recommend: bool
+    created_at: datetime
+
+# ============================================================
+# WAITLIST
+# ============================================================
+
+class WaitlistRequest(BaseModel):
+    consultation_type_id: uuid.UUID
+    preferred_date_start: Optional[date] = None
+    preferred_date_end: Optional[date] = None
+
+class WaitlistResponse(BaseModel):
+    id: uuid.UUID
+    consultation_type_id: uuid.UUID
+    consultation_type_name: str
+    status: str
+    created_at: datetime
+
+# ============================================================
+# STATISTICS
+# ============================================================
+
+class ConsultationStatsResponse(BaseModel):
+    total_bookings: int
+    completed_bookings: int
+    cancelled_bookings: int
+    upcoming_bookings: int
+    average_rating: Optional[float] = None
+    total_spent: Decimal
+    currency: str = "JMD"
+
+class BookingNoteResponse(BaseModel):
+    id: uuid.UUID
+    booking_id: uuid.UUID
+    note: str
+    created_by: str
+    created_at: datetime
+
+class BookingNoteRequest(BaseModel):
+    note: str
 # ---------------------------------------------------------------------------
 # Shop Schemas
 # ---------------------------------------------------------------------------
@@ -1604,29 +1859,8 @@ class BookingRequest(BaseModel):
     special_notes: Optional[str] = None
     payment_method: str = "online"  # online or cash
 
-class BookingResponse(BaseModel):
-    id: uuid.UUID
-    booking_reference: str
-    excursion_id: uuid.UUID
-    excursion_name: str
-    excursion_date: datetime
-    excursion_time: str
-    booked_for_name: str
-    booked_for_email: str
-    booked_for_phone: str
-    special_notes: Optional[str] = None
-    payment_method: str
-    payment_status: str
-    booking_status: str
-    total_amount: float
-    booked_at: datetime
-    
-    class Config:
-        from_attributes = True
 
-class MyBookingsResponse(BaseModel):
-    bookings: List[BookingResponse]
-    total: int
+
 
 class CancelBookingResponse(BaseModel):
     message: str
@@ -1656,6 +1890,10 @@ class BookingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class MyBookingsResponse(BaseModel):
+    bookings: List[BookingResponse]
+    total: int
+    
 class MLScoreResponse(BaseModel):
     excursion_id: uuid.UUID
     score: int

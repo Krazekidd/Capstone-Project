@@ -4,7 +4,7 @@ import "./Consultations.css";
 import Navbar from "../../Components/navbar";
 
 /* ═══════════════════════════════════════
-   ICONS (same as before)
+   ICONS 
 ═══════════════════════════════════════ */
 const ChevLeft  = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>;
 const ChevRight = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>;
@@ -20,6 +20,16 @@ const LockIcon  = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="no
 const VideoIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>;
 const InfoIcon  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 const TrashIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>;
+const RefreshIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>;
+
+// Helper function for formatting time
+const formatTime12 = (t) => {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+};
 
 /* ═══════════════════════════════════════
    NAVBAR
@@ -32,98 +42,40 @@ const NAV_ITEMS = [
   { label:"Contact",    children:null },
 ];
 
-function Navbar1({ userData }) {
-  const [scrolled,   setScrolled]   = useState(false);
-  const [activeMenu, setActiveMenu] = useState(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const closeTimer = useRef(null);
-
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 50);
-    window.addEventListener("scroll", fn);
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
-
-  const enter = l => { clearTimeout(closeTimer.current); setActiveMenu(l); };
-  const leave = ()  => { closeTimer.current = setTimeout(() => setActiveMenu(null), 180); };
-
+/* ═══════════════════════════════════════
+   STEP INDICATOR
+═══════════════════════════════════════ */
+function StepBar({ step }) {
+  const steps = [
+    { num: 1, label: "Choose Type" },
+    { num: 2, label: "Pick Date & Time" },
+    { num: 3, label: "Confirm Booking" },
+  ];
+  
   return (
-    <nav className={`navbar${scrolled ? " navbar--scrolled" : ""}`}>
-      <div className="navbar-inner">
-        <div className="nav-logo">
-          <div className="nav-logo-hex"><div className="nlh-bg"/><div className="nlh-inner"/><span className="nlh-letter">G</span></div>
-          <span className="nav-logo-name">GYMVAULT</span>
-        </div>
-
-        <ul className="nav-links">
-          {NAV_ITEMS.map(item => (
-            <li key={item.label} className="nav-item"
-              onMouseEnter={() => item.children && enter(item.label)}
-              onMouseLeave={leave}>
-              <span className={`nav-link${activeMenu === item.label ? " nav-link--active" : ""}`}>
-                {item.label}{item.children && <ChevDown/>}
-              </span>
-              {item.children && activeMenu === item.label && (
-                <div className="nav-dropdown" onMouseEnter={() => clearTimeout(closeTimer.current)} onMouseLeave={leave}>
-                  <div className="nav-dropdown-inner">
-                    {item.children.map(c => (
-                      <a key={c.label} href="#" className="nav-dropdown-item" onClick={e=>e.preventDefault()}>
-                        <span className="ndi-label">{c.label}</span>
-                        <span className="ndi-desc">{c.desc}</span>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-
-        <div className="nav-user-pill">
-          <div className="nav-user-avatar">{userData?.name?.charAt(0) || 'U'}</div>
-          <div className="nav-user-info">
-            <span className="nav-user-name">{userData?.name?.split(' ')[0] || 'Member'}</span>
-            <span className="nav-user-badge">Active Member</span>
+    <div className="step-bar">
+      {steps.map((s, i) => (
+        <div key={s.num} className="step-bar-segment">
+          <div className={`step-node${step >= s.num ? " step-node--done" : ""}${step === s.num ? " step-node--active" : ""}`}>
+            <div className="step-num">{step > s.num ? <CheckIcon/> : s.num}</div>
+            <span className="step-label">{s.label}</span>
           </div>
+          {i < steps.length - 1 && (
+            <div className={`step-connector${step > s.num ? " step-connector--done" : ""}`}/>
+          )}
         </div>
-
-        <div className="nav-actions">
-          <a href="/login" className="nav-btn-ghost">Sign In</a>
-          <a href="/login" className="nav-btn-solid">Join Now</a>
-        </div>
-
-        <button className="nav-hamburger" onClick={() => setMobileOpen(o=>!o)}>
-          <span className={mobileOpen?"ham-open":""}/><span className={mobileOpen?"ham-open":""}/><span className={mobileOpen?"ham-open":""}/>
-        </button>
-      </div>
-
-      {mobileOpen && (
-        <div className="nav-mobile">
-          {NAV_ITEMS.map(item => (
-            <div key={item.label} className="nav-mobile-item">
-              <span className="nav-mobile-label">{item.label}</span>
-              {item.children && (
-                <div className="nav-mobile-children">
-                  {item.children.map(c=><a key={c.label} href="#" className="nav-mobile-child" onClick={e=>e.preventDefault()}>{c.label}</a>)}
-                </div>
-              )}
-            </div>
-          ))}
-          <div className="nav-mobile-actions">
-            <a href="/login" className="nav-btn-ghost">Sign In</a>
-            <a href="/login" className="nav-btn-solid">Join Now</a>
-          </div>
-        </div>
-      )}
-    </nav>
+      ))}
+    </div>
   );
 }
 
 /* ═══════════════════════════════════════
-   MY BOOKINGS SECTION
+   MY BOOKINGS SECTION (Updated)
 ═══════════════════════════════════════ */
-function MyBookingsSection({ upcomingBookings, pastBookings, onCancel, loading }) {
+function MyBookingsSection({ upcomingBookings, pastBookings, onCancel, onReschedule, onFeedback, loading }) {
   const [cancellingId, setCancellingId] = useState(null);
+  const [rescheduleModal, setRescheduleModal] = useState(null);
+  const [feedbackModal, setFeedbackModal] = useState(null);
 
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
@@ -131,6 +83,7 @@ function MyBookingsSection({ upcomingBookings, pastBookings, onCancel, loading }
   };
 
   const formatTime = (timeStr) => {
+    if (!timeStr) return "";
     const [h, m] = timeStr.split(":").map(Number);
     const ampm = h >= 12 ? "PM" : "AM";
     const h12 = h % 12 || 12;
@@ -142,6 +95,28 @@ function MyBookingsSection({ upcomingBookings, pastBookings, onCancel, loading }
       setCancellingId(bookingId);
       await onCancel(bookingId);
       setCancellingId(null);
+    }
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch(status) {
+      case 'confirmed': return 'status-confirmed';
+      case 'completed': return 'status-completed';
+      case 'cancelled': return 'status-cancelled';
+      case 'rescheduled': return 'status-rescheduled';
+      case 'no_show': return 'status-no-show';
+      default: return 'status-default';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch(status) {
+      case 'confirmed': return 'Confirmed';
+      case 'completed': return 'Completed';
+      case 'cancelled': return 'Cancelled';
+      case 'rescheduled': return 'Rescheduled';
+      case 'no_show': return 'No Show';
+      default: return status;
     }
   };
 
@@ -182,28 +157,41 @@ function MyBookingsSection({ upcomingBookings, pastBookings, onCancel, loading }
             {upcomingBookings.map(booking => (
               <div key={booking.id} className="booking-card">
                 <div className="booking-card-header">
-                  <div className="booking-type-icon">{booking.consultation_type_id === 'starter' ? '🚀' : booking.consultation_type_id === 'nutrition' ? '🥗' : '💬'}</div>
+                  <div className="booking-type-icon">{booking.emoji_icon || (booking.consultation_type_id === 'starter' ? '🚀' : booking.consultation_type_id === 'nutrition' ? '🥗' : '💬')}</div>
                   <div className="booking-info">
-                    <h4 className="booking-title">{booking.consultation_title}</h4>
+                    <h4 className="booking-title">{booking.consultation_type_name || booking.consultation_title}</h4>
                     <p className="booking-meta">
-                      <CalIcon/> {formatDate(booking.booking_date)} at {formatTime(booking.booking_time)}
+                      <CalIcon/> {formatDate(booking.scheduled_date || booking.booking_date)} at {formatTime(booking.scheduled_time || booking.booking_time)}
                     </p>
                     <p className="booking-meta">
-                      <VideoIcon/> {booking.session_format === 'in-person' ? 'In-Person' : 'Video Call'}
+                      <UserIcon/> Coach: {booking.coach_name || 'TBD'}
+                    </p>
+                    <p className="booking-meta">
+                      <VideoIcon/> {booking.format === 'in_person' ? 'In-Person' : booking.format === 'video' ? 'Video Call' : (booking.session_format || 'In-Person')}
                     </p>
                   </div>
-                  <button 
-                    className="booking-cancel-btn"
-                    onClick={() => handleCancel(booking.id)}
-                    disabled={cancellingId === booking.id}
-                  >
-                    {cancellingId === booking.id ? <div className="spinner-small"/> : <TrashIcon/>}
-                    Cancel
-                  </button>
+                  <div className="booking-actions">
+                    <button 
+                      className="booking-reschedule-btn"
+                      onClick={() => setRescheduleModal(booking)}
+                    >
+                      <RefreshIcon/> Reschedule
+                    </button>
+                    <button 
+                      className="booking-cancel-btn"
+                      onClick={() => handleCancel(booking.id)}
+                      disabled={cancellingId === booking.id}
+                    >
+                      {cancellingId === booking.id ? <div className="spinner-small"/> : <TrashIcon/>}
+                      Cancel
+                    </button>
+                  </div>
                 </div>
                 <div className="booking-card-footer">
-                  <span className="booking-ref">Ref: {booking.booking_reference}</span>
-                  <span className="booking-status confirmed">Confirmed</span>
+                  <span className="booking-ref">Ref: {booking.reference || booking.booking_reference}</span>
+                  <span className={`booking-status ${getStatusBadgeClass(booking.status)}`}>
+                    {getStatusText(booking.status)}
+                  </span>
                 </div>
               </div>
             ))}
@@ -221,21 +209,32 @@ function MyBookingsSection({ upcomingBookings, pastBookings, onCancel, loading }
             {pastBookings.map(booking => (
               <div key={booking.id} className="booking-card past-card">
                 <div className="booking-card-header">
-                  <div className="booking-type-icon">{booking.consultation_type_id === 'starter' ? '🚀' : booking.consultation_type_id === 'nutrition' ? '🥗' : '💬'}</div>
+                  <div className="booking-type-icon">{booking.emoji_icon || (booking.consultation_type_id === 'starter' ? '🚀' : booking.consultation_type_id === 'nutrition' ? '🥗' : '💬')}</div>
                   <div className="booking-info">
-                    <h4 className="booking-title">{booking.consultation_title}</h4>
+                    <h4 className="booking-title">{booking.consultation_type_name || booking.consultation_title}</h4>
                     <p className="booking-meta">
-                      <CalIcon/> {formatDate(booking.booking_date)} at {formatTime(booking.booking_time)}
+                      <CalIcon/> {formatDate(booking.scheduled_date || booking.booking_date)} at {formatTime(booking.scheduled_time || booking.booking_time)}
                     </p>
                     <p className="booking-meta">
-                      <VideoIcon/> {booking.session_format === 'in-person' ? 'In-Person' : 'Video Call'}
+                      <UserIcon/> Coach: {booking.coach_name || 'TBD'}
+                    </p>
+                    <p className="booking-meta">
+                      <VideoIcon/> {booking.format === 'in_person' ? 'In-Person' : booking.format === 'video' ? 'Video Call' : (booking.session_format || 'In-Person')}
                     </p>
                   </div>
+                  {booking.status === 'completed' && !booking.has_feedback && (
+                    <button 
+                      className="booking-feedback-btn"
+                      onClick={() => setFeedbackModal(booking)}
+                    >
+                      <StarIcon/> Rate Session
+                    </button>
+                  )}
                 </div>
                 <div className="booking-card-footer">
-                  <span className="booking-ref">Ref: {booking.booking_reference}</span>
-                  <span className={`booking-status ${booking.status}`}>
-                    {booking.status === 'completed' ? 'Completed' : booking.status === 'cancelled' ? 'Cancelled' : booking.status}
+                  <span className="booking-ref">Ref: {booking.reference || booking.booking_reference}</span>
+                  <span className={`booking-status ${getStatusBadgeClass(booking.status)}`}>
+                    {getStatusText(booking.status)}
                   </span>
                 </div>
               </div>
@@ -243,38 +242,210 @@ function MyBookingsSection({ upcomingBookings, pastBookings, onCancel, loading }
           </div>
         </div>
       )}
+
+      {/* Reschedule Modal */}
+      {rescheduleModal && (
+        <RescheduleModal 
+          booking={rescheduleModal}
+          onClose={() => setRescheduleModal(null)}
+          onReschedule={onReschedule}
+        />
+      )}
+
+      {/* Feedback Modal */}
+      {feedbackModal && (
+        <FeedbackModal 
+          booking={feedbackModal}
+          onClose={() => setFeedbackModal(null)}
+          onSubmit={onFeedback}
+        />
+      )}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════
-   STEP INDICATOR
+   RESCHEDULE MODAL
 ═══════════════════════════════════════ */
-function StepBar({ step }) {
-  const steps = [
-    { num:1, label:"Choose Type" },
-    { num:2, label:"Pick Date & Time" },
-    { num:3, label:"Confirm Booking" },
-  ];
+function RescheduleModal({ booking, onClose, onReschedule }) {
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const loadSlots = async (date) => {
+    setLoadingSlots(true);
+    try {
+      const availability = await consultationsAPI.getAvailability(date, booking.consultation_type_id);
+      setSlots(availability.coaches?.find(c => c.coach_id === booking.coach_id)?.slots || []);
+    } catch (err) {
+      console.error("Failed to load slots:", err);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedDate) {
+      loadSlots(selectedDate);
+    }
+  }, [selectedDate]);
+
+  const handleSubmit = async () => {
+    if (!selectedDate || !selectedTime) return;
+    setSubmitting(true);
+    await onReschedule(booking.id, selectedDate, selectedTime, reason);
+    setSubmitting(false);
+    onClose();
+  };
+
   return (
-    <div className="step-bar">
-      {steps.map((s, i) => (
-        <div key={s.num} className="step-bar-segment">
-          <div className={`step-node${step >= s.num ? " step-node--done" : ""}${step === s.num ? " step-node--active" : ""}`}>
-            <div className="step-num">{step > s.num ? <CheckIcon/> : s.num}</div>
-            <span className="step-label">{s.label}</span>
-          </div>
-          {i < steps.length - 1 && (
-            <div className={`step-connector${step > s.num ? " step-connector--done" : ""}`}/>
-          )}
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="reschedule-modal">
+        <h3>Reschedule Consultation</h3>
+        <p className="modal-sub">Select a new date and time for your {booking.consultation_type_name}</p>
+        
+        <div className="reschedule-date-picker">
+          <label>New Date</label>
+          <input 
+            type="date" 
+            min={new Date().toISOString().split('T')[0]}
+            value={selectedDate || ''}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
         </div>
-      ))}
+
+        {selectedDate && (
+          <div className="reschedule-time-slots">
+            <label>Available Times</label>
+            {loadingSlots ? (
+              <div className="loading-spinner-small"/>
+            ) : (
+              <div className="time-slots-grid">
+                {slots.filter(s => s.available).map(slot => (
+                  <button
+                    key={slot.time}
+                    className={`time-slot ${selectedTime === slot.time ? 'time-slot--selected' : ''}`}
+                    onClick={() => setSelectedTime(slot.time)}
+                  >
+                    {formatTime12(slot.time)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="reschedule-reason">
+          <label>Reason for Rescheduling (optional)</label>
+          <textarea 
+            rows={2}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Tell us why you need to reschedule..."
+          />
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn-back" onClick={onClose}>Cancel</button>
+          <button 
+            className="btn-confirm" 
+            disabled={!selectedDate || !selectedTime || submitting}
+            onClick={handleSubmit}
+          >
+            {submitting ? "Processing..." : "Confirm Reschedule"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════
-   STEP 1 — CHOOSE CONSULTATION TYPE
+   FEEDBACK MODAL
+═══════════════════════════════════════ */
+function FeedbackModal({ booking, onClose, onSubmit }) {
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [review, setReview] = useState("");
+  const [wouldRecommend, setWouldRecommend] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (rating === 0) return;
+    setSubmitting(true);
+    await onSubmit(booking.id, rating, review, wouldRecommend);
+    setSubmitting(false);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="feedback-modal">
+        <h3>Rate Your Consultation</h3>
+        <p className="modal-sub">How was your {booking.consultation_type_name} with {booking.coach_name || 'your coach'}?</p>
+        
+        <div className="rating-stars">
+          {[1,2,3,4,5].map(star => (
+            <button
+              key={star}
+              className={`star-btn ${star <= (hoverRating || rating) ? 'star-active' : ''}`}
+              onMouseEnter={() => setHoverRating(star)}
+              onMouseLeave={() => setHoverRating(0)}
+              onClick={() => setRating(star)}
+            >
+              ★
+            </button>
+          ))}
+        </div>
+
+        <div className="feedback-review">
+          <label>Your Review (optional)</label>
+          <textarea 
+            rows={3}
+            value={review}
+            onChange={(e) => setReview(e.target.value)}
+            placeholder="Share your experience with the coach and consultation..."
+          />
+        </div>
+
+        <div className="feedback-recommend">
+          <label>Would you recommend this consultation to others?</label>
+          <div className="recommend-buttons">
+            <button 
+              className={`recommend-btn ${wouldRecommend ? 'active-yes' : ''}`}
+              onClick={() => setWouldRecommend(true)}
+            >
+              Yes, definitely
+            </button>
+            <button 
+              className={`recommend-btn ${!wouldRecommend ? 'active-no' : ''}`}
+              onClick={() => setWouldRecommend(false)}
+            >
+              Not really
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn-back" onClick={onClose}>Skip</button>
+          <button 
+            className="btn-confirm" 
+            disabled={rating === 0 || submitting}
+            onClick={handleSubmit}
+          >
+            {submitting ? "Submitting..." : "Submit Feedback"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   STEP 1 — CHOOSE CONSULTATION TYPE (Updated)
 ═══════════════════════════════════════ */
 function Step1({ consultationTypes, selected, onSelect, onNext, loading }) {
   if (loading) {
@@ -303,34 +474,27 @@ function Step1({ consultationTypes, selected, onSelect, onNext, loading }) {
             className={`consult-card${selected?.id === ct.id ? " consult-card--selected" : ""}`}
             onClick={() => onSelect(ct)}
           >
-            <div className="cc-img-wrap">
-              <div className="cc-img" style={{ backgroundImage:`url(${ct.img_url})` }}/>
-              <div className="cc-img-overlay"/>
-              {ct.badge_text && (
-                <span className={`cc-badge cc-badge--${ct.badge_color}`}>{ct.badge_text}</span>
-              )}
-            </div>
-
             <div className="cc-body">
-              <div className="cc-icon">{ct.icon}</div>
+              <div className="cc-icon">{ct.emoji_icon || '💬'}</div>
               <div className="cc-meta-row">
                 <span className="cc-duration"><ClockIcon/> {ct.duration_minutes} min</span>
-                <span className="cc-price">{ct.price_display}</span>
+                <span className="cc-price">${ct.price === 0 ? 'Free' : ct.price}</span>
               </div>
-              <h3 className="cc-title">{ct.title}</h3>
+              <h3 className="cc-title">{ct.name}</h3>
               <p className="cc-subtitle">{ct.subtitle}</p>
               <p className="cc-desc">{ct.description}</p>
 
               <ul className="cc-includes">
-                {ct.includes?.map((item, idx) => (
+                {ct.what_to_expect?.map((item, idx) => (
                   <li key={idx}><span className="cc-check"><CheckIcon/></span>{item}</li>
                 ))}
               </ul>
 
-              <div className="cc-coach-row">
-                <span className="cc-coach-lbl">Coach:</span>
-                <span className="cc-coach-val">{ct.coach_description}</span>
-              </div>
+              {ct.requires_membership && ct.requires_membership !== 'free' && (
+                <div className="cc-membership-warning">
+                  <LockIcon/> Requires {ct.requires_membership} membership
+                </div>
+              )}
 
               <div className="cc-video-row">
                 <VideoIcon/>
@@ -365,17 +529,14 @@ function Step1({ consultationTypes, selected, onSelect, onNext, loading }) {
 }
 
 /* ═══════════════════════════════════════
-   STEP 2 — DATE & TIME PICKER
+   STEP 2 — DATE & TIME PICKER (Updated for multi-coach)
 ═══════════════════════════════════════ */
-function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSelect, onNext, onBack }) {
+function Step2({ consultType, selectedDate, selectedTime, selectedCoach, onDateSelect, onTimeSelect, onCoachSelect, onNext, onBack }) {
   const today = new Date();
   const [calYear, setCalYear] = useState(today.getFullYear());
   const [calMonth, setCalMonth] = useState(today.getMonth());
-  const [slots, setSlots] = useState([]);
+  const [availability, setAvailability] = useState(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [isHoliday, setIsHoliday] = useState(false);
-  const [isClosed, setIsClosed] = useState(false);
-  const [holidayName, setHolidayName] = useState(null);
 
   const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   const DAY_LABELS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -397,33 +558,37 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
 
   const getDateStatus = (dateStr) => {
     const date = new Date(dateStr + "T00:00:00");
-    const dow = date.getDay();
     const todayDate = new Date();
     todayDate.setHours(0,0,0,0);
     if (date < todayDate) return "past";
-    if (dow === 0) return "closed";
     return "open";
   };
 
-  const loadSlotsForDate = async (dateStr) => {
-    setLoadingSlots(true);
-    try {
-      const availability = await consultationsAPI.getAvailability(dateStr);
-      setSlots(availability.slots || []);
-      setIsHoliday(availability.is_holiday);
-      setIsClosed(availability.is_closed);
-      setHolidayName(availability.holiday_name);
-    } catch (err) {
-      console.error("Failed to load slots:", err);
-      setSlots([]);
-    } finally {
-      setLoadingSlots(false);
+const loadAvailability = async (dateStr) => {
+  setLoadingSlots(true);
+  try {
+    console.log('Fetching availability for date:', dateStr);
+    console.log('Consultation type ID:', consultType?.id);
+    
+    const data = await consultationsAPI.getAvailability(dateStr, consultType?.id);
+    console.log('Availability response:', data);
+    
+    setAvailability(data);
+    
+    if (!data.coaches || data.coaches.length === 0) {
+      console.log('No coaches available on this date');
     }
-  };
+  } catch (err) {
+    console.error("Failed to load availability:", err);
+    setAvailability(null);
+  } finally {
+    setLoadingSlots(false);
+  }
+};
 
   useEffect(() => {
     if (selectedDate) {
-      loadSlotsForDate(selectedDate);
+      loadAvailability(selectedDate);
     }
   }, [selectedDate]);
 
@@ -448,6 +613,7 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
   };
 
   const formatTime12 = (t) => {
+    if (!t) return "";
     const [h, m] = t.split(":").map(Number);
     const ampm = h >= 12 ? "PM" : "AM";
     const h12 = h % 12 || 12;
@@ -458,15 +624,15 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
     <div className="step-panel step2-panel">
       <div className="step-header">
         <div className="step-eyebrow"><span className="eyebrow-line"/>Step 2 of 3</div>
-        <h2 className="step-title">SELECT DATE & TIME</h2>
-        <p className="step-sub">Choose an available date, then pick your preferred time slot. Greyed-out dates and times are unavailable.</p>
+        <h2 className="step-title">SELECT DATE, TIME & COACH</h2>
+        <p className="step-sub">Choose an available date, then pick your preferred time slot and coach.</p>
       </div>
 
       <div className="selected-type-summary">
-        <span className="sts-icon">{consultType.icon}</span>
+        <span className="sts-icon">{consultType.emoji_icon || '💬'}</span>
         <div>
-          <p className="sts-name">{consultType.title}</p>
-          <p className="sts-meta"><ClockIcon/> {consultType.duration_minutes} min &nbsp;·&nbsp; {consultType.price_display}</p>
+          <p className="sts-name">{consultType.name}</p>
+          <p className="sts-meta"><ClockIcon/> {consultType.duration_minutes} min &nbsp;·&nbsp; ${consultType.price === 0 ? 'Free' : consultType.price}</p>
         </div>
         <button className="sts-change" onClick={onBack}>Change</button>
       </div>
@@ -500,15 +666,13 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
               let cellClass = "cal-cell";
               if (!available)   cellClass += " cal-cell--disabled";
               if (isSelected)   cellClass += " cal-cell--selected";
-              if (status === "closed")  cellClass += " cal-cell--closed";
 
               return (
                 <button
                   key={ds}
                   className={cellClass}
                   disabled={!available}
-                  onClick={() => { onDateSelect(ds); onTimeSelect(null); }}
-                  title={status === "closed" ? "Closed on Sundays" : "Available"}
+                  onClick={() => { onDateSelect(ds); onTimeSelect(null); onCoachSelect(null); }}
                 >
                   <span className="cal-day-num">{dayNum}</span>
                 </button>
@@ -519,7 +683,6 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
           <div className="cal-legend">
             <div className="legend-item"><div className="legend-dot legend-dot--available"/><span>Available</span></div>
             <div className="legend-item"><div className="legend-dot legend-dot--selected"/><span>Selected</span></div>
-            <div className="legend-item"><div className="legend-dot legend-dot--closed"/><span>Closed</span></div>
           </div>
         </div>
 
@@ -527,12 +690,7 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
           {!selectedDate ? (
             <div className="time-empty">
               <CalIcon/>
-              <p>Select a date to see<br/>available time slots</p>
-            </div>
-          ) : isHoliday || isClosed ? (
-            <div className="time-empty">
-              <InfoIcon/>
-              <p>{isHoliday ? `Closed for ${holidayName}` : "Closed on this day"}</p>
+              <p>Select a date to see<br/>available time slots & coaches</p>
             </div>
           ) : loadingSlots ? (
             <div className="time-empty">
@@ -542,60 +700,50 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
           ) : (
             <>
               <div className="time-panel-header">
-                <h4 className="time-panel-title">Available Times</h4>
+                <h4 className="time-panel-title">Available Sessions</h4>
                 <p className="time-panel-date">{formatDisplayDate(selectedDate)}</p>
-                <p className="time-panel-tz">Timezone: Eastern Time (ET)</p>
               </div>
 
-              {slots.length === 0 ? (
+              {!availability?.coaches?.length ? (
                 <div className="time-empty">
                   <ClockIcon/>
-                  <p>No slots available<br/>on this day</p>
+                  <p>No sessions available<br/>on this day</p>
                 </div>
               ) : (
-                <div className="time-slots-grid">
-                  {slots.map(slot => {
-                    const isBooked = slot.booked;
-                    const isSel = slot.time === selectedTime;
-                    let cls = "time-slot";
-                    if (isBooked) cls += " time-slot--booked";
-                    if (isSel)    cls += " time-slot--selected";
-
-                    return (
-                      <button
-                        key={slot.time}
-                        className={cls}
-                        disabled={isBooked || !slot.available}
-                        onClick={() => onTimeSelect(slot.time)}
-                        title={isBooked ? "Already booked" : `Book ${formatTime12(slot.time)}`}
-                      >
-                        {formatTime12(slot.time)}
-                        {isBooked && <span className="slot-tag">Booked</span>}
-                        {isSel && <span className="slot-tag slot-tag--sel">✓</span>}
-                      </button>
-                    );
-                  })}
-                </div>
+                <>
+                  {availability.coaches.map(coach => (
+                    <div key={coach.coach_id} className="coach-slot-group">
+                      <div className="coach-header">
+                        <UserIcon/>
+                        <span className="coach-name">{coach.coach_name}</span>
+                      </div>
+                      <div className="time-slots-grid">
+                        {coach.slots.filter(s => s.available).map(slot => (
+                          <button
+                            key={slot.time}
+                            className={`time-slot ${selectedTime === slot.time && selectedCoach === coach.coach_id ? 'time-slot--selected' : ''}`}
+                            onClick={() => {
+                              onTimeSelect(slot.time);
+                              onCoachSelect(coach.coach_id);
+                            }}
+                          >
+                            {formatTime12(slot.time)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </>
               )}
 
-              {selectedTime && (
+              {selectedTime && selectedCoach && (
                 <div className="time-selection-confirm">
                   <CheckIcon/>
-                  <span>{formatTime12(selectedTime)} selected</span>
+                  <span>{formatTime12(selectedTime)} with {availability?.coaches?.find(c => c.coach_id === selectedCoach)?.coach_name} selected</span>
                 </div>
               )}
             </>
           )}
-
-          <div className="hours-info-box">
-            <p className="hours-info-title">Consultation Hours</p>
-            <ul className="hours-info-list">
-              <li><span>Mon – Fri</span><span>6:00 AM – 8:00 PM</span></li>
-              <li><span>Saturday</span><span>7:00 AM – 5:00 PM</span></li>
-              <li><span>Sunday</span><span>Closed</span></li>
-              <li><span>Public Holidays</span><span>Closed</span></li>
-            </ul>
-          </div>
         </div>
       </div>
 
@@ -603,7 +751,7 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
         <button className="btn-back" onClick={onBack}><ChevLeft/> Back</button>
         <button
           className="btn-next"
-          disabled={!selectedDate || !selectedTime}
+          disabled={!selectedDate || !selectedTime || !selectedCoach}
           onClick={onNext}
         >
           Review & Confirm <ArrowRight/>
@@ -614,11 +762,11 @@ function Step2({ consultType, selectedDate, selectedTime, onDateSelect, onTimeSe
 }
 
 /* ═══════════════════════════════════════
-   STEP 3 — CONFIRM BOOKING
+   STEP 3 — CONFIRM BOOKING (Updated)
 ═══════════════════════════════════════ */
-function Step3({ consultType, selectedDate, selectedTime, userData, onBack, onConfirm }) {
+function Step3({ consultType, selectedDate, selectedTime, selectedCoach, coachName, userData, onBack, onConfirm }) {
   const [notes, setNotes] = useState("");
-  const [format, setFormat] = useState("in-person");
+  const [format, setFormat] = useState("in_person");
   const [agreed, setAgreed] = useState(false);
   const [bookingInProgress, setBookingInProgress] = useState(false);
 
@@ -627,15 +775,16 @@ function Step3({ consultType, selectedDate, selectedTime, userData, onBack, onCo
     return d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
   };
   const formatTime12 = (t) => {
-    const [h] = t.split(":").map(Number);
+    const [h, m] = t.split(":").map(Number);
     const ampm = h >= 12 ? "PM" : "AM";
-    return `${h % 12 || 12}:00 ${ampm}`;
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
   };
 
   const handleConfirm = async () => {
     if (!agreed) return;
     setBookingInProgress(true);
-    await onConfirm({ format, notes });
+    await onConfirm({ format, notes, coach_id: selectedCoach });
     setBookingInProgress(false);
   };
 
@@ -656,17 +805,25 @@ function Step3({ consultType, selectedDate, selectedTime, userData, onBack, onCo
             <div className="confirm-user-info">
               <p className="confirm-user-name">{userData?.name || 'Member'}</p>
               <p className="confirm-user-email"><MailIcon/> {userData?.email || 'user@example.com'}</p>
-              <p className="confirm-user-badge"><StarIcon/> Active Member</p>
+              <p className="confirm-user-badge"><StarIcon/> {userData?.membership_tier || 'Active'} Member</p>
             </div>
           </div>
 
           <div className="confirm-details">
             <div className="confirm-detail-row">
-              <div className="cdr-icon">{consultType.icon}</div>
+              <div className="cdr-icon">{consultType.emoji_icon || '💬'}</div>
               <div>
                 <p className="cdr-label">Consultation Type</p>
-                <p className="cdr-val">{consultType.title}</p>
-                <p className="cdr-sub">{consultType.duration_minutes} min session · {consultType.price_display}</p>
+                <p className="cdr-val">{consultType.name}</p>
+                <p className="cdr-sub">{consultType.duration_minutes} min session · ${consultType.price === 0 ? 'Free' : consultType.price}</p>
+              </div>
+            </div>
+
+            <div className="confirm-detail-row">
+              <div className="cdr-icon"><UserIcon/></div>
+              <div>
+                <p className="cdr-label">Coach</p>
+                <p className="cdr-val">{coachName || 'Assigned Coach'}</p>
               </div>
             </div>
 
@@ -682,15 +839,7 @@ function Step3({ consultType, selectedDate, selectedTime, userData, onBack, onCo
               <div className="cdr-icon"><ClockIcon/></div>
               <div>
                 <p className="cdr-label">Time</p>
-                <p className="cdr-val">{formatTime12(selectedTime)} Eastern Time (ET)</p>
-              </div>
-            </div>
-
-            <div className="confirm-detail-row">
-              <div className="cdr-icon"><UserIcon/></div>
-              <div>
-                <p className="cdr-label">Coach</p>
-                <p className="cdr-val">{consultType.coach_description}</p>
+                <p className="cdr-val">{formatTime12(selectedTime)} (Timezone: America/New_York)</p>
               </div>
             </div>
           </div>
@@ -699,8 +848,8 @@ function Step3({ consultType, selectedDate, selectedTime, userData, onBack, onCo
             <p className="confirm-format-label">Session Format</p>
             <div className="format-toggle">
               <button
-                className={`format-btn${format === "in-person" ? " format-btn--active" : ""}`}
-                onClick={() => setFormat("in-person")}
+                className={`format-btn${format === "in_person" ? " format-btn--active" : ""}`}
+                onClick={() => setFormat("in_person")}
               >
                 <UserIcon/> In-Person
               </button>
@@ -756,7 +905,7 @@ function Step3({ consultType, selectedDate, selectedTime, userData, onBack, onCo
           <div className="what-to-expect">
             <h4 className="wte-title">What to Expect</h4>
             <ul className="wte-list">
-              {consultType.includes?.map((item, idx) => (
+              {consultType.what_to_expect?.map((item, idx) => (
                 <li key={idx}><span className="wte-check"><CheckIcon/></span>{item}</li>
               ))}
             </ul>
@@ -785,22 +934,23 @@ function Step3({ consultType, selectedDate, selectedTime, userData, onBack, onCo
 }
 
 /* ═══════════════════════════════════════
-   BOOKING SUCCESS MODAL
+   BOOKING SUCCESS MODAL (Updated)
 ═══════════════════════════════════════ */
 function SuccessModal({ booking, userData, onClose }) {
-  const { consultType, selectedDate, selectedTime, format, notes, response } = booking;
+  const { consultType, selectedDate, selectedTime, format, notes, response, coachName } = booking;
 
   const formatDisplayDate = (ds) => {
     const d = new Date(ds + "T00:00:00");
     return d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
   };
   const formatTime12 = (t) => {
-    const [h] = t.split(":").map(Number);
+    const [h, m] = t.split(":").map(Number);
     const ampm = h >= 12 ? "PM" : "AM";
-    return `${h % 12 || 12}:00 ${ampm}`;
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
   };
 
-  const bookingRef = response?.booking_reference || `GV-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
+  const bookingRef = response?.reference || response?.booking_reference || `GV-${Math.random().toString(36).substring(2,8).toUpperCase()}`;
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -834,7 +984,11 @@ function SuccessModal({ booking, userData, onClose }) {
             </div>
             <div className="sm-detail">
               <span className="sm-detail-lbl">Consultation</span>
-              <span className="sm-detail-val">{consultType.title}</span>
+              <span className="sm-detail-val">{consultType.name}</span>
+            </div>
+            <div className="sm-detail">
+              <span className="sm-detail-lbl">Coach</span>
+              <span className="sm-detail-val">{coachName || 'Assigned Coach'}</span>
             </div>
             <div className="sm-detail">
               <span className="sm-detail-lbl">Date</span>
@@ -846,7 +1000,7 @@ function SuccessModal({ booking, userData, onClose }) {
             </div>
             <div className="sm-detail">
               <span className="sm-detail-lbl">Format</span>
-              <span className="sm-detail-val" style={{ textTransform:"capitalize" }}>{format.replace("-"," ")}</span>
+              <span className="sm-detail-val" style={{ textTransform:"capitalize" }}>{format.replace("_", " ")}</span>
             </div>
             <div className="sm-detail">
               <span className="sm-detail-lbl">Duration</span>
@@ -854,7 +1008,9 @@ function SuccessModal({ booking, userData, onClose }) {
             </div>
             <div className="sm-detail">
               <span className="sm-detail-lbl">Price</span>
-              <span className="sm-detail-val" style={{ color:"var(--orange)", fontWeight:700 }}>{consultType.price_display}</span>
+              <span className="sm-detail-val" style={{ color:"var(--orange)", fontWeight:700 }}>
+                ${consultType.price === 0 ? 'Free' : consultType.price}
+              </span>
             </div>
           </div>
         </div>
@@ -879,13 +1035,15 @@ function SuccessModal({ booking, userData, onClose }) {
 }
 
 /* ═══════════════════════════════════════
-   MAIN PAGE
+   MAIN PAGE (Updated)
 ═══════════════════════════════════════ */
 export default function ConsultationPage() {
   const [step, setStep] = useState(1);
   const [consultType, setConsultType] = useState(null);
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState(null);
+  const [selectedCoach, setSelectedCoach] = useState(null);
+  const [selectedCoachName, setSelectedCoachName] = useState(null);
   const [booking, setBooking] = useState(null);
   const [userData, setUserData] = useState(null);
   const [consultationTypes, setConsultationTypes] = useState([]);
@@ -908,12 +1066,11 @@ export default function ConsultationPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Get user account info
       const accountData = await accountAPI.getMyAccount();
       setUserData(accountData);
       
-      // Get consultation types
-      const types = await consultationsAPI.getConsultationTypes();
+      const typesResponse = await consultationsAPI.getConsultationTypes();
+      const types = typesResponse.types || typesResponse;
       setConsultationTypes(types);
     } catch (err) {
       console.error("Failed to load data:", err);
@@ -935,21 +1092,40 @@ export default function ConsultationPage() {
     }
   };
 
-  const handleConfirm = async ({ format, notes }) => {
+  const handleConfirm = async ({ format, notes, coach_id }) => {
     try {
       const bookingData = {
         consultation_type_id: consultType.id,
+        coach_id: coach_id,
         booking_date: selectedDate,
         booking_time: selectedTime,
-        session_format: format,
-        notes: notes
+        format: format,
+        notes: notes,
+        agreed_cancellation_policy: true
       };
       
       const response = await consultationsAPI.bookConsultation(bookingData);
-      setBooking({ consultType, selectedDate, selectedTime, format, notes, response });
       
-      // Refresh bookings after successful booking
+      // Get coach name from availability data or response
+      const coachNameValue = selectedCoachName || response.coach_name || 'Assigned Coach';
+      
+      setBooking({ 
+        consultType, 
+        selectedDate, 
+        selectedTime, 
+        format, 
+        notes, 
+        response,
+        coachName: coachNameValue
+      });
+      
       await loadMyBookings();
+      setStep(1);
+      setConsultType(null);
+      setSelectedDate(null);
+      setSelectedTime(null);
+      setSelectedCoach(null);
+      setSelectedCoachName(null);
     } catch (err) {
       console.error("Booking failed:", err);
       alert(err.detail || "Failed to book consultation. Please try again.");
@@ -959,7 +1135,6 @@ export default function ConsultationPage() {
   const handleCancelBooking = async (bookingId) => {
     try {
       await consultationsAPI.cancelConsultation(bookingId);
-      // Refresh bookings after cancellation
       await loadMyBookings();
       alert("Consultation cancelled successfully.");
     } catch (err) {
@@ -968,12 +1143,39 @@ export default function ConsultationPage() {
     }
   };
 
+  const handleRescheduleBooking = async (bookingId, newDate, newTime, reason) => {
+    try {
+      await consultationsAPI.rescheduleBooking(bookingId, newDate, newTime, reason);
+      await loadMyBookings();
+      alert("Consultation rescheduled successfully.");
+    } catch (err) {
+      console.error("Reschedule failed:", err);
+      alert(err.detail || "Failed to reschedule consultation. Please try again.");
+    }
+  };
+
+  const handleSubmitFeedback = async (bookingId, rating, review, wouldRecommend) => {
+    try {
+      await consultationsAPI.submitFeedback(bookingId, rating, review, wouldRecommend);
+      await loadMyBookings();
+      alert("Thank you for your feedback!");
+    } catch (err) {
+      console.error("Feedback submission failed:", err);
+      alert(err.detail || "Failed to submit feedback. Please try again.");
+    }
+  };
+
   const handleModalClose = () => {
     setBooking(null);
-    setStep(1);
-    setConsultType(null);
-    setSelectedDate(null);
-    setSelectedTime(null);
+  };
+
+  // Helper function to format time for display
+  const formatTime12Helper = (t) => {
+    if (!t) return "";
+    const [h, m] = t.split(":").map(Number);
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
   };
 
   if (loading) {
@@ -1002,7 +1204,7 @@ export default function ConsultationPage() {
           <p className="ch-sub">Three steps. Zero friction. Expert guidance waiting for you.</p>
           <div className="ch-user-tag">
             <div className="ch-user-avatar">{userData?.name?.charAt(0) || 'U'}</div>
-            <span>Booking as <strong>{userData?.name || 'Member'}</strong> · Active Member</span>
+            <span>Booking as <strong>{userData?.name || 'Member'}</strong> · {userData?.membership_tier || 'Active'} Member</span>
           </div>
         </div>
       </section>
@@ -1013,6 +1215,8 @@ export default function ConsultationPage() {
           upcomingBookings={upcomingBookings}
           pastBookings={pastBookings}
           onCancel={handleCancelBooking}
+          onReschedule={handleRescheduleBooking}
+          onFeedback={handleSubmitFeedback}
           loading={loadingBookings}
         />
       </div>
@@ -1036,8 +1240,14 @@ export default function ConsultationPage() {
                 consultType={consultType}
                 selectedDate={selectedDate}
                 selectedTime={selectedTime}
+                selectedCoach={selectedCoach}
                 onDateSelect={setSelectedDate}
                 onTimeSelect={setSelectedTime}
+                onCoachSelect={(coachId) => {
+                  setSelectedCoach(coachId);
+                  // Find coach name from availability data
+                  // This would be populated from the availability response
+                }}
                 onNext={() => goTo(3)}
                 onBack={() => goTo(1)}
               />
@@ -1047,6 +1257,8 @@ export default function ConsultationPage() {
                 consultType={consultType}
                 selectedDate={selectedDate}
                 selectedTime={selectedTime}
+                selectedCoach={selectedCoach}
+                coachName={selectedCoachName}
                 userData={userData}
                 onBack={() => goTo(2)}
                 onConfirm={handleConfirm}
@@ -1077,3 +1289,4 @@ export default function ConsultationPage() {
     </div>
   );
 }
+

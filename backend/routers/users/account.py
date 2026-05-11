@@ -1215,10 +1215,29 @@ async def get_today_water_intake(
     )
     intake = result.scalar_one_or_none()
     
-    return WaterIntakeResponse(
-        date=today,
-        cups_consumed=intake.cups_consumed if intake else 0
-    )
+    if intake:
+        return WaterIntakeResponse(
+            id=intake.id,
+            client_id=intake.client_id,
+            date=intake.date,
+            cups_consumed=intake.cups_consumed,
+            notes=intake.notes,
+            created_at=intake.created_at,
+            updated_at=intake.updated_at
+        )
+    else:
+        # Return a response with default values when no record exists
+        import uuid
+        now = datetime.utcnow()
+        return WaterIntakeResponse(
+            id=uuid.uuid4(),
+            client_id=user_id,
+            date=today,
+            cups_consumed=0,
+            notes=None,
+            created_at=now,
+            updated_at=now
+        )
 
 @router.post("/water-intake/log")
 async def log_water_intake(

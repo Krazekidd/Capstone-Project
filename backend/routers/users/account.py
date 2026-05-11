@@ -259,17 +259,18 @@ async def save_progress(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Save complete body measurements to progress tracking"""
+    """Save complete body measurements to progress tracking.
+    If an entry already exists for the current month/year, it will be updated instead of creating a duplicate."""
     try:
         user_id = current_user["user_id"]
-        role = current_user.get("role", "client")  # Default to client if role is missing
+        role = current_user.get("role", "client")
         
         # Only clients can save progress
         if role != "client":
             raise HTTPException(status_code=403, detail="Only clients can save progress measurements")
         
         # Verify that client profile exists
-        from models import Client
+        from models import Client, BodyMeasurement
         
         client_result = await db.execute(select(Client).where(Client.id == user_id))
         client = client_result.scalar_one_or_none()
@@ -277,49 +278,109 @@ async def save_progress(
         if not client:
             raise HTTPException(status_code=404, detail="Client profile not found. Please complete your registration first.")
         
-        # Create new progress entry using body_measurements table
-        from models import BodyMeasurement
+        # Check for existing measurement in the current month and year
+        now = datetime.utcnow()
+        current_month = now.month
+        current_year = now.year
         
-        new_measurement = BodyMeasurement(
-            client_id=user_id,
-            weight=measurements.weight,
-            height=measurements.height,
-            body_fat=measurements.body_fat,
-            chest=measurements.chest,
-            waist=measurements.waist,
-            shoulders=measurements.shoulders,
-            arm_left=measurements.arm_left,
-            arm_right=measurements.arm_right,
-            neck=measurements.neck,
-            hips=measurements.hips,
-            thigh_left=measurements.thigh_left,
-            thigh_right=measurements.thigh_right,
-            calf_left=measurements.calf_left,
-            calf_right=measurements.calf_right,
-            glutes=measurements.glutes
+        from sqlalchemy import extract
+        
+        existing_result = await db.execute(
+            select(BodyMeasurement)
+            .where(BodyMeasurement.client_id == user_id)
+            .where(extract('month', BodyMeasurement.recorded_at) == current_month)
+            .where(extract('year', BodyMeasurement.recorded_at) == current_year)
         )
+        existing_measurement = existing_result.scalar_one_or_none()
         
-        db.add(new_measurement)
-        await db.commit()
-        await db.refresh(new_measurement)
-        
-        # Also update the client profile with latest weight/height
-        if measurements.weight or measurements.height:
+        if existing_measurement:
+            # Update existing entry
             update_data = {}
-            if measurements.weight:
-                update_data["weight"] = float(measurements.weight)
-            if measurements.height:
-                update_data["height"] = float(measurements.height)
+            if measurements.weight is not None:
+                update_data["weight"] = measurements.weight
+            if measurements.height is not None:
+                update_data["height"] = measurements.height
+            if measurements.body_fat is not None:
+                update_data["body_fat"] = measurements.body_fat
+            if measurements.chest is not None:
+                update_data["chest"] = measurements.chest
+            if measurements.waist is not None:
+                update_data["waist"] = measurements.waist
+            if measurements.shoulders is not None:
+                update_data["shoulders"] = measurements.shoulders
+            if measurements.arm_left is not None:
+                update_data["arm_left"] = measurements.arm_left
+            if measurements.arm_right is not None:
+                update_data["arm_right"] = measurements.arm_right
+            if measurements.neck is not None:
+                update_data["neck"] = measurements.neck
+            if measurements.hips is not None:
+                update_data["hips"] = measurements.hips
+            if measurements.thigh_left is not None:
+                update_data["thigh_left"] = measurements.thigh_left
+            if measurements.thigh_right is not None:
+                update_data["thigh_right"] = measurements.thigh_right
+            if measurements.calf_left is not None:
+                update_data["calf_left"] = measurements.calf_left
+            if measurements.calf_right is not None:
+                update_data["calf_right"] = measurements.calf_right
+            if measurements.glutes is not None:
+                update_data["glutes"] = measurements.glutes
             
             if update_data:
-                from sqlalchemy import update as sql_update
-                stmt = sql_update(Client).where(Client.id == user_id).values(**update_data)
+                update_data["updated_at"] = datetime.utcnow()
+                
+                stmt = update(BodyMeasurement).where(
+                    BodyMeasurement.id == existing_measurement.id
+                ).values(**update_data)
                 await db.execute(stmt)
-                await db.commit()
+                
+                measurement_id = existing_measurement.id
+                is_new = False
+        else:
+            # Create new entry
+            new_measurement = BodyMeasurement(
+                client_id=user_id,
+                weight=measurements.weight,
+                height=measurements.height,
+                body_fat=measurements.body_fat,
+                chest=measurements.chest,
+                waist=measurements.waist,
+                shoulders=measurements.shoulders,
+                arm_left=measurements.arm_left,
+                arm_right=measurements.arm_right,
+                neck=measurements.neck,
+                hips=measurements.hips,
+                thigh_left=measurements.thigh_left,
+                thigh_right=measurements.thigh_right,
+                calf_left=measurements.calf_left,
+                calf_right=measurements.calf_right,
+                glutes=measurements.glutes
+            )
+            
+            db.add(new_measurement)
+            await db.flush()
+            measurement_id = new_measurement.id
+            is_new = True
+        
+        # Also update the client profile with latest weight/height
+        if measurements.weight is not None or measurements.height is not None:
+            client_update = {}
+            if measurements.weight is not None:
+                client_update["weight"] = float(measurements.weight)
+            if measurements.height is not None:
+                client_update["height"] = float(measurements.height)
+            
+            if client_update:
+                stmt = update(Client).where(Client.id == user_id).values(**client_update)
+                await db.execute(stmt)
+        
+        await db.commit()
         
         return {
-            "message": "Progress saved successfully",
-            "id": str(new_measurement.id)
+            "message": "Progress updated successfully" if not is_new else "Progress saved successfully",
+            "id": str(measurement_id),
+            "is_new": is_new
         }
         
     except HTTPException:
@@ -1150,12 +1211,12 @@ async def get_today_water_intake(
     result = await db.execute(
         select(ClientWaterIntake)
         .where(ClientWaterIntake.client_id == user_id)
-        .where(ClientWaterIntake.intake_date == today)
+        .where(ClientWaterIntake.date == today)
     )
     intake = result.scalar_one_or_none()
     
     return WaterIntakeResponse(
-        intake_date=today,
+        date=today,
         cups_consumed=intake.cups_consumed if intake else 0
     )
 
@@ -1199,7 +1260,7 @@ async def log_water_intake(
     result = await db.execute(
         select(ClientWaterIntake)
         .where(ClientWaterIntake.client_id == user_id)
-        .where(ClientWaterIntake.intake_date == today)
+        .where(ClientWaterIntake.date == today)
     )
     intake = result.scalar_one_or_none()
     
@@ -1208,7 +1269,7 @@ async def log_water_intake(
     else:
         new_intake = ClientWaterIntake(
             client_id=user_id,
-            intake_date=today,
+            date=today,
             cups_consumed=request.cups_consumed
         )
         db.add(new_intake)

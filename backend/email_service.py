@@ -698,7 +698,7 @@ async def send_consultation_cancellation_email(
 async def send_order_confirmation_email(
     email: str,
     customer_name: str,
-    order_reference: str,
+    order_number: str,
     items: list,
     subtotal: float,
     tax: float,
@@ -739,7 +739,7 @@ async def send_order_confirmation_email(
             <p>Thank you for your order. We've received your order and will process it shortly.</p>
             
             <div style="background-color: #f5f5f5; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                <p><strong>Order Reference:</strong> {order_reference}</p>
+                <p><strong>Order Reference:</strong> {order_number}</p>
                 <p><strong>Shipping Address:</strong><br>{shipping_address}, {city}</p>
             </div>
             
@@ -778,7 +778,7 @@ async def send_order_confirmation_email(
     
     try:
         result = client.transactional_emails.send_transac_email(
-            subject=f"Order Confirmed: {order_reference} - B.A.D People Fitness",
+            subject=f"Order Confirmed: {order_number} - B.A.D People Fitness",
             html_content=html_content,
             sender=DEFAULT_SENDER,
             to=[
@@ -793,7 +793,7 @@ async def send_order_confirmation_email(
             f"Timestamp: {datetime.now().isoformat()} | "
             f"Recipient: {email} | "
             f"Name: {customer_name} | "
-            f"Order Reference: {order_reference} | "
+            f"Order Reference: {order_number} | "
             f"Items Count: {len(items)} | "
             f"Subtotal: ${subtotal:.2f} JMD | "
             f"Tax: ${tax:.2f} JMD | "
@@ -810,7 +810,7 @@ async def send_order_confirmation_email(
             f"Timestamp: {datetime.now().isoformat()} | "
             f"Recipient: {email} | "
             f"Name: {customer_name} | "
-            f"Order Reference: {order_reference} | "
+            f"Order Reference: {order_number} | "
             f"Error: {str(e)} | "
             f"Error Type: {type(e).__name__}"
         )

@@ -69,7 +69,6 @@ class User(Base):
     product_reviews = relationship("ProductReview", back_populates="user", cascade="all, delete-orphan")
     cart_items = relationship("ShopCartItem", back_populates="user", cascade="all, delete-orphan")
     wishlist_items = relationship("ShopWishlistItem", back_populates="user", cascade="all, delete-orphan")   
-    excursion_bookings = relationship("ExcursionBooking", back_populates="user", cascade="all, delete-orphan")
     
     # Role-specific relationships
     client_profile = relationship("Client", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -831,7 +830,7 @@ class ClientWaterIntake(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     date = Column(Date, nullable=False)
-    amount_ml = Column(Integer, nullable=False)  # Water intake in milliliters
+    cups_consumed = Column(Integer, nullable=False)  # Water intake in milliliters
     notes = Column(Text)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
@@ -999,52 +998,141 @@ Trainer.evaluations = relationship("TrainerEvaluation", back_populates="trainer"
 # EXCURSIONS & EVENTS
 # =============================================================
 
+
+# ============================================================
+# EXCURSION MODELS
+# ============================================================
+
+
+# Helper function for UTC timestamps
+def _utcnow():
+    """Return current UTC datetime with timezone"""
+    return datetime.now(timezone.utc)
+
 class Excursion(Base):
     __tablename__ = "excursions"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    title = Column(String(200), nullable=False)
+    
+    # Use PostgreSQL UUID instead of String(50)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, 
+                server_default=func.gen_random_uuid())
+    name = Column(String(255), nullable=False)
+    location = Column(String(255), nullable=False)
+    level = Column(String(20), nullable=False)
+    level_label = Column(String(20), nullable=False)
+    # Use timestamptz for better timezone handling
+    date = Column(DateTime(timezone=True), nullable=False)  # Changed from Date to DateTime with timezone
+    time = Column(Time, nullable=False)
+    duration = Column(String(50), nullable=False)
+    spots = Column(Integer, nullable=False, server_default='0')
+    spots_left = Column(Integer, nullable=False, server_default='0')
+    cost = Column(Numeric(10, 2), nullable=False)
+    img_url = Column(String(500))
+    thumb_url = Column(String(500))
+    map_url = Column(String(500))
     description = Column(Text)
-    location = Column(String(200))
-    start_date = Column(DateTime(timezone=True), nullable=False)
-    end_date = Column(DateTime(timezone=True), nullable=False)
-    max_participants = Column(Integer)
-    current_participants = Column(Integer, nullable=False, default=0)
-    price = Column(Numeric(10, 2), nullable=False, default=0)
-    is_active = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+    guide = Column(String(100))
+    meetup_point = Column(String(255))
+    min_bmi = Column(Integer, server_default='15')
+    max_bmi = Column(Integer, server_default='40')
+    min_level = Column(String(20), server_default='beginner')
+    required_tenure_months = Column(Integer, server_default='0')
+    difficulty = Column(Integer, server_default='1')
+    created_at = Column(DateTime(timezone=True), nullable=False, 
+                       server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, 
+                       server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    tags = relationship("ExcursionTag", back_populates="excursion", 
+                       cascade="all, delete-orphan", lazy='selectin')
+    bring_items = relationship("ExcursionBringItem", back_populates="excursion", 
+                              cascade="all, delete-orphan", lazy='selectin')
+    bookings = relationship("ExcursionBooking", back_populates="excursion", 
+                           lazy='selectin')
 
-    # Indexes
-    __table_args__ = (
-        Index('idx_excursions_start_date', 'start_date'),
-        Index('idx_excursions_active', 'is_active'),
-    )
+    # Property to easily access bring items as list
+    @property
+    def what_to_bring(self):
+        """Property to get bring items as a list of strings"""
+        return [item.item_name for item in self.bring_items]
+
+class ExcursionTag(Base):
+    __tablename__ = "excursion_tags"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    excursion_id = Column(UUID(as_uuid=True), 
+                         ForeignKey("excursions.id", ondelete="CASCADE"), 
+                         nullable=False)
+    tag_name = Column(String(50), nullable=False)
+    
+    # Relationships
+    excursion = relationship("Excursion", back_populates="tags")
+    
+
+class ExcursionBringItem(Base):
+    __tablename__ = "excursion_bring_items"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    excursion_id = Column(UUID(as_uuid=True), 
+                         ForeignKey("excursions.id", ondelete="CASCADE"), 
+                         nullable=False)
+    item_name = Column(String(255), nullable=False)
+    display_order = Column(Integer, server_default='0')
+    
+    # Relationships
+    excursion = relationship("Excursion", back_populates="bring_items")
+    
 
 
 class ExcursionBooking(Base):
     __tablename__ = "excursion_bookings"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    excursion_id = Column(UUID(as_uuid=True), ForeignKey("excursions.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    booking_date = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    status = Column(String(20), nullable=False, default='confirmed')  # confirmed, cancelled, completed
-    notes = Column(Text)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
-
+    
+    # Use UUID instead of LargeBinary(16)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                server_default=func.gen_random_uuid())
+    user_id = Column(UUID(as_uuid=True), 
+                      ForeignKey("clients.id", ondelete="CASCADE"), 
+                      nullable=False)
+    excursion_id = Column(UUID(as_uuid=True), 
+                         ForeignKey("excursions.id", ondelete="RESTRICT"), 
+                         nullable=False)
+    booking_reference = Column(String(50), unique=True, nullable=False)
+    booked_for_name = Column(String(255), nullable=False)
+    booked_for_email = Column(String(255), nullable=False)
+    booked_for_phone = Column(String(50), nullable=False)
+    special_notes = Column(Text)
+    payment_method = Column(String(50), server_default='online')
+    payment_status = Column(String(50), server_default='pending')
+    booking_status = Column(String(50), server_default='confirmed')
+    total_amount = Column(Numeric(10, 2), nullable=False)
+    booked_at = Column(DateTime(timezone=True), nullable=False, 
+                      server_default=func.now())
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, 
+                       server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, 
+                       server_default=func.now(), onupdate=func.now())
+    
     # Relationships
-    excursion = relationship("Excursion")
-    user = relationship("User", back_populates="excursion_bookings")
+    client = relationship("Client", backref="excursion_bookings", lazy='selectin')
+    excursion = relationship("Excursion", back_populates="bookings", lazy='selectin')
+    
 
-    # Indexes
-    __table_args__ = (
-        Index('idx_excursion_bookings_excursion_id', 'excursion_id'),
-        Index('idx_excursion_bookings_user_id', 'user_id'),
-        Index('idx_excursion_bookings_unique', 'excursion_id', 'user_id', unique=True),
-    )
 
+class ExcursionMLScore(Base):
+    __tablename__ = "excursion_ml_scores"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID(as_uuid=True), 
+                      ForeignKey("clients.id", ondelete="CASCADE"), 
+                      nullable=False)
+    excursion_id = Column(UUID(as_uuid=True), 
+                         ForeignKey("excursions.id", ondelete="CASCADE"), 
+                         nullable=False)
+    score = Column(Integer, nullable=False)
+    calculated_at = Column(DateTime(timezone=True), nullable=False, 
+                          server_default=func.now())
+    
 
 # =============================================================
 # CLIENT STATUS MANAGEMENT

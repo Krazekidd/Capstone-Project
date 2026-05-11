@@ -754,7 +754,7 @@ async def place_order(
         items=items_data,
         subtotal=subtotal,
         tax=tax,
-        shipping=shipping,
+        shipping_cost=shipping,
         total=total,
         shipping_address=request.address,
         city=request.city

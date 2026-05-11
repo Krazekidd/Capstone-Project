@@ -74,6 +74,9 @@ export default function Login() {
   const [fpSent, setFpSent]         = useState(false);
   const [isSendingReset, setIsSendingReset] = useState(false);
 
+  /* Legal modal state */
+  const [legalModal, setLegalModal] = useState(null); // "terms" | "privacy" | null
+
   // Check if already logged in and redirect based on role
   useEffect(() => {
     // Check auth context first
@@ -570,9 +573,9 @@ export default function Login() {
                   <input name="agree" type="checkbox" checked={form.agree} onChange={fc}/>
                   <span>
                     I agree to GymPRO's{" "}
-                    <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Terms & Conditions</a>{" "}
+                    <a href="#" className="link-cta" onClick={e => { e.preventDefault(); setLegalModal("terms"); }}>Terms & Conditions</a>{" "}
                     and{" "}
-                    <a href="#" className="link-cta" onClick={e => e.preventDefault()}>Privacy Policy</a>.
+                    <a href="#" className="link-cta" onClick={e => { e.preventDefault(); setLegalModal("privacy"); }}>Privacy Policy</a>.
                     I understand that my membership is subject to GymPRO's code of conduct.
                   </span>
                 </label>
@@ -585,6 +588,167 @@ export default function Login() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* ══════════════════════════
+          LEGAL MODAL (Terms / Privacy)
+      ══════════════════════════ */}
+      {legalModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setLegalModal(null); }}>
+          <div className="modal-box legal-box">
+            <button className="modal-close" onClick={() => setLegalModal(null)} type="button">✕</button>
+
+            {/* Tab switcher */}
+            <div className="legal-tabs">
+              <button
+                className={`legal-tab ${legalModal === "terms" ? "legal-tab-active" : ""}`}
+                onClick={() => setLegalModal("terms")}
+                type="button"
+              >
+                Terms of Service
+              </button>
+              <button
+                className={`legal-tab ${legalModal === "privacy" ? "legal-tab-active" : ""}`}
+                onClick={() => setLegalModal("privacy")}
+                type="button"
+              >
+                Privacy Policy
+              </button>
+            </div>
+
+            {legalModal === "terms" && (
+              <div className="legal-content">
+                <div className="modal-head">
+                  <div className="eyebrow"><span className="eyebrow-line"/>GymPro</div>
+                  <h2>TERMS OF SERVICE</h2>
+                  <p>Effective Date: April 15, 2026 &nbsp;·&nbsp; Last Updated: May 10, 2026</p>
+                </div>
+                <div className="legal-body">
+                  <div className="legal-section">
+                    <h3>1. Acceptance of Terms</h3>
+                    <p>By accessing or using the GymPro website and any associated services (collectively, the "Service"), you agree to be bound by these Terms of Service. If you do not agree, you may not use the Service.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>2. Eligibility</h3>
+                    <p>You must be at least 18 years old to register an account. If you are under 18, you may only use the Service with the consent and supervision of a parent or legal guardian.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>3. Account Registration, Security & Data Processing</h3>
+                    <p>You must provide accurate, complete, and up-to-date information when creating an account. You are responsible for safeguarding your login credentials. Any activity under your account is your responsibility. Notify us immediately of any unauthorised use.</p>
+                    <p style={{marginTop:10}}>We process your personal data (account data, client data, transaction data, communication data, and technical data) to provide and improve the Service. Certain health-related data constitutes Sensitive Personal Data under the Data Protection Act and will only be processed with your explicit consent, which may be withdrawn at any time.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>4. Your Data Protection Rights</h3>
+                    <p>Under the Data Protection Act you have the right to: access your data (s.32), rectification (s.33), restriction of processing (s.34), object to processing (s.35), rights related to automated decision-making (s.36), and data portability (s.37). Contact us to exercise any of these rights; we will respond within 30 days.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>5. Service Description</h3>
+                    <p>GymPro provides a fitness management platform including body measurement tracking, consultation booking, excursion registration, shop purchases, AI-powered fitness advice, and role-based dashboards. We may modify or discontinue features at any time with reasonable notice.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>6. User Obligations</h3>
+                    <p>You agree not to use the Service for unlawful purposes, share false information, interfere with security, transfer your account, or upload malicious code.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>7. Payments & Subscriptions</h3>
+                    <p>Certain features require payment in Jamaican Dollars. Payments are processed through third-party gateways; we do not store full card details. All sales are final unless otherwise stated.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>8. Cancellation Policy</h3>
+                    <p>Consultations may be cancelled free of charge up to 24 hours before the scheduled start time. Excursion cancellation terms are stated on each excursion's detail page.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>9. AI Chatbot & Content</h3>
+                    <p>The AI assistant is powered by a third-party service (OpenRouter). We are not responsible for the accuracy of AI-generated advice. Always consult a qualified professional before making significant changes to your diet or exercise routine.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>10. Intellectual Property</h3>
+                    <p>All content on the Service is the property of GymPro or its licensors. You may not copy, modify, or distribute it without prior written consent.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>11. Termination</h3>
+                    <p>You may terminate your account at any time. Account data will be deleted within 30 days unless retention is legally required. We may suspend or terminate your account immediately for violation of these Terms.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {legalModal === "privacy" && (
+              <div className="legal-content">
+                <div className="modal-head">
+                  <div className="eyebrow"><span className="eyebrow-line"/>GymPro</div>
+                  <h2>PRIVACY POLICY</h2>
+                  <p>Effective Date: May 11, 2026 &nbsp;·&nbsp; Last Updated: May 11, 2026</p>
+                </div>
+                <div className="legal-body">
+                  <div className="legal-section">
+                    <h3>1. Introduction</h3>
+                    <p>GymPro is committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information in compliance with the Data Protection Act, 2020 (DPA) of Jamaica.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>2. Data Controller</h3>
+                    <p>GymPro is the Data Controller for personal data collected through the Service. For any questions about your data, please contact us via our registered email address.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>3. Personal Data We Collect</h3>
+                    <p>We collect account data (name, email, phone, role), client data (fitness goals, body measurements, progress), transaction data (bookings, orders, payment info), trainer/admin data, communication data (messages, support requests), and technical data (IP address, device info, usage logs).</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>4. Sensitive Personal Data</h3>
+                    <p>Health-related data (height, weight, measurements, fitness goals) is Sensitive Personal Data under the DPA. We process it only with your explicit, separate consent, which you may withdraw at any time by contacting us.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>5. How We Use Your Data</h3>
+                    <p>We use your data to provide and improve the Service, personalise your dashboard, process bookings and purchases, communicate with you, ensure security, and analyse usage trends using anonymised data where possible.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>6. Legal Bases for Processing</h3>
+                    <p>We rely on: Consent (sensitive data and marketing), Contractual Necessity (providing the service), Legitimate Interests (fraud prevention, security), and Legal Obligation (compliance with Jamaican law).</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>7. Data Sharing & Disclosure</h3>
+                    <p>We do not sell your personal data. We may share it with service providers (cloud hosting, payment processors), our AI chatbot provider (OpenRouter), or as required by law. In a business transfer, you will be notified of any data changes.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>8. International Data Transfers</h3>
+                    <p>Your data may be stored on servers outside Jamaica. We ensure adequate protection through standard contractual clauses or other approved mechanisms as required by the DPA.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>9. Data Security</h3>
+                    <p>We implement TLS encryption in transit and at rest, role-based access controls, and regular security assessments. No internet transmission is 100% secure; you use the Service at your own risk.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>10. Data Breach Notification</h3>
+                    <p>In the event of a breach likely to risk your rights and freedoms, we will notify the Office of the Information Commissioner (OIC) of Jamaica within 72 hours and affected users without undue delay.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>11. Data Retention</h3>
+                    <p>Account data is retained while active and deleted within 30 days of termination. Transaction records are retained for 7 years for legal compliance. Health and progress data is retained until you delete your account or withdraw consent.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>12. Your Rights Under the DPA</h3>
+                    <p>You have the right to access, rectify, restrict processing of, object to, and receive a portable copy of your data, as well as rights related to automated decision-making. Contact us to exercise these rights; we will respond within 30 days.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>13. Children's Privacy</h3>
+                    <p>The Service is not intended for children under 18 without parental consent. If we discover we have collected data from a minor without verified consent, we will delete it promptly.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>14. Complaints</h3>
+                    <p>You may lodge a complaint with the Office of the Information Commissioner (OIC) of Jamaica at <strong>complaints@oic.gov.jm</strong> or <strong>www.oic.gov.jm</strong>. We encourage you to contact us first so we can resolve your concern directly.</p>
+                  </div>
+                  <div className="legal-section">
+                    <h3>15. Changes to This Policy</h3>
+                    <p>We may update this Privacy Policy and will notify you of material changes by posting an updated version with a new date and, where significant, by email.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="legal-footer">
+              <button className="btn-main" type="button" onClick={() => setLegalModal(null)}>Close</button>
+            </div>
           </div>
         </div>
       )}

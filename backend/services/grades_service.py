@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.models import TrainerGrade
+from models.models import TrainerGrade, Trainer, TrainerRating
 from schemas.schemas import GradeSubmitRequest, GradeResponse, GradeListResponse
 
 LOCK_HOURS = 24
@@ -165,14 +165,14 @@ async def get_all_trainers_with_grades(db: AsyncSession) -> list:
                 "hours_remaining": hrs,
             }
 
-        # Build per-month client ratings array (indices 0-10 = Jan-Nov)
+        # Build per-month client ratings array (indices 0-11 = Jan-Dec)
         # Group ratings by month of created_at, average per month slot
-        monthly_buckets: dict[int, list[float]] = {i: [] for i in range(11)}
+        monthly_buckets: dict[int, list[float]] = {i: [] for i in range(12)}
         for r in t.trainer_ratings:
-            # month 1-11 maps to index 0-10
+            # month 1-12 maps to index 0-11
             m = r.created_at.month  # 1-12
             idx = m - 1             # 0-11
-            if 0 <= idx <= 10:
+            if 0 <= idx <= 11:
                 monthly_buckets[idx].append(float(r.rating))
 
         client_ratings = [
@@ -192,3 +192,68 @@ async def get_all_trainers_with_grades(db: AsyncSession) -> list:
         })
 
     return output
+
+
+async def get_senior_trainer_performance(db: AsyncSession, trainer_id: str) -> dict:
+    """
+    Get performance data for a senior trainer including:
+      - internal grades by month (as percentages)
+      - client ratings by month (1-5 scale)
+    Returns data structure expected by frontend:
+    {
+        "myInternal": [float],  # 12 values for Jan-Dec (as percentages)
+        "myClient": [float]     # 12 values for Jan-Dec (1-5 scale)
+    }
+    """
+    from sqlalchemy.orm import selectinload
+    from sqlalchemy import extract
+    
+    # Load senior trainer with their grades and ratings
+    result = await db.execute(
+        select(Trainer)
+        .where(Trainer.id == UUID(trainer_id))
+        .options(
+            selectinload(Trainer.grades),
+            selectinload(Trainer.trainer_ratings),
+        )
+    )
+    trainer = result.scalar_one_or_none()
+    
+    if not trainer:
+        return {"myInternal": [], "myClient": []}
+    
+    # Build per-month internal grades array (indices 0-11 = Jan-Dec)
+    # Convert grade averages to percentages (score out of 10 * 10)
+    monthly_internal: dict[int, list[float]] = {i: [] for i in range(12)}
+    for grade in trainer.grades:
+        if grade.finalised and grade.overall_avg is not None:
+            month_idx = grade.month_index  # 0-11 for Jan-Dec
+            if 0 <= month_idx <= 11:
+                # Convert score from 0-10 scale to 0-100 percentage
+                percentage = float(grade.overall_avg) * 10
+                monthly_internal[month_idx].append(percentage)
+    
+    internal_ratings = [
+        round(sum(v) / len(v), 1) if v else None
+        for v in monthly_internal.values()
+    ]
+    
+    # Build per-month client ratings array (indices 0-11 = Jan-Dec)
+    # Group ratings by month of created_at, average per month slot
+    monthly_client: dict[int, list[float]] = {i: [] for i in range(12)}
+    for rating in trainer.trainer_ratings:
+        # month 1-12 maps to index 0-11
+        m = rating.created_at.month  # 1-12
+        idx = m - 1                 # 0-11
+        if 0 <= idx <= 11:
+            monthly_client[idx].append(float(rating.rating))
+    
+    client_ratings = [
+        round(sum(v) / len(v), 2) if v else None
+        for v in monthly_client.values()
+    ]
+    
+    return {
+        "myInternal": internal_ratings,
+        "myClient": client_ratings
+    }

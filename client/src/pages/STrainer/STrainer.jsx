@@ -10,7 +10,7 @@ import "./STrainer.css";
 /* ─────────────────────────────────────────────
    STATIC DATA
 ───────────────────────────────────────────── */
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 const CRITERIA = [
   { key:"performance", label:"Performance & Results", icon:"🏆" },
@@ -541,6 +541,29 @@ export default function SeniorTrainerPage() {
       .finally(()=>setLoadingTrainers(false));
   },[]);
 
+  /* Load senior trainer's performance data */
+  useEffect(()=>{
+    const loadSeniorPerformance = async () => {
+      try {
+        const response = await axiosInstance.get('/api/v1/trainers/performance');
+        const performanceData = response.data?.data;
+        
+        if (performanceData) {
+          setSenior(prev => ({
+            ...prev,
+            myInternal: performanceData.myInternal || [],
+            myClient: performanceData.myClient || [],
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load senior trainer performance:', error);
+        // Don't show toast for this error as it's not critical
+      }
+    };
+
+    loadSeniorPerformance();
+  }, []);
+
   /* senior's own stats */
   const myIntAvg = Math.round(avg(senior.myInternal)*1)||0;
   const myCliAvg = avg(senior.myClient)||0;
@@ -695,7 +718,7 @@ export default function SeniorTrainerPage() {
             {/* My performance chart */}
             <div className="sd-panel">
               <div className="sd-panel-hdr">
-                <h3>My Performance — Jan–Nov</h3>
+                <h3>My Performance — Jan–Dec</h3>
                 <div className="sd-chart-legend">
                   <span><span className="sd-leg-dot sd-leg-dot--orange"/>Internal %</span>
                   <span><span className="sd-leg-dot sd-leg-dot--green"/>Client ×20</span>

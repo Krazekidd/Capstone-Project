@@ -511,7 +511,7 @@ export default function Account() {
     logout();
     setShowSettings(false);
     showToast("Logged out — see you next time! 👋");
-    navigate("/login");
+    navigate("/");
   };
   // Log Water Intake to API
   const logWaterToAPI = async (cups) => {

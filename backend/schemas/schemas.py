@@ -1532,8 +1532,8 @@ class GradeSubmitRequest(BaseModel):
 
     @validator("month_index")
     def validate_month_index(cls, v):
-        if v < 0 or v > 10:
-            raise ValueError("month_index must be between 0 and 10 (Jan–Nov)")
+        if v < 0 or v > 11:
+            raise ValueError("month_index must be between 0 and 11 (Jan–Dec)")
         return v
 
 

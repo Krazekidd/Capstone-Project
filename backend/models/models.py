@@ -1229,7 +1229,7 @@ class TrainerGrade(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     trainer_id = Column(UUID(as_uuid=True), ForeignKey("trainers.id", ondelete="CASCADE"), nullable=False)
-    month_index = Column(Integer, nullable=False)  # 0–10 (Jan–Nov)
+    month_index = Column(Integer, nullable=False)  # 0–11 (Jan–Dec)
     scores = Column(JSONB, nullable=False)          # {performance, motivation, interaction, knowledge, punctuality}
     overall_avg = Column(Numeric(4, 2), nullable=False)
     notes = Column(Text)
@@ -1242,7 +1242,7 @@ class TrainerGrade(Base):
     submitter = relationship("User", foreign_keys=[submitted_by])  # senior trainer or admin
 
     __table_args__ = (
-        CheckConstraint('month_index BETWEEN 0 AND 10', name='check_grade_month_index'),
+        CheckConstraint('month_index BETWEEN 0 AND 11', name='check_grade_month_index'),
         Index('idx_trainer_grades_trainer_id', 'trainer_id'),
         Index('idx_trainer_grades_submitted_by', 'submitted_by'),
     )

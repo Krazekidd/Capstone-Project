@@ -114,13 +114,14 @@ async def init_db():
         NutritionGoals, ActivityData, TrainingSchedule, ClientBadge,
         Client, Trainer, Admin, ClientGoal, ClientHealthCondition,
         ClientWaterIntake, ClientStrengthRecord, TrainerRating,
-        TrainerAssessment, Excursion, ExcursionBooking, ClientStatus,
+        TrainerAssessment, ClientStatus,
         ShopCartItem, 
     ShopWishlistItem, 
     ShopOrder, 
-    ShopOrderItem, TrainerEvaluation, Excursion, ExcursionBooking, 
+    ShopOrderItem, TrainerEvaluation, Excursion, ExcursionTag, ExcursionBringItem, ExcursionBooking,
         ClientStatus, ShopOrder, ShopOrderItem, TrainerGrade
     )  # noqa: F401
+
 
     async with engine.begin() as conn:
         # Create citext extension if it doesn't exist

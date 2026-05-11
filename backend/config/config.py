@@ -1,9 +1,36 @@
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 from typing import Optional
+from fastapi_mail import ConnectionConfig
 
+import os
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+AI_MODEL = "qwen/qwen3-vl-30b-a3b-thinking"
 load_dotenv()
+# SMTP Configuration - Only create if email settings are available
+def get_smtp_config():
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    from_email = os.getenv("FROM_EMAIL")
+    
+    if smtp_user and smtp_password and from_email:
+        return ConnectionConfig(
+            MAIL_USERNAME=smtp_user,
+            MAIL_PASSWORD=smtp_password,
+            MAIL_FROM=from_email,
+            MAIL_FROM_NAME=os.getenv("FROM_NAME", "GymPRO"),
+            MAIL_PORT=int(os.getenv("SMTP_PORT", 587)),
+            MAIL_SERVER=os.getenv("SMTP_HOST", "smtp.gmail.com"),
+            MAIL_STARTTLS=True,  # TLS encryption [citation:7]
+            MAIL_SSL_TLS=False,
+            USE_CREDENTIALS=True,
+            VALIDATE_CERTS=True,
+        )
+    return None
 
+SMTP_CONFIG = get_smtp_config()
 
 class Settings(BaseSettings):
     # OpenRouter API
@@ -41,8 +68,17 @@ class Settings(BaseSettings):
     FROM_EMAIL: Optional[str] = None
     FROM_NAME: str = "GymPRO"
 
+    # Email SMTP Settings
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    FROM_EMAIL: Optional[str] = None
+    FROM_NAME: str = "GymPRO"
+
+
     # Frontend
-    FRONTEND_URL: str = "http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:5173"
 
     # Environment
     ENVIRONMENT: str = "development"

@@ -940,7 +940,7 @@ class WaterIntakeResponse(BaseModel):
     id: uuid.UUID
     client_id: uuid.UUID
     date: date
-    amount_ml: int
+    cups_consumed: int
     notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -950,7 +950,7 @@ class WaterIntakeResponse(BaseModel):
 
 class UpdateWaterIntakeRequest(BaseModel):
     date: Optional[date] = None
-    amount_ml: Optional[int] = None
+    cups_consumed: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -1042,7 +1042,7 @@ class ClientWithStatusResponse(BaseModel):
 
 class ShopProductResponse(BaseModel):
     """Response schema for shop product list"""
-    id: str
+    id: uuid.UUID
     name: str
     description: Optional[str] = None
     price: float
@@ -1557,4 +1557,112 @@ class GradeResponse(BaseModel):
 class GradeListResponse(BaseModel):
     trainer_id: str
     grades: List[GradeResponse]
+
+
+class ExcursionBase(BaseModel):
+    id: uuid.UUID
+    name: str
+    location: str
+    level: str
+    level_label: str
+    date: datetime
+    time: str
+    duration: str
+    spots: int
+    spots_left: int
+    cost: float
+    img_url: Optional[str] = None
+    thumb_url: Optional[str] = None
+    map_url: Optional[str] = None
+    description: str
+    guide: str
+    meetup_point: str
+    min_bmi: int = 15
+    max_bmi: int = 40
+    min_level: str = "beginner"
+    required_tenure_months: int = 0
+    difficulty: int = 1
+    tags: List[str] = []
+    what_to_bring: List[str] = []
+
+class ExcursionResponse(ExcursionBase):
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ExcursionListResponse(BaseModel):
+    excursions: List[ExcursionResponse]
+    total: int
+
+class BookingRequest(BaseModel):
+    excursion_id: uuid.UUID
+    booked_for_name: str
+    booked_for_email: EmailStr
+    booked_for_phone: str
+    special_notes: Optional[str] = None
+    payment_method: str = "online"  # online or cash
+
+class BookingResponse(BaseModel):
+    id: uuid.UUID
+    booking_reference: str
+    excursion_id: uuid.UUID
+    excursion_name: str
+    excursion_date: datetime
+    excursion_time: str
+    booked_for_name: str
+    booked_for_email: str
+    booked_for_phone: str
+    special_notes: Optional[str] = None
+    payment_method: str
+    payment_status: str
+    booking_status: str
+    total_amount: float
+    booked_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class MyBookingsResponse(BaseModel):
+    bookings: List[BookingResponse]
+    total: int
+
+class CancelBookingResponse(BaseModel):
+    message: str
+    booking_id: uuid.UUID
+    refund_amount: Optional[float] = None
+
+class BookingResponse(BaseModel):
+    id: uuid.UUID
+    booking_reference: str
+    excursion_id: uuid.UUID
+    excursion_name: str
+    excursion_date: datetime
+    excursion_time: str
+    location: Optional[str] = None  # Add this
+    level: Optional[str] = None      # Add this
+    thumb_url: Optional[str] = None  # Add this
+    booked_for_name: str
+    booked_for_email: str
+    booked_for_phone: str
+    special_notes: Optional[str] = None
+    payment_method: str
+    payment_status: str
+    booking_status: str
+    total_amount: float
+    booked_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class MLScoreResponse(BaseModel):
+    excursion_id: uuid.UUID
+    score: int
+    label: str
+    color: str
+
+class MLRecommendationsResponse(BaseModel):
+    recommendations: List[MLScoreResponse]
+    user_context: dict
 

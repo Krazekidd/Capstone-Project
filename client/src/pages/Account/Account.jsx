@@ -421,6 +421,8 @@ export default function Account() {
   const [restoreMeas, setRestoreMeas] = useState(null);
 
   const currentBMI = calcBMI(parseFloat(meas.weight)||84, parseFloat(meas.height)||178);
+  
+  const [apiWaterIntake, setApiWaterIntake] = useState({ cups_consumed: 0 });
 
   // Goals - fetched from API
   const [goals, setGoals] = useState({ weight:80, chest:100, waist:80, hips:98, thigh:58, arm:38 });
@@ -511,7 +513,14 @@ export default function Account() {
     showToast("Logged out — see you next time! 👋");
     navigate("/login");
   };
-
+  // Log Water Intake to API
+  const logWaterToAPI = async (cups) => {
+    try {
+      await progressAPI.logWaterIntake(cups);
+    } catch (err) {
+      console.error("Failed to log water intake:", err);
+    }
+  };  
   // ML data fetch — calls all 3 ML endpoints in parallel
   const fetchMLData = async () => {
     const w = parseFloat(meas.weight), h = parseFloat(meas.height);
@@ -583,7 +592,29 @@ export default function Account() {
   // Scroll chat/ai
   useEffect(()=>{ if(chatRef.current) chatRef.current.scrollTop=chatRef.current.scrollHeight; },[chatMsgs]);
   useEffect(()=>{ if(aiScrollRef.current) aiScrollRef.current.scrollTop=aiScrollRef.current.scrollHeight; },[aiMsgs]);
-
+  
+  // Load water intake - FIX: Add debug logging and ensure proper value extraction
+  const fetchWater = async () => {
+    try {
+      const waterData = await progressAPI.getWaterIntake();
+      console.log('Water intake API response:', waterData); // Debug log
+      if (waterData && typeof waterData.cups_consumed === 'number') {
+        console.log('Setting water cups to:', waterData.cups_consumed); // Debug log
+        setApiWaterIntake(waterData);
+        setWaterCups(waterData.cups_consumed);
+      } else if (waterData && waterData.cups_consumed !== undefined) {
+        // Handle string case
+        const cups = parseInt(waterData.cups_consumed, 10);
+        console.log('Parsed water cups to:', cups); // Debug log
+        setApiWaterIntake(waterData);
+        setWaterCups(isNaN(cups) ? 0 : cups);
+      } else {
+        console.log('No water intake data found, keeping default 0');
+      }
+    } catch (waterErr) {
+      console.error('Failed to load water intake:', waterErr);
+    }
+  }
   // Load goals from API on component mount
   const fetchGoals = async () => {
     try {
@@ -698,6 +729,7 @@ export default function Account() {
   // Load data on component mount
   useEffect(() => {
     fetchProgressHistory();
+    fetchWater();
     fetchGoals();
     fetchGoalsHistory();
     fetchHealthConditions();
@@ -1427,8 +1459,16 @@ export default function Account() {
               <div className="cups-grid">
                 {Array.from({length:WGOAL},(_,i)=>(
                   <div key={i} className={`cup${i<waterCups?" full":""}`}
-                    onClick={()=>{if(i<waterCups)setWaterCups(i);else if(i===waterCups){setWaterCups(i+1);showToast(`💧 Cup ${i+1} logged!`);}}}>
-                    <svg viewBox="0 0 32 40" width="32" height="40">
+                    onClick={()=>{
+                      if(i<waterCups) {
+                        setWaterCups(i);
+                        logWaterToAPI(i);
+                      } else if(i===waterCups) {
+                        setWaterCups(i+1);
+                        logWaterToAPI(i+1);
+                        showToast(`💧 Cup ${i+1} logged!`);
+                      }
+                    }}><svg viewBox="0 0 32 40" width="32" height="40">
                       <path d="M5 10 L27 10 L24 38 L8 38 Z" fill={i<waterCups?"url(#cupFill)":"rgba(255,255,255,0.06)"} style={{transition:"fill 0.3s"}}/>
                       <path d="M5 10 L27 10 L29 5 L3 5 Z" fill={i<waterCups?"#4a9eff":"rgba(255,255,255,0.1)"}/>
                       {i<waterCups&&<>

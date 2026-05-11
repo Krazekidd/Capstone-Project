@@ -354,3 +354,11 @@ export const deleteTrainerRating = async (ratingId) => {
   const response = await api.delete(`/api/v1/ratings/rating/${ratingId}`);
   return response.data;
 };
+
+export const getAllReviews = async (options = {}) => {
+  const { limit = 50, offset = 0 } = options;
+  const response = await api.get('/api/v1/ratings/all-reviews', {
+    params: { limit, offset }
+  });
+  return response.data;
+};

@@ -404,6 +404,93 @@ async def delete_trainer_rating(
         raise HTTPException(status_code=500, detail="Failed to delete rating")
 
 
+@router.get("/all-reviews", response_model=APIResponse)
+async def get_all_reviews(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get all client reviews across all trainers for senior trainer dashboard"""
+    try:
+        # Get all ratings with user and trainer info
+        result = await db.execute(
+            select(
+                TrainerRating, 
+                Trainer.name, 
+                Trainer.profile_image,
+                User.first_name, 
+                User.last_name,
+                User.email
+            )
+            .join(Trainer, TrainerRating.trainer_id == Trainer.id)
+            .join(User, TrainerRating.user_id == User.id)
+            .where(TrainerRating.review.isnot(None), TrainerRating.review != "")
+            .order_by(desc(TrainerRating.created_at))
+            .limit(limit)
+            .offset(offset)
+        )
+        
+        reviews = []
+        for row in result.all():
+            rating, trainer_name, trainer_profile_image, first_name, last_name, email = row
+            
+            # Handle potential null values and generate safe avatar URLs
+            safe_first_name = first_name.replace(" ", "%20") if first_name else "Unknown"
+            safe_last_name = last_name.replace(" ", "%20") if last_name else "User"
+            safe_trainer_name = trainer_name.replace(" ", "%20") if trainer_name else "Trainer"
+            
+            avatar_url = f"https://ui-avatars.com/api/?name={safe_first_name}+{safe_last_name}&background=random&color=fff"
+            
+            review_data = {
+                "id": str(rating.id),
+                "client": f"{first_name or 'Unknown'} {last_name or 'User'}",
+                "trainer": trainer_name or "Unknown Trainer",
+                "trainer_id": str(rating.trainer_id),
+                "rating": rating.rating,
+                "comment": rating.review or "",
+                "date": rating.created_at.strftime("%b %d, %Y") if rating.created_at else "",
+                "time": rating.created_at.strftime("%I:%M %p") if rating.created_at else "",
+                "avatar": avatar_url,
+                "trainer_avatar": trainer_profile_image or f"https://ui-avatars.com/api/?name={safe_trainer_name}&background=random&color=fff",
+                "is_verified": rating.is_verified,
+                "session_date": rating.session_date.isoformat() if rating.session_date else None
+            }
+            reviews.append(review_data)
+        
+        # Get total count
+        count_result = await db.execute(
+            select(func.count(TrainerRating.id))
+            .where(TrainerRating.review.isnot(None), TrainerRating.review != "")
+        )
+        total_count = count_result.scalar() or 0
+        
+        # Calculate overall average rating
+        avg_result = await db.execute(
+            select(func.avg(TrainerRating.rating))
+            .where(TrainerRating.review.isnot(None), TrainerRating.review != "")
+        )
+        avg_rating = avg_result.scalar()
+        overall_avg = float(avg_rating) if avg_rating else 0.0
+        
+        return APIResponse(
+            success=True,
+            message="All reviews retrieved successfully",
+            data={
+                "reviews": reviews,
+                "total_count": total_count,
+                "overall_average": overall_avg,
+                "limit": limit,
+                "offset": offset
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error getting all reviews: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to retrieve reviews")
+
+
 async def update_trainer_average_rating(db: AsyncSession, trainer_id: bytes):
     """Update trainer's average rating based on all ratings"""
     try:

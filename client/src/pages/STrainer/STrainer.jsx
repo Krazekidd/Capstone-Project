@@ -65,7 +65,10 @@ const REVIEWS = [
 /* ─────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────── */
-const avg  = (arr) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : null;
+const avg  = (arr) => {
+  const valid = arr.filter(v=>v!==null);
+  return valid.length ? +(valid.reduce((a,b)=>a+b,0)/valid.length).toFixed(2) : 0;
+};
 const avgG = (g) => { if(!g) return null; const v=CRITERIA.map(c=>Number(g[c.key]||0)); return +(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2); };
 const gradeCol = (s) => { if(s==null) return "#555"; if(s>=8.5) return "#22C55E"; if(s>=6) return "#F59E0B"; return "#EF4444"; };
 const gradeLbl = (s) => { if(s==null) return "Not Graded"; if(s>=8.5) return "Excellent"; if(s>=6) return "Good"; return "Needs Improvement"; };

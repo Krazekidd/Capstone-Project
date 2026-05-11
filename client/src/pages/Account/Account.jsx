@@ -377,7 +377,7 @@ export default function Account() {
 
   // Profile - derived from auth context (no local state needed)
   const profilePic = null;
-  const username = userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : userData?.email || "User";
+  const username = userData?.firstName && userData?.lastName ? `${userData.firstName} ${userData.lastName}` : userData?.email || "User";
   const birthday = userData?.birthday || "";
   const memberSince = new Date(userData?.created_at || Date.now()).getFullYear();
   
@@ -486,7 +486,7 @@ export default function Account() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMsgs, setChatMsgs] = useState([{ 
     role:"agent", 
-    text:`Hey ${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : userData?.email || "User"}! 👋 I'm your GymPro support agent. How can I help today?`, 
+    text:`Hey ${userData?.firstName && userData?.lastName ? `${userData.firstName} ${userData.lastName}` : userData?.email || "User"}! 👋 I'm your GymPro support agent. How can I help today?`, 
     time:"Just now" 
   }]);
   const [chatIn, setChatIn] = useState("");
@@ -572,7 +572,7 @@ export default function Account() {
       // Update chat greeting when user changes
       setChatMsgs([{ 
         role:"agent", 
-        text:`Hey ${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : userData?.email || "User"}! 👋 I'm your GymPro support agent. How can I help today?`, 
+        text:`Hey ${userData?.firstName && userData?.lastName ? `${userData.firstName} ${userData.lastName}` : userData?.email || "User"}! 👋 I'm your GymPro support agent. How can I help today?`, 
         time:"Just now" 
       }]);
     }

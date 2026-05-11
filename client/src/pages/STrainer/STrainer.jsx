@@ -5,6 +5,7 @@ Chart.register(...registerables);
 import { gradesAPI } from "../../api/api";
 import { useAuth } from "../../Context/AuthContext";
 import axiosInstance from "../../api/axiosConfig";
+import { getAllReviews } from "../../api/trainer";
 import "./STrainer.css";
 
 /* ─────────────────────────────────────────────
@@ -39,39 +40,31 @@ const SENIOR_DEFAULT = {
 
 const TRAINERS = []; // populated from API
 
-
 const AT_RISK = [
   { id:1, name:"Kwame Asante",   trainer:"Sasha Volkov",  risk:"high",   reason:"Missed 4 consecutive sessions",       attendance:38, progress:-12, lastSeen:"8 days ago", goal:"Weight Loss",    img:"https://images.unsplash.com/photo-1534367610401-9f5ed68180aa?w=80&q=80",  interventionBy:null },
   { id:2, name:"Leila Moreau",   trainer:"Priya Nair",    risk:"high",   reason:"BMI increased 3.2 points this month",  attendance:45, progress:-8,  lastSeen:"5 days ago", goal:"Tone & Define",  img:"https://images.unsplash.com/photo-1550259979-ed79b48d2a30?w=80&q=80",  interventionBy:null },
-  { id:3, name:"Devon Campbell", trainer:"Jordan Wells",  risk:"high",   reason:"Heart rate spike flagged by wearable", attendance:42, progress:-5,  lastSeen:"6 days ago", goal:"Cardio Fitness", img:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&q=80", interventionBy:"Marcus Reid" },
-  { id:4, name:"Ana Costa",      trainer:"Devon Clarke",  risk:"medium", reason:"No nutrition log in 2 weeks",          attendance:62, progress:2,   lastSeen:"3 days ago", goal:"Build Muscle",   img:"https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=80&q=80", interventionBy:null },
+  { id:3, name:"Devon Campbell", trainer:"Jordan Wells",  risk:"high",   reason:"Heart rate spike flagged by wearable", attendance:42, progress:-5,  lastSeen:"6 days ago", goal:"Cardio Fitness", img:"https://images.unsplash.com/photo-1494790108371-be9c29b29330?w=80&q=80", interventionBy:"Marcus Reid" },
+  { id:4, name:"Ana Costa",      trainer:"Devon Clarke",  risk:"medium", reason:"No nutrition log in 2 weeks",          attendance:62, progress:2,   lastSeen:"3 days ago", goal:"Build Muscle",   img:"https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=80&q=80", interventionBy:null },
   { id:5, name:"James Thornton", trainer:"Alicia Chen",   risk:"medium", reason:"Sleep tracking shows 5-hour average",  attendance:71, progress:4,   lastSeen:"Yesterday",  goal:"Build Muscle",   img:"https://images.unsplash.com/photo-1593085512500-5d55148d6f0d?w=80&q=80", interventionBy:null },
   { id:6, name:"Nia Williams",   trainer:"Sasha Volkov",  risk:"medium", reason:"Strength plateau for 3 weeks",         attendance:80, progress:6,   lastSeen:"2 days ago", goal:"Build Muscle",   img:"https://images.unsplash.com/photo-1607962837359-5e7e89f86776?w=80&q=80", interventionBy:null },
   { id:7, name:"Raj Patel",      trainer:"Jordan Wells",  risk:"low",    reason:"Water intake consistently below target",attendance:85, progress:8,   lastSeen:"Today",      goal:"Lose Weight",    img:"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&q=80",  interventionBy:null },
   { id:8, name:"Sofia Mendez",   trainer:"Priya Nair",    risk:"low",    reason:"Missed two optional wellness sessions", attendance:88, progress:9,   lastSeen:"Today",      goal:"Endurance",      img:"https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=80&q=80",  interventionBy:null },
 ];
 
-const REVIEWS = [
-  { id:1, client:"Alice Morrison", trainer:"Marcus Reid",   rating:5, date:"Apr 28, 2026", time:"9:14 AM",  comment:"Marcus completely transformed my approach to fitness. Every session is purposeful and challenging — best trainer I've had.", avatar:"https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60&q=80" },
-  { id:2, client:"Bob Kamara",     trainer:"Sasha Volkov",  rating:5, date:"Apr 27, 2026", time:"2:30 PM",  comment:"Sasha's boxing sessions are incredible. Lost 12kg in 3 months and I genuinely enjoy going to the gym now.", avatar:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=60&q=80" },
-  { id:3, client:"Sara Linares",   trainer:"Priya Nair",    rating:5, date:"Apr 26, 2026", time:"11:05 AM", comment:"Priya helped me recover from a knee injury I'd had for years. Her rehab knowledge is outstanding.", avatar:"https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=60&q=80" },
-  { id:4, client:"Tom Richardson", trainer:"Marcus Reid",   rating:4, date:"Apr 25, 2026", time:"4:45 PM",  comment:"Very knowledgeable and professional. Sessions are always well-planned. Marcus pushes you just hard enough.", avatar:"https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&q=80" },
-  { id:5, client:"Maya Johnson",   trainer:"Jordan Wells",  rating:4, date:"Apr 24, 2026", time:"8:20 AM",  comment:"Jordan's HIIT classes are brilliant. Lost body fat and endurance is through the roof.", avatar:"https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=60&q=80" },
-  { id:6, client:"Carlos Diaz",    trainer:"Devon Clarke",  rating:5, date:"Apr 23, 2026", time:"6:00 PM",  comment:"Devon builds athletes. Went from 80kg to 140kg squats in four months. Elite-level periodisation.", avatar:"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=60&q=80" },
-  { id:7, client:"Naomi Ashford",  trainer:"Alicia Chen",   rating:5, date:"Apr 22, 2026", time:"10:30 AM", comment:"Alicia's holistic approach is genuinely caring. She balances mental and physical health perfectly.", avatar:"https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=60&q=80" },
-  { id:8, client:"Ethan Wright",   trainer:"Marcus Reid",   rating:5, date:"Apr 20, 2026", time:"3:15 PM",  comment:"Incredible attention to detail. Marcus remembers every aspect of your programme and pushes you to exceed it.", avatar:"https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=60&q=80" },
-];
+const REVIEWS = []; // populated from API
 
 /* ─────────────────────────────────────────────
    HELPERS
 ───────────────────────────────────────────── */
-const avg  = (arr) => arr.length ? +(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : null;
+const avg  = (arr) => {
+  const valid = arr.filter(v=>v!==null);
+  return valid.length ? +(valid.reduce((a,b)=>a+b,0)/valid.length).toFixed(2) : 0;
+};
 const avgG = (g) => { if(!g) return null; const v=CRITERIA.map(c=>Number(g[c.key]||0)); return +(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2); };
 const gradeCol = (s) => { if(s==null) return "#555"; if(s>=8.5) return "#22C55E"; if(s>=6) return "#F59E0B"; return "#EF4444"; };
 const gradeLbl = (s) => { if(s==null) return "Not Graded"; if(s>=8.5) return "Excellent"; if(s>=6) return "Good"; return "Needs Improvement"; };
 const stars5   = (s) => s==null ? 0 : Math.round((s/10)*5);
 const hoursAgo = (ts) => ts ? (Date.now()-ts)/3600000 : 999;
-
 
 /* ─────────────────────────────────────────────
    TINY ICONS
@@ -486,6 +479,9 @@ export default function SeniorTrainerPage() {
   const [interventions, setInterventions] = useState({});
   const [transfers, setTransfers]   = useState([]);
   const [reviewFilter, setReviewFilter] = useState("All");
+  const [reviews, setReviews] = useState([]);
+  const [overallAverage, setOverallAverage] = useState(0);
+  const [loadingReviews, setLoadingReviews] = useState(true);
   const [toast, setToast]           = useState({show:false,msg:""});
   const [activeTab, setActiveTab]   = useState("overview"); // overview | grading | risk | reviews
 
@@ -614,10 +610,29 @@ export default function SeniorTrainerPage() {
     setGradeModal(null);
   };
 
+  /* Load all client reviews */
+  useEffect(()=>{
+    const loadReviews = async () => {
+      try {
+        const response = await getAllReviews({ limit: 100 });
+        const reviewData = response.data?.reviews || [];
+        setReviews(reviewData);
+        setOverallAverage(response.data?.overall_average || 0);
+      } catch (error) {
+        console.error('Failed to load reviews:', error);
+        showToast("⚠ Could not load reviews");
+      } finally {
+        setLoadingReviews(false);
+      }
+    };
+
+    loadReviews();
+  }, [showToast]);
+
   const displayedRisk = showAllRisk ? AT_RISK : AT_RISK.slice(0,5);
-  const reviewOptions = ["All","Marcus Reid",...trainers.map(t=>t.name)];
-  const filteredReviews = reviewFilter==="All" ? REVIEWS : REVIEWS.filter(r=>r.trainer===reviewFilter);
-  const avgReview = (REVIEWS.reduce((a,r)=>a+r.rating,0)/REVIEWS.length).toFixed(1);
+  const reviewOptions = ["All", ...trainers.map(t=>t.name)];
+  const filteredReviews = reviewFilter==="All" ? reviews : reviews.filter(r=>r.trainer===reviewFilter);
+  const avgReview = reviews.length ? (reviews.reduce((a,r)=>a+r.rating,0)/reviews.length).toFixed(1) : "0.0";
 
   const TABS = [
     { id:"overview", label:"Overview"     },
@@ -706,7 +721,7 @@ export default function SeniorTrainerPage() {
                 {val:myOverall,     lbl:"Overall Score",        col:"#F26522",            trend:null  },
                 {val:senior.active, lbl:"Active Clients",       col:"#F26522",            trend:null  },
                 {val:`${AT_RISK.filter(c=>c.risk==="high").length}`, lbl:"High Risk Clients", col:"#EF4444", trend:null },
-                {val:REVIEWS.length,lbl:"Total Reviews",        col:"#F26522",            trend:null  },
+                {val:reviews.length,lbl:"Total Reviews",        col:"#F26522",            trend:null  },
               ].map((k,i)=>(
                 <div key={i} className="sd-kpi-card">
                   <span className="sd-kpi-val" style={{color:k.col}}>{k.val}</span>
@@ -856,12 +871,12 @@ export default function SeniorTrainerPage() {
             </div>
             <div className="sd-reviews-header">
               <div className="sd-reviews-score">
-                <span className="sd-reviews-big">{avgReview}</span>
+                <span className="sd-reviews-big">{overallAverage.toFixed(1)}</span>
                 <div>
                   <div className="sd-reviews-stars-row">
-                    {[1,2,3,4,5].map(i=><span key={i} style={{color:i<=Math.round(parseFloat(avgReview))?"#F59E0B":"rgba(255,255,255,0.12)",fontSize:22}}>★</span>)}
+                    {[1,2,3,4,5].map(i=><span key={i} style={{color:i<=Math.round(overallAverage)?"#F59E0B":"rgba(255,255,255,0.12)",fontSize:22}}>★</span>)}
                   </div>
-                  <span className="sd-reviews-count">{REVIEWS.length} verified reviews</span>
+                  <span className="sd-reviews-count">{reviews.length} verified reviews</span>
                 </div>
               </div>
               <div className="sd-reviews-filters">
@@ -875,7 +890,24 @@ export default function SeniorTrainerPage() {
               </div>
             </div>
             <div className="sd-reviews-grid">
-              {filteredReviews.map(r=><ReviewCard key={r.id} r={r}/>)}
+              {loadingReviews ? (
+                <div className="sd-empty-state">
+                  <span className="sd-empty-icon">⏳</span>
+                  <p className="sd-empty-title">Loading reviews…</p>
+                </div>
+              ) : filteredReviews.length === 0 ? (
+                <div className="sd-empty-state">
+                  <span className="sd-empty-icon">💬</span>
+                  <p className="sd-empty-title">No reviews found</p>
+                  <p className="sd-empty-sub">
+                    {reviewFilter === "All" 
+                      ? "There are no client reviews yet." 
+                      : `No reviews found for ${reviewFilter}.`}
+                  </p>
+                </div>
+              ) : (
+                filteredReviews.map(r=><ReviewCard key={r.id} r={r}/>)
+              )}
             </div>
           </div>
         )}

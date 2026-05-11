@@ -178,8 +178,12 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   const [loading, setLoading] = useState(false);
   const [trainerAssessments, setTrainerAssessments] = useState({});
   const [showAddTrainer, setShowAddTrainer] = useState(false);
-  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "" });
+  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "", email: "", password: "", expertise: "Strength", photo: null, photoPreview: null });
+  const [editTrainer, setEditTrainer] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [confirmDeleteTrainer, setConfirmDeleteTrainer] = useState(null);
   const [gradeLog, setGradeLog] = useState({});
+  const [overviewTrainer, setOverviewTrainer] = useState(null);
 
   // Load gradeLog from backend on mount so it persists across sessions
   // When backend is ready, uncomment this:
@@ -214,40 +218,44 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     try {
       const assessments = await adminAPI.getTrainerAssessments(t.id);
       setTrainerAssessments(prev => ({ ...prev, [t.id]: assessments }));
-    } catch (err) { console.error("Failed to load assessments:", err); }
+    } catch (err) { console.error("Failed to load assessments:", err); /* non-blocking */ }
   };
 
   const submitAssess = async () => {
     setLoading(true);
+    const a = parseFloat(avg.toFixed(1));
+    const s = getStanding(a);
+    const now = new Date();
+    // Always update local state immediately
+    setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
+    setAssessHistory(prev => [{
+      trainer: assessTrainer.name, perf: scores.perf, motiv: scores.motiv,
+      interact: scores.interact, avg: a, standing: s.label,
+      month: now.toLocaleString("default", { month: "long", year: "numeric" }),
+      date: now.toLocaleDateString()
+    }, ...prev]);
+    // Also update trainer rating locally
+    setTrainers(prev => prev.map(t => t.id === assessTrainer.id ? { ...t, rating: a } : t));
+    toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
+    setAssessTrainer(null);
+    setLoading(false);
+    // Try to persist to backend (non-blocking)
     try {
-      const a = parseFloat(avg.toFixed(1));
-      const s = getStanding(a);
-      const now = new Date();
       await adminAPI.saveTrainerAssessment({
         trainer_id: assessTrainer.id, trainer_name: assessTrainer.name,
         scores, average: a, standing: s.label, notes: ""
       });
       const updatedAssessments = await adminAPI.getTrainerAssessments(assessTrainer.id);
       setTrainerAssessments(prev => ({ ...prev, [assessTrainer.id]: updatedAssessments }));
-      setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
-      // When backend is ready, also persist the grade log so it survives refresh:
-      // await adminAPI.saveGradeLog({ trainer_id: assessTrainer.id, graded_at: now.toISOString() });
-      setAssessHistory(prev => [{
-        trainer: assessTrainer.name, perf: scores.perf, motiv: scores.motiv,
-        interact: scores.interact, avg: a, standing: s.label,
-        month: now.toLocaleString("default", { month: "long", year: "numeric" }),
-        date: now.toLocaleDateString()
-      }, ...prev]);
-      toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
-      setAssessTrainer(null);
     } catch (err) {
-      console.error("Failed to save assessment:", err);
-      toast("Failed to save assessment: " + (err.detail || err.message));
-    } finally { setLoading(false); }
+      console.error("Backend save failed (grade saved locally):", err);
+    }
   };
 
   const submitAddTrainer = async () => {
     if (!addForm.firstName.trim() || !addForm.lastName.trim()) { toast("Please enter first and last name"); return; }
+    if (!addForm.email.trim()) { toast("Please enter an email address"); return; }
+    if (!addForm.password.trim()) { toast("Please enter a password"); return; }
     const newTrainer = {
       id: Date.now(),
       name: `${addForm.firstName.trim()} ${addForm.lastName.trim()}`,
@@ -256,6 +264,9 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
       experience_years: parseInt(addForm.experience) || 0,
       certification_date: addForm.certDate,
       rating: 0,
+      email: addForm.email.trim(),
+      expertise: addForm.expertise,
+      photo: addForm.photoPreview || null,
     };
     // When backend is ready, uncomment this and remove the id: Date.now() above (backend will assign id):
     // const saved = await adminAPI.createTrainer(newTrainer);
@@ -263,7 +274,51 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     setTrainers(prev => [...prev, newTrainer]);
     toast(`Trainer ${newTrainer.name} added successfully`);
     setShowAddTrainer(false);
-    setAddForm({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "" });
+    setAddForm({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "", email: "", password: "", expertise: "Strength", photo: null, photoPreview: null });
+  };
+
+  const openEditTrainer = (t) => {
+    const nameParts = (t.name || "").split(" ");
+    setEditForm({
+      firstName: nameParts[0] || "",
+      lastName: nameParts.slice(1).join(" ") || "",
+      role: t.certification || "Trainer",
+      certDate: t.certification_date || "",
+      experience: t.experience_years || "",
+      email: t.email || "",
+      expertise: t.expertise || "Strength",
+      photoPreview: t.photo || null,
+      photo: null,
+    });
+    setEditTrainer(t);
+  };
+
+  const submitEditTrainer = () => {
+    if (!editForm.firstName.trim() || !editForm.lastName.trim()) { toast("Please enter first and last name"); return; }
+    if (!editForm.email.trim()) { toast("Please enter an email address"); return; }
+    const updatedTrainer = {
+      ...editTrainer,
+      name: `${editForm.firstName.trim()} ${editForm.lastName.trim()}`,
+      certification: editForm.role,
+      trainer_level: editForm.role === "Senior Trainer" ? 2 : 1,
+      experience_years: parseInt(editForm.experience) || 0,
+      certification_date: editForm.certDate,
+      email: editForm.email.trim(),
+      expertise: editForm.expertise,
+      photo: editForm.photoPreview || editTrainer.photo || null,
+    };
+    setTrainers(prev => prev.map(t => t.id === editTrainer.id ? updatedTrainer : t));
+    toast(`Trainer ${updatedTrainer.name} updated successfully`);
+    setEditTrainer(null);
+    setEditForm({});
+  };
+
+  const deleteTrainer = (t) => {
+    setTrainers(prev => prev.filter(tr => tr.id !== t.id));
+    setAssessHistory(prev => prev.filter(a => a.trainer !== t.name));
+    toast(`Trainer ${t.name} removed`);
+    setConfirmDeleteTrainer(null);
+    // When backend is ready: await adminAPI.deleteTrainer(t.id);
   };
 
   const allHistory = assessHistory.length > 0 ? assessHistory :
@@ -281,12 +336,79 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     historyByMonth[m].push(a);
   });
 
-  const AddTrainerModal = () => (
+  const gradeColor = (s) => {
+    if (!s || s === 0) return "var(--muted)";
+    if (s >= 8.5) return "var(--green)";
+    if (s >= 6)   return "var(--orange)";
+    return "var(--red)";
+  };
+  const gradeLabel = (s) => {
+    if (!s || s === 0) return "Not Graded";
+    if (s >= 8.5) return "Excellent";
+    if (s >= 6)   return "Good";
+    return "Needs Work";
+  };
+  const sdColor = (sd) => sd === null ? "var(--muted)" : sd < 1 ? "var(--green)" : sd <= 2 ? "#F59E0B" : "var(--red)";
+  const sdMsg   = (sd) => sd === null ? "—" : sd < 1 ? "Raters are in agreement" : sd <= 2 ? "Raters slightly disagree" : "Raters strongly disagree";
+
+  const getGradeOverview = (t) => {
+    const tHistory = allHistory.filter(h => h.trainer === t.name).map(h => parseFloat(h.avg)).filter(v => !isNaN(v) && v > 0);
+    const baseRating = t.rating || 0;
+    const st1Avg  = baseRating > 0 ? baseRating : null;
+    const st2Avg  = tHistory.length > 1 ? +(tHistory.slice(0, -1).reduce((a, b) => a + b, 0) / tHistory.slice(0, -1).length).toFixed(2) : null;
+    const adminAvg = tHistory.length > 0 ? +tHistory[tHistory.length - 1].toFixed(2) : null;
+    const raterScores = [st1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
+    const weights = raterScores.length === 3 ? [0.35, 0.35, 0.30] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
+    const weightedAvg = raterScores.length ? +(raterScores.reduce((s, v, i) => s + v * weights[i], 0)).toFixed(2) : null;
+    const stdDev = raterScores.length >= 2
+      ? +(Math.sqrt(raterScores.reduce((s, v) => { const m = raterScores.reduce((a, b) => a + b, 0) / raterScores.length; return s + (v - m) ** 2; }, 0) / raterScores.length)).toFixed(2)
+      : null;
+    return { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev };
+  };
+
+  const EXPERTISE_OPTIONS = ["Strength", "Power Lifting", "Olympic Lifting", "HIIT & Conditioning", "Mobility & Recovery"];
+
+  const handlePhotoChange = (e, formSetter) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => formSetter(prev => ({ ...prev, photo: file, photoPreview: reader.result }));
+    reader.readAsDataURL(file);
+  };
+
+  const addTrainerModalJSX = showAddTrainer ? (
     <Modal title="Add <span style='color:var(--cyan)'>New Trainer</span>" onClose={() => setShowAddTrainer(false)}>
+      {/* Photo Upload */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+        <label style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: "50%",
+            background: addForm.photoPreview ? "transparent" : "var(--bg3, #1e1e1e)",
+            border: "2px dashed var(--cyan)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden", fontSize: addForm.photoPreview ? 0 : 28
+          }}>
+            {addForm.photoPreview
+              ? <img src={addForm.photoPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : "📷"}
+          </div>
+          <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--cyan)", fontFamily: "'JetBrains Mono',monospace" }}>
+            {addForm.photoPreview ? "CHANGE PHOTO" : "UPLOAD PHOTO"}
+          </span>
+          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => handlePhotoChange(e, setAddForm)} />
+        </label>
+      </div>
+      {/* Name Row */}
       <div className="form-row">
         <div className="form-group"><label>First Name</label><input value={addForm.firstName} onChange={e => setAddForm(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" /></div>
         <div className="form-group"><label>Last Name</label><input value={addForm.lastName} onChange={e => setAddForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" /></div>
       </div>
+      {/* Email & Password */}
+      <div className="form-row">
+        <div className="form-group"><label>Email</label><input type="email" value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} placeholder="trainer@gym.com" /></div>
+        <div className="form-group"><label>Password</label><input type="password" value={addForm.password} onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))} placeholder="Set password" /></div>
+      </div>
+      {/* Role & Expertise */}
       <div className="form-row">
         <div className="form-group"><label>Role</label>
           <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value }))}>
@@ -294,12 +416,95 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             <option value="Senior Trainer">Senior Trainer</option>
           </select>
         </div>
-        <div className="form-group"><label>Certification Date</label><input type="date" value={addForm.certDate} onChange={e => setAddForm(p => ({ ...p, certDate: e.target.value }))} /></div>
+        <div className="form-group"><label>Expertise</label>
+          <select value={addForm.expertise} onChange={e => setAddForm(p => ({ ...p, expertise: e.target.value }))}>
+            {EXPERTISE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </select>
+        </div>
       </div>
-      <div className="form-group"><label>Experience (yrs)</label><input type="number" min="0" max="50" value={addForm.experience} onChange={e => setAddForm(p => ({ ...p, experience: e.target.value }))} placeholder="Years of experience" /></div>
+      {/* Cert Date & Experience */}
+      <div className="form-row">
+        <div className="form-group"><label>Certification Date</label><input type="date" value={addForm.certDate} onChange={e => setAddForm(p => ({ ...p, certDate: e.target.value }))} /></div>
+        <div className="form-group"><label>Experience (yrs)</label><input type="number" min="0" max="50" value={addForm.experience} onChange={e => setAddForm(p => ({ ...p, experience: e.target.value }))} placeholder="Years of experience" /></div>
+      </div>
       <button className="btn btn-cyan" style={{ width: "100%", marginTop: 16, padding: 12 }} onClick={submitAddTrainer}>Add Trainer</button>
     </Modal>
-  );
+  ) : null;
+
+  const editTrainerModalJSX = editTrainer ? (
+    <Modal title={`Edit <span style='color:var(--cyan)'>${editTrainer.name}</span>`} onClose={() => setEditTrainer(null)}>
+      {/* Photo Upload */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+        <label style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: "50%",
+            background: editForm.photoPreview ? "transparent" : "var(--bg3, #1e1e1e)",
+            border: "2px dashed var(--cyan)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden", fontSize: editForm.photoPreview ? 0 : 28
+          }}>
+            {editForm.photoPreview
+              ? <img src={editForm.photoPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : "📷"}
+          </div>
+          <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--cyan)", fontFamily: "'JetBrains Mono',monospace" }}>
+            {editForm.photoPreview ? "CHANGE PHOTO" : "UPLOAD PHOTO"}
+          </span>
+          <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => handlePhotoChange(e, setEditForm)} />
+        </label>
+      </div>
+      {/* Name Row */}
+      <div className="form-row">
+        <div className="form-group"><label>First Name</label><input value={editForm.firstName} onChange={e => setEditForm(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" /></div>
+        <div className="form-group"><label>Last Name</label><input value={editForm.lastName} onChange={e => setEditForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" /></div>
+      </div>
+      {/* Email */}
+      <div className="form-group"><label>Email</label><input type="email" value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} placeholder="trainer@gym.com" /></div>
+      {/* Role & Expertise */}
+      <div className="form-row">
+        <div className="form-group"><label>Role</label>
+          <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}>
+            <option value="Trainer">Trainer</option>
+            <option value="Senior Trainer">Senior Trainer</option>
+          </select>
+        </div>
+        <div className="form-group"><label>Expertise</label>
+          <select value={editForm.expertise} onChange={e => setEditForm(p => ({ ...p, expertise: e.target.value }))}>
+            {EXPERTISE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+          </select>
+        </div>
+      </div>
+      {/* Cert Date & Experience */}
+      <div className="form-row">
+        <div className="form-group"><label>Certification Date</label><input type="date" value={editForm.certDate} onChange={e => setEditForm(p => ({ ...p, certDate: e.target.value }))} /></div>
+        <div className="form-group"><label>Experience (yrs)</label><input type="number" min="0" max="50" value={editForm.experience} onChange={e => setEditForm(p => ({ ...p, experience: e.target.value }))} placeholder="Years of experience" /></div>
+      </div>
+      <button className="btn btn-cyan" style={{ width: "100%", marginTop: 16, padding: 12 }} onClick={submitEditTrainer}>Save Changes</button>
+    </Modal>
+  ) : null;
+
+  const deleteConfirmModalJSX = confirmDeleteTrainer && confirmDeleteTrainer !== "select" ? (
+    <Modal title={`Delete <span style='color:var(--red)'>${confirmDeleteTrainer.name}</span>?`} onClose={() => setConfirmDeleteTrainer(null)}>
+      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 8 }}>
+        This will permanently remove <strong style={{ color: "var(--off-white)" }}>{confirmDeleteTrainer.name}</strong> and all their assessment history. This action cannot be undone.
+      </p>
+      {confirmDeleteTrainer.photo && (
+        <div style={{ display: "flex", justifyContent: "center", margin: "16px 0" }}>
+          <img src={confirmDeleteTrainer.photo} alt={confirmDeleteTrainer.name} style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--red)", opacity: 0.8 }} />
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+        <button className="btn btn-ghost" style={{ flex: 1, padding: 12 }} onClick={() => setConfirmDeleteTrainer(null)}>Cancel</button>
+        <button
+          className="btn"
+          style={{ flex: 1, padding: 12, background: "rgba(255,92,92,0.15)", color: "var(--red)", border: "1px solid rgba(255,92,92,0.5)", fontFamily: "var(--font-condensed)", letterSpacing: 1, fontWeight: 700 }}
+          onClick={() => deleteTrainer(confirmDeleteTrainer)}
+        >
+          🗑 Confirm Delete
+        </button>
+      </div>
+    </Modal>
+  ) : null;
 
   if (!trainers || trainers.length === 0) {
     return (
@@ -312,7 +517,9 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             <button className="btn btn-green btn-sm" onClick={onRefresh}>⟳ Refresh</button>
           </div>
         </div>
-        {showAddTrainer && <AddTrainerModal />}
+        {addTrainerModalJSX}
+        {editTrainerModalJSX}
+        {deleteConfirmModalJSX}
       </div>
     );
   }
@@ -328,24 +535,68 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn btn-cyan btn-sm" onClick={() => setShowAddTrainer(true)}>+ Add Trainer</button>
+              <button className="btn btn-sm" style={{ background: confirmDeleteTrainer === "select" ? "rgba(255,92,92,0.25)" : "rgba(255,92,92,0.12)", color: "var(--red)", border: `1px solid ${confirmDeleteTrainer === "select" ? "rgba(255,92,92,0.7)" : "rgba(255,92,92,0.35)"}`, fontFamily: "var(--font-condensed)", fontSize: 11, letterSpacing: 1 }} onClick={() => setConfirmDeleteTrainer(confirmDeleteTrainer === "select" ? null : "select")}>
+                {confirmDeleteTrainer === "select" ? "✕ Cancel" : "🗑 Delete Trainer"}
+              </button>
               <button className="btn btn-green btn-sm" onClick={onRefresh}>⟳ Refresh</button>
             </div>
           </div>
+          {confirmDeleteTrainer === "select" && (
+            <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(255,92,92,0.08)", border: "1px solid rgba(255,92,92,0.25)", borderRadius: 6, fontSize: 11, color: "var(--red)", fontFamily: "'JetBrains Mono',monospace", letterSpacing: 0.5 }}>
+              ⚠ SELECT A TRAINER BELOW TO DELETE
+            </div>
+          )}
           {trainers.map(t => {
             const a = t.rating || 0;
             const s = getStanding(a);
             const status = getGradeStatus(t.id);
             return (
               <div key={t.id} className="trainer-assess-card">
-                <div className="trainer-avatar" style={{ background: "var(--bg3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>
-                  {t.name?.charAt(0) || "T"}
+                <div className="trainer-avatar" style={{
+                  background: t.photo ? "transparent" : "var(--bg3)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: t.photo ? 0 : 24, overflow: "hidden"
+                }}>
+                  {t.photo
+                    ? <img src={t.photo} alt={t.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : (t.name?.charAt(0) || "T")}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div className="trainer-card-name">{t.name}</div>
                   <div className="trainer-card-sub">{t.certification || "Certified Trainer"} · Level {t.trainer_level || 1}</div>
+                  {t.expertise && (
+                    <span style={{ display: "inline-block", marginTop: 4, fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1, color: "var(--orange)", background: "rgba(242,101,34,0.12)", border: "1px solid rgba(242,101,34,0.3)", borderRadius: 3, padding: "2px 6px" }}>
+                      {t.expertise.toUpperCase()}
+                    </span>
+                  )}
+                  <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 10, letterSpacing: 1 }}
+                      onClick={() => setOverviewTrainer(t)}
+                    >
+                      📊 Grade Overview
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ fontSize: 10, letterSpacing: 1, color: "var(--cyan)", borderColor: "rgba(0,168,204,0.35)" }}
+                      onClick={() => openEditTrainer(t)}
+                    >
+                      ✏️ Edit
+                    </button>
+                    {confirmDeleteTrainer === "select" && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ fontSize: 10, letterSpacing: 1, color: "var(--red)", background: "rgba(255,92,92,0.1)", border: "1px solid rgba(255,92,92,0.4)" }}
+                        onClick={() => setConfirmDeleteTrainer(t)}
+                      >
+                        🗑 Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                  <div className="trainer-score" style={{ color: a >= 7 ? "var(--green)" : a >= 5 ? "var(--orange)" : "var(--red)" }}>{a}</div>
+                  <div className="trainer-score" style={{ color: a >= 7 ? "var(--green)" : a >= 5 ? "var(--orange)" : "var(--red)" }}>{a || "—"}</div>
                   <Badge cls={s.cls}>{s.label}</Badge>
                   <button
                     className={`btn btn-sm ${status.canGrade ? "btn-grade" : "btn-ghost"}`}
@@ -395,7 +646,81 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
         </div>
       </div>
 
-      {showAddTrainer && <AddTrainerModal />}
+      {addTrainerModalJSX}
+      {editTrainerModalJSX}
+      {deleteConfirmModalJSX}
+
+      {overviewTrainer && (() => {
+        const { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev } = getGradeOverview(overviewTrainer);
+        const wc = gradeColor(weightedAvg);
+        const sd = sdColor(stdDev);
+        const RaterLine = ({ label, score }) => (
+          <div className="admin-rater-row">
+            <span className="admin-rater-label">{label}</span>
+            {score !== null && score > 0 ? (
+              <>
+                <div className="admin-rater-bar-track">
+                  <div className="admin-rater-bar-fill" style={{ width: `${score * 10}%`, background: gradeColor(score) }} />
+                </div>
+                <span className="admin-rater-val" style={{ color: gradeColor(score) }}>{score.toFixed(2)}</span>
+                <span className="admin-rater-badge" style={{ background: `${gradeColor(score)}22`, color: gradeColor(score), border: `1px solid ${gradeColor(score)}55` }}>
+                  {gradeLabel(score)}
+                </span>
+              </>
+            ) : (
+              <span className="admin-rater-none" style={{ gridColumn: "2 / -1" }}>Not graded</span>
+            )}
+          </div>
+        );
+        return (
+          <Modal title={`Grade Overview: <span style="color:var(--cyan)">${overviewTrainer.name}</span>`} onClose={() => setOverviewTrainer(null)}>
+            <div style={{ marginBottom: 6 }}>
+              <div className="admin-grade-overview-label">Contributing Grades</div>
+              <div className="admin-raters">
+                <RaterLine label="1 · Senior Trainer" score={st1Avg} />
+                <RaterLine label="2 · Senior Trainer" score={st2Avg} />
+                <RaterLine label="3 · Admin"           score={adminAvg} />
+              </div>
+            </div>
+            <div className="admin-grade-key" style={{ marginBottom: 14 }}>
+              <span><span className="admin-key-dot" style={{ background: "#22C55E" }} />≥ 8.5 Excellent</span>
+              <span><span className="admin-key-dot" style={{ background: "#F59E0B" }} />6–8.4 Good</span>
+              <span><span className="admin-key-dot" style={{ background: "#EF4444" }} />Below 6 Needs Work</span>
+            </div>
+            <div className="admin-overview-divider" />
+            <div style={{ marginBottom: 16 }}>
+              <div className="admin-overview-sub-label">
+                Overall Weighted Avg <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 10 }}>· ST1 35% · ST2 35% · Admin 30%</span>
+              </div>
+              {weightedAvg !== null ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 38, color: wc, letterSpacing: 2 }}>{weightedAvg.toFixed(2)}</span>
+                  <span style={{ fontFamily: "var(--font-condensed)", fontSize: 12, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: wc }}>{gradeLabel(weightedAvg)}</span>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: wc, display: "inline-block" }} />
+                </div>
+              ) : <span style={{ color: "var(--muted)", fontSize: 13 }}>No data yet — grade this trainer first.</span>}
+            </div>
+            <div className="admin-overview-divider" />
+            <div>
+              <div className="admin-overview-sub-label">Standard Deviation</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 8 }}>
+                <span style={{ fontFamily: "var(--font-display)", fontSize: 38, color: sd, letterSpacing: 2 }}>
+                  {stdDev !== null ? stdDev.toFixed(2) : "—"}
+                </span>
+                <span className="admin-sd-agree" style={{ color: sd, borderColor: `${sd}55`, background: `${sd}15` }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: sd, display: "inline-block", marginRight: 6 }} />
+                  {sdMsg(stdDev)}
+                </span>
+              </div>
+              <div className="admin-grade-key" style={{ marginTop: 10 }}>
+                <span><span className="admin-key-dot" style={{ background: "#22C55E" }} />&lt; 1 — In agreement</span>
+                <span><span className="admin-key-dot" style={{ background: "#F59E0B" }} />1–2 — Slightly disagree</span>
+                <span><span className="admin-key-dot" style={{ background: "#EF4444" }} />&gt; 2 — Strongly disagree</span>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {assessTrainer && (
         <Modal title={`Assess: <span style="color:var(--cyan)">${assessTrainer.name}</span>`} onClose={() => setAssessTrainer(null)}>

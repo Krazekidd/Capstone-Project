@@ -62,7 +62,6 @@ async def get_user_db():
     async with UserAsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
             await session.rollback()
             raise

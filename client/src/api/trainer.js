@@ -112,8 +112,8 @@ export const getTrainerReviews = async () => {
   return response.data;
 };
 
-export const respondToReview = async (reviewId, response) => {
-  const response = await api.post(`/api/v1/trainers/reviews/${reviewId}/respond`, { response });
+export const respondToReview = async (reviewId, responseData) => {
+  const response = await api.post(`/api/v1/trainers/reviews/${reviewId}/respond`, { response: responseData });
   return response.data;
 };
 
@@ -315,5 +315,50 @@ export const addParticipantToClass = async (classId, clientId) => {
 
 export const removeParticipantFromClass = async (classId, clientId) => {
   const response = await api.delete(`/api/v1/trainers/group-classes/${classId}/participants/${clientId}`);
+  return response.data;
+};
+
+// Trainer Ratings
+export const getAllTrainersForRating = async () => {
+  const response = await api.get('/api/v1/ratings/trainers');
+  return response.data;
+};
+
+export const createTrainerRating = async (trainerId, ratingData) => {
+  const response = await api.post(`/api/v1/ratings/trainer/${trainerId}`, ratingData);
+  return response.data;
+};
+
+export const getTrainerRatings = async (trainerId, options = {}) => {
+  const { limit = 20, offset = 0 } = options;
+  const response = await api.get(`/api/v1/ratings/trainer/${trainerId}/ratings`, {
+    params: { limit, offset }
+  });
+  return response.data;
+};
+
+export const getUserRatings = async (options = {}) => {
+  const { limit = 20, offset = 0 } = options;
+  const response = await api.get('/api/v1/ratings/my-ratings', {
+    params: { limit, offset }
+  });
+  return response.data;
+};
+
+export const updateTrainerRating = async (ratingId, ratingData) => {
+  const response = await api.put(`/api/v1/ratings/rating/${ratingId}`, ratingData);
+  return response.data;
+};
+
+export const deleteTrainerRating = async (ratingId) => {
+  const response = await api.delete(`/api/v1/ratings/rating/${ratingId}`);
+  return response.data;
+};
+
+export const getAllReviews = async (options = {}) => {
+  const { limit = 50, offset = 0 } = options;
+  const response = await api.get('/api/v1/ratings/all-reviews', {
+    params: { limit, offset }
+  });
   return response.data;
 };

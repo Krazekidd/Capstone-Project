@@ -1201,3 +1201,116 @@ body {
     transform: rotate(360deg);
   }
 }
+/* ────────────────────────────────
+   LEGAL MODAL
+──────────────────────────────── */
+.legal-box {
+  max-width: 680px;
+  width: 95vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.legal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--charcoal-2, #1A1A1A);
+  flex-shrink: 0;
+}
+
+.legal-tab {
+  flex: 1;
+  padding: 14px 20px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  font-family: var(--font-condensed);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.legal-tab:hover {
+  color: var(--white);
+}
+
+.legal-tab-active {
+  color: var(--orange);
+  border-bottom-color: var(--orange);
+}
+
+.legal-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.legal-content .modal-head {
+  padding: 24px 28px 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.legal-content .modal-head h2 {
+  font-size: 28px;
+}
+
+.legal-body {
+  overflow-y: auto;
+  padding: 20px 28px;
+  flex: 1;
+}
+
+.legal-body::-webkit-scrollbar { width: 4px; }
+.legal-body::-webkit-scrollbar-track { background: transparent; }
+.legal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.legal-body::-webkit-scrollbar-thumb:hover { background: var(--orange); }
+
+.legal-section {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.legal-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.legal-section h3 {
+  font-family: var(--font-condensed);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 8px;
+}
+
+.legal-section p {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: rgba(255,255,255,0.75);
+}
+
+.legal-footer {
+  padding: 16px 28px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--charcoal-2, #1A1A1A);
+}
+
+.legal-footer .btn-main {
+  max-width: 160px;
+  margin: 0 auto;
+  display: block;
+}

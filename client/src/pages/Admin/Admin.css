@@ -1062,3 +1062,102 @@ tbody tr:hover { background: rgba(242, 101, 34, 0.05); }
     border-bottom: 1px solid var(--border);
     margin-bottom: 8px;
 }
+/* ── GRADE OVERVIEW (modal) styles ── */
+.admin-grade-overview-label {
+    font-family: var(--font-condensed);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 12px;
+}
+.admin-raters { display: flex; flex-direction: column; }
+.admin-rater-row {
+    display: grid;
+    grid-template-columns: 155px 1fr 54px 88px;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.admin-rater-row:last-child { border-bottom: none; }
+.admin-rater-label {
+    font-family: var(--font-condensed);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--off-white);
+    white-space: nowrap;
+}
+.admin-rater-bar-track { height: 5px; background: rgba(255,255,255,0.06); overflow: hidden; }
+.admin-rater-bar-fill  { height: 100%; transition: width 0.4s ease; }
+.admin-rater-val {
+    font-family: var(--font-display);
+    font-size: 18px;
+    letter-spacing: 1px;
+    text-align: right;
+}
+.admin-rater-badge {
+    padding: 3px 8px;
+    font-family: var(--font-condensed);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+}
+.admin-rater-none {
+    font-family: var(--font-condensed);
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+}
+.admin-grade-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+}
+.admin-grade-key span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-condensed);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.admin-key-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.admin-overview-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+    margin: 14px 0;
+}
+.admin-overview-sub-label {
+    font-family: var(--font-condensed);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--off-white);
+}
+.admin-sd-agree {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border: 1px solid;
+    font-family: var(--font-condensed);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}

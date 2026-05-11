@@ -6,6 +6,7 @@ Chart.register(...registerables);
 import { sendNutriMessage } from "../../api/nutriAI";
 import { buildMLProfile, getMLWorkoutRecommendation, getMLProgressPrediction, getMLFoodSuggestions } from "../../api/mlApi";
 import { progressAPI } from "../../api/api";
+import { getAllTrainersForRating, createTrainerRating, getUserRatings, updateTrainerRating, deleteTrainerRating } from "../../api/trainer";
 import ReactMarkdown from "react-markdown";
 import { useAuth } from "../../Context/AuthContext";
 import "./Account.css";
@@ -471,6 +472,9 @@ export default function Account() {
     { id:1, trainer:"Coach Alex Reid",  rating:5, comment:"Absolutely incredible. Best trainer at the gym.", privacy:"public",  draft:false, date:"Feb 2026" },
     { id:2, trainer:"Coach Marcus Lee", rating:4, comment:"Great session structure, really organised.",       privacy:"private", draft:false, date:"Jan 2026" },
   ]);
+  const [trainers, setTrainers] = useState([]);
+  const [trainersLoading, setTrainersLoading] = useState(false);
+  const [ratingsLoading, setRatingsLoading] = useState(false);
   const [rDraft, setRDraft] = useState({ trainer:TRAINER_LIST[0], rating:0, comment:"", privacy:"public" });
   const [editRev, setEditRev] = useState(null);
   const [delRevId, setDelRevId] = useState(null);
@@ -612,6 +616,63 @@ export default function Account() {
       console.error('Error fetching goals:', error);
     }
   };
+
+  // Load trainers and user ratings on component mount
+  const fetchTrainers = async () => {
+    try {
+      setTrainersLoading(true);
+      const trainersData = await getAllTrainersForRating();
+      if (trainersData?.success && trainersData?.data?.trainers) {
+        setTrainers(trainersData.data.trainers);
+        // Set default trainer to first trainer if available
+        if (trainersData.data.trainers.length > 0) {
+          setRDraft(prev => ({ ...prev, trainer: trainersData.data.trainers[0].name }));
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching trainers:', error);
+      showToast('⚠️ Failed to load trainers');
+    } finally {
+      setTrainersLoading(false);
+    }
+  };
+
+  const fetchUserRatings = async () => {
+    try {
+      setRatingsLoading(true);
+      const ratingsData = await getUserRatings();
+      if (ratingsData?.success && ratingsData?.data?.ratings) {
+        // Transform backend ratings to frontend format
+        const formattedRatings = ratingsData.data.ratings.map(rating => ({
+          id: rating.id,
+          trainer: rating.trainer_name,
+          trainer_id: rating.trainer_id,
+          rating: rating.rating,
+          comment: rating.review || '',
+          privacy: 'public', // Backend doesn't have privacy field, default to public
+          draft: false,
+          date: new Date(rating.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+        }));
+        setReviews(formattedRatings);
+      }
+    } catch (error) {
+      console.error('Error fetching user ratings:', error);
+      // Don't show toast for this error as it's not critical
+    } finally {
+      setRatingsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchTrainers();
+      fetchUserRatings();
+      fetchGoals();
+      fetchGoalsHistory();
+      fetchHealthConditions();
+      fetchProgressHistory();
+    }
+  }, [isLoggedIn]);
 
   // Load goals history from API
   const fetchGoalsHistory = async () => {
@@ -963,12 +1024,58 @@ export default function Account() {
     setAiLoading(false);
   };
 
-  const postReview = () => {
-    if(!rDraft.rating||!rDraft.comment.trim()){showToast("⚠️ Rating and comment required.");return;}
-    setReviews(r=>[...r,{...rDraft,id:Date.now(),draft:false,date:now.toLocaleDateString("en-GB",{month:"short",year:"numeric"})}]);
-    setRDraft({trainer:TRAINER_LIST[0],rating:0,comment:"",privacy:"public"});
-    showToast("✓ Review posted!");
+  const postReview = async () => {
+    if (!rDraft.rating || !rDraft.comment.trim()) {
+      showToast("⚠️ Rating and comment required.");
+      return;
+    }
+
+    try {
+      setRatingsLoading(true);
+      
+      // Find trainer ID from trainer name
+      const selectedTrainer = trainers.find(t => t.name === rDraft.trainer);
+      if (!selectedTrainer) {
+        showToast("⚠️ Trainer not found.");
+        return;
+      }
+
+      const ratingData = {
+        rating: rDraft.rating,
+        review: rDraft.comment.trim(),
+        privacy: rDraft.privacy,
+        session_date: new Date().toISOString().split('T')[0] // Today's date
+      };
+
+      const ratingResponse = await createTrainerRating(selectedTrainer.id, ratingData);
+      
+      if (ratingResponse?.success) {
+        // Add the new review to local state
+        const newReview = {
+          id: ratingResponse.data.rating_id,
+          trainer: rDraft.trainer,
+          trainer_id: selectedTrainer.id,
+          rating: rDraft.rating,
+          comment: rDraft.comment.trim(),
+          privacy: rDraft.privacy,
+          draft: false,
+          date: now.toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+        };
+        
+        setReviews(prev => [...prev, newReview]);
+        setRDraft({ trainer: trainers.length > 0 ? trainers[0].name : TRAINER_LIST[0], rating: 0, comment: "", privacy: "public" });
+        showToast("✓ Review posted!");
+      } else {
+        showToast("⚠️ Failed to post review.");
+      }
+    } catch (error) {
+      console.error('Error posting review:', error);
+      showToast("⚠️ Failed to post review.");
+    } finally {
+      setRatingsLoading(false);
+    }
   };
+
   const saveDraft = () => {
     if(!rDraft.comment.trim()){showToast("⚠️ Write something first.");return;}
     setReviews(r=>[...r,{...rDraft,id:Date.now(),draft:true,date:"Draft"}]);
@@ -1694,12 +1801,20 @@ export default function Account() {
 
           {/* Trainer photo strip */}
           <div className="trainer-strip">
-            {TRAINER_LIST.map(t=>(
-              <div key={t} className={`trainer-card${rDraft.trainer===t?" on":""}`} onClick={()=>setRDraft(d=>({...d,trainer:t}))}>
-                <div className="trainer-photo"><img src={TRAINER_PHOTOS[t]} alt={t} loading="lazy"/></div>
-                <div className="trainer-name">{t.replace("Coach ","")}</div>
-              </div>
-            ))}
+            {trainersLoading ? (
+              <div className="loading-trainers">Loading trainers...</div>
+            ) : trainers.length > 0 ? (
+              trainers.map(t=>(
+                <div key={t.id} className={`trainer-card${rDraft.trainer===t.name?" on":""}`} onClick={()=>setRDraft(d=>({...d,trainer:t.name}))}>
+                  <div className="trainer-photo">
+                    <img src={t.profile_image || `https://images.unsplash.com/photo-${t.id}?w=200&q=80`} alt={t.name} loading="lazy"/>
+                  </div>
+                  <div className="trainer-name">{t.name.replace("Coach ","")}</div>
+                </div>
+              ))
+            ) : (
+              <div className="no-trainers">No trainers available</div>
+            )}
           </div>
 
           <div className="review-form">
@@ -1708,8 +1823,9 @@ export default function Account() {
               <div className="field">
                 <label>Trainer</label>
                 <select value={editRev?editRev.trainer:rDraft.trainer}
-                  onChange={e=>editRev?setEditRev(r=>({...r,trainer:e.target.value})):setRDraft(d=>({...d,trainer:e.target.value}))}>
-                  {TRAINER_LIST.map(t=><option key={t}>{t}</option>)}
+                  onChange={e=>editRev?setEditRev(r=>({...r,trainer:e.target.value})):setRDraft(d=>({...d,trainer:e.target.value}))}
+                  disabled={trainersLoading}>
+                  {trainers.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
                 </select>
               </div>
               <div className="field">
@@ -1743,6 +1859,7 @@ export default function Account() {
                   <button className="btn-ghost" onClick={saveDraft}>💾 Save Draft</button></>
               )}
             </div>
+
           </div>
 
           <div className="chart-tabs" style={{marginTop:20}}>
@@ -1755,7 +1872,11 @@ export default function Account() {
               <div key={rev.id} className="rev-card">
                 <div className="rev-card-top">
                   <div className="rev-trainer-photo">
-                    <img src={TRAINER_PHOTOS[rev.trainer]} alt={rev.trainer}/>
+                    <img src={
+                      trainers.find(t => t.name === rev.trainer)?.profile_image || 
+                      TRAINER_PHOTOS[rev.trainer] || 
+                      `https://images.unsplash.com/photo-${rev.trainer_id || 'default'}?w=200&q=80`
+                    } alt={rev.trainer} />
                   </div>
                   <div style={{flex:1}}>
                     <div className="rev-trainer-name">{rev.trainer}</div>
@@ -1772,6 +1893,7 @@ export default function Account() {
               </div>
             ))}
           </div>
+
         </div>
 
         {/* ═══════════ BADGES ═══════════ */}

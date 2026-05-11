@@ -18,6 +18,7 @@ from routers.users.user_profile import router as user_profile_router
 from routers.trainers.trainer_api import router as trainer_api_router
 from routers.evaluations.evaluation import router as evaluation_router
 from routers.grades.grades import router as grades_router
+from routers.ratings.ratings import router as ratings_router
 from database import init_db, check_db_connection, get_db
 from config.config import PROFILE_IMAGES_DIR, PROGRESS_PHOTOS_DIR
 from config.seed import run_seed
@@ -103,6 +104,7 @@ app.include_router(user_profile_router)
 app.include_router(trainer_api_router)
 app.include_router(evaluation_router)
 app.include_router(grades_router)
+app.include_router(ratings_router)
 app.include_router(booking_router)
 app.include_router(shop_router)
 app.include_router(membership_router)

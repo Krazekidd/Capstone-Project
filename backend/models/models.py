@@ -1329,7 +1329,8 @@ class ClientStatus(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, unique=True)
-    status = Column(String(50),ForeignKey("user_memberships.status"), nullable=False)
+    user_membership_id = Column(UUID(as_uuid=True), ForeignKey("user_memberships.id", ondelete="CASCADE"), nullable=False)
+    status = Column(String(50), nullable=False)
     membership_type = Column(String(50))  # basic, premium, elite
     membership_expiry = Column(Date)
     last_active_date = Column(Date)

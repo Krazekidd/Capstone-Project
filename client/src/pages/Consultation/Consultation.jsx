@@ -854,13 +854,13 @@ function Step3({ consultType, selectedDate, selectedTime, selectedCoach, coachNa
                 <UserIcon/> In-Person
               </button>
               <button
-                className={`format-btn${format === "video" ? " format-btn--active" : ""}`}
-                onClick={() => setFormat("video")}
+                className={`format-btn${format === "video_call" ? " format-btn--active" : ""}`}
+                onClick={() => setFormat("video_call")}
               >
                 <VideoIcon/> Video Call
               </button>
             </div>
-            {format === "video" && (
+            {format === "video_call" && (
               <p className="format-video-note">
                 A GymVault Meet link will be sent to your email 15 minutes before your session.
               </p>

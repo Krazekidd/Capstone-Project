@@ -378,9 +378,9 @@ class Booking(Base):
     user = relationship("User", back_populates="bookings")
     consultation_type = relationship("ConsultationType", back_populates="bookings")
     coach = relationship("Coach", back_populates="bookings")
-    feedback = relationship("ConsultationFeedback", back_populates="booking", uselist=False, cascade="all, delete-orphan")
-    history = relationship("BookingHistory", back_populates="booking", cascade="all, delete-orphan")
-    email_logs = relationship("EmailNotificationLog", back_populates="booking", cascade="all, delete-orphan")
+    feedback = relationship("ConsultationFeedback", back_populates="bookings", uselist=False, cascade="all, delete-orphan")
+    history = relationship("BookingHistory", back_populates="bookings", cascade="all, delete-orphan")
+    email_logs = relationship("EmailNotificationLog", back_populates="bookings", cascade="all, delete-orphan")
     # Indexes
     __table_args__ = (
         Index('idx_bookings_user_id', 'user_id'),
@@ -405,7 +405,7 @@ class EmailNotificationLog(Base):
     status = Column(String(20), nullable=False, default='sent')  # sent, failed, bounced
     error_message = Column(Text)
     
-    booking = relationship("Booking", back_populates="email_logs")
+    bookings = relationship("Booking", back_populates="email_logs")
 
     __table_args__ = (
         Index('idx_email_notifications_booking', 'booking_id'),
@@ -429,7 +429,7 @@ class BookingHistory(Base):
     changed_by = Column(String(100))  # user_id or system
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     
-    booking = relationship("Booking", back_populates="history")
+    bookings = relationship("Booking", back_populates="history")
 
     __table_args__ = (
         Index('idx_booking_history_booking', 'booking_id'),
@@ -476,7 +476,7 @@ class ConsultationFeedback(Base):
     would_recommend = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     
-    booking = relationship("Booking", back_populates="feedback")
+    bookings = relationship("Booking", back_populates="feedback")
 
     __table_args__ = (
         CheckConstraint('rating BETWEEN 1 AND 5', name='check_rating_range'),

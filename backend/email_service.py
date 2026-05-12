@@ -26,6 +26,42 @@ DEFAULT_SENDER = SendTransacEmailRequestSender(
     email=settings.FROM_EMAIL or "hello@brevo.com",
 )
 
+if settings.BREVO_API_KEY:
+    print(f"✅ Brevo API key configured (length: {len(settings.BREVO_API_KEY)})")
+else:
+    print("❌ BREVO_API_KEY not found in settings!")
+    
+if settings.FROM_EMAIL:
+    print(f"✅ From email configured: {settings.FROM_EMAIL}")
+else:
+    print("❌ FROM_EMAIL not configured!")
+
+# Add this function to email_service.py
+async def send_email(to_email: str, subject: str, html_content: str):
+    """Generic email sending function using Brevo"""
+    if not client:
+        logger.error("Brevo client not initialized. Cannot send email.")
+        print(f"\n{'='*50}\n📧 EMAIL WOULD BE SENT\n{'='*50}\nTO: {to_email}\nSUBJECT: {subject}\n{'='*50}\n")
+        return False
+    
+    try:
+        result = client.transactional_emails.send_transac_email(
+            subject=subject,
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=[
+                SendTransacEmailRequestToItem(
+                    email=to_email,
+                    name=to_email.split('@')[0],
+                )
+            ],
+        )
+        logger.info(f"Email sent to {to_email}: {subject} - Message ID: {result.message_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send email to {to_email}: {str(e)}")
+        print(f"Email error: {str(e)}")
+        return False
 
 async def send_password_reset_email(email: str, token: str, name: str):
     """Send password reset email to user using Brevo"""
@@ -464,20 +500,20 @@ async def send_consultation_confirmation_email(
     consultation_title: str,
     booking_date: date,
     booking_time: str,
-    session_format: str,
+    format: str,
     booking_reference: str,
     duration_minutes: int,
-    coach_description: str
+    coach_name: str
 ):
     """Send consultation booking confirmation email"""
     if not client:
         logger.error("Brevo client not initialized. Cannot send consultation confirmation email.")
         return False
         
-    date_str = booking_date.strftime("%A, %B %d, %Y")
-    time_str = datetime.strptime(booking_time, "%H:%M:%S").strftime("%I:%M %p")
+    date_str = booking_date
+    time_str = booking_time
     
-    format_display = "In-Person" if session_format == "in-person" else "Video Call"
+    format_display = "In-Person" if format == "in-person" else "Video Call"
     
     html_content = f"""
     <!DOCTYPE html>
@@ -503,7 +539,7 @@ async def send_consultation_confirmation_email(
                 <p><strong>Date:</strong> {date_str}</p>
                 <p><strong>Time:</strong> {time_str} ({duration_minutes} minutes)</p>
                 <p><strong>Format:</strong> {format_display}</p>
-                <p><strong>Coach:</strong> {coach_description}</p>
+                <p><strong>Coach:</strong> {coach_name}</p>
             </div>
             
             <div style="margin: 20px 0;">
@@ -563,7 +599,7 @@ async def send_consultation_confirmation_email(
             f"Time: {time_str} | "
             f"Duration: {duration_minutes} minutes | "
             f"Format: {format_display} | "
-            f"Coach: {coach_description} | "
+            f"Coach: {coach_name} | "
             f"Booking Reference: {booking_reference} | "
             f"Message ID: {result.message_id} | "
             f"Sender: {DEFAULT_SENDER.email}"
@@ -597,8 +633,8 @@ async def send_consultation_cancellation_email(
         logger.error("Brevo client not initialized. Cannot send consultation cancellation email.")
         return False
         
-    date_str = booking_date.strftime("%A, %B %d, %Y")
-    time_str = datetime.strptime(booking_time, "%H:%M:%S").strftime("%I:%M %p")
+    date_str = booking_date
+    time_str = booking_time
     
     refund_html = ""
     if refund_amount:

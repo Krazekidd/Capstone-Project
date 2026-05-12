@@ -1279,7 +1279,7 @@ export const consultationsAPI = {
         coach_id: bookingData.coach_id || null,
         booking_date: bookingData.booking_date || bookingData.scheduled_date,
         booking_time: bookingData.booking_time || bookingData.scheduled_time,
-        format: bookingData.format || 'in_person',
+        format: bookingData.format ,
         notes: bookingData.notes || null,
         agreed_cancellation_policy: bookingData.agreed_cancellation_policy !== undefined ? 
           bookingData.agreed_cancellation_policy : true,
@@ -1316,9 +1316,9 @@ export const consultationsAPI = {
   },
 
   // Cancel a consultation
-  cancelConsultation: async (bookingId, reason = null) => {
+  cancelConsultation: async (bookingId) => {
     try {
-      const response = await axiosInstance.patch(`/consultations/bookings/${bookingId}/cancel`, { reason });
+      const response = await axiosInstance.patch(`/consultations/bookings/${bookingId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to cancel consultation' };
@@ -1328,7 +1328,7 @@ export const consultationsAPI = {
   // Reschedule a consultation
   rescheduleBooking: async (bookingId, newDate, newTime, reason = null) => {
     try {
-      const response = await axiosInstance.patch(`/consultations/bookings/${bookingId}/reschedule`, {
+      const response = await axiosInstance.patch(`/consultations/bookings/reschedule/${bookingId}`, {
         new_date: newDate,
         new_time: newTime,
         reason: reason
@@ -1441,7 +1441,7 @@ export const consultationsAPI = {
   // Send reminder for booking (manual)
   sendReminder: async (bookingId) => {
     try {
-      const response = await axiosInstance.post(`/consultations/bookings/${bookingId}/remind`);
+      const response = await axiosInstance.post(`/consultations/bookings/remind/${bookingId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to send reminder' };

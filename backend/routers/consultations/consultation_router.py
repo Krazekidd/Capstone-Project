@@ -52,8 +52,8 @@ from email_service import (
     send_consultation_confirmation_email, 
     send_consultation_cancellation_email,
     send_consultation_reminder_email,
-    send_consultation_reschedule_email
-)
+    send_consultation_reschedule_email)
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/consultations", tags=["consultations"])
@@ -410,6 +410,19 @@ async def book_consultation(
             coach = coach_result.scalar_one_or_none()
             coach_name = coach.full_name if coach else None
         
+        # Send confirmation email
+        background_tasks.add_task(
+            send_consultation_confirmation_email,
+            client_email=user.email,
+            client_name=str(user.first_name+" "+user.last_name),
+            consultation_title=consultation_type.name,
+            booking_date=new_booking.scheduled_date,
+            booking_time=new_booking.scheduled_time.strftime("%H:%M"),
+            format=new_booking.format,
+            booking_reference=new_booking.reference,
+            duration_minutes = consultation_type.duration_minutes,
+            coach_name = coach_name
+        )        
         return ConsultationBookingResponse(
             id=new_booking.id,
             reference=new_booking.reference,
@@ -520,10 +533,9 @@ async def get_my_consultations(
         total_past=len(past)
     )
 
-@router.patch("/bookings/{booking_id}/cancel", response_model=CancelConsultationResponse)
+@router.patch("/bookings/{booking_id}", response_model=CancelConsultationResponse)
 async def cancel_consultation(
     booking_id: uuid.UUID,
-    reason: Optional[str] = None,
     background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
@@ -567,14 +579,13 @@ async def cancel_consultation(
     # Update booking status
     booking.status = "cancelled"
     booking.cancelled_at = now
-    booking.cancellation_reason = reason
+    booking.cancellation_reason = "none"
     
     # Create booking history
     await create_booking_history(
         db, booking.id, 'cancelled',
         previous_status='confirmed',
         new_status='cancelled',
-        notes=reason,
         changed_by=user.email
     )
     
@@ -582,18 +593,16 @@ async def cancel_consultation(
     await db.refresh(booking)
     
     # Send cancellation email
-    if background_tasks:
-        background_tasks.add_task(
-            send_consultation_cancellation_email,
-            client_email=user.email,
-            client_name=user.full_name,
-            consultation_title=consultation_type.name,
-            booking_date=booking.scheduled_date,
-            booking_time=booking.scheduled_time.strftime("%H:%M"),
-            booking_reference=booking.reference,
-            refund_amount=refund_amount,
-            reason=reason
-        )
+    background_tasks.add_task(
+        send_consultation_cancellation_email,
+        client_email=user.email,
+        client_name=str(user.first_name+" "+user.last_name),
+        consultation_title=consultation_type.name,
+        booking_date=booking.scheduled_date,
+        booking_time=booking.scheduled_time.strftime("%H:%M"),
+        booking_reference=booking.reference,
+        refund_amount=refund_amount,
+    )
     
     return CancelConsultationResponse(
         message="Consultation cancelled successfully",
@@ -601,7 +610,9 @@ async def cancel_consultation(
         refund_amount=refund_amount,
         cancelled_at=booking.cancelled_at
     )
-@router.patch("/bookings/{booking_id}/reschedule")
+
+
+@router.patch("/bookings/reschedule/{booking_id}")
 async def reschedule_consultation(
     booking_id: uuid.UUID,
     request: RescheduleBookingRequest,
@@ -669,7 +680,18 @@ async def reschedule_consultation(
         await db.refresh(booking)
         
         logger.info(f"Successfully rescheduled booking {booking_id}")
-        
+        # Send confirmation email
+        background_tasks.add_task(
+            send_consultation_reschedule_email,
+            client_email=user.email,
+            client_name=str(user.first_name+" "+user.last_name),
+            consultation_title=consultation_type.name,
+            old_date=old_date,
+            old_time=old_time,
+            new_date=new_booking.scheduled_date,
+            new_time=new_booking.scheduled_time.strftime("%H:%M"),
+            booking_reference=new_booking.reference
+        )         
         return {
             "message": "Consultation rescheduled successfully",
             "booking_id": str(booking.id),
@@ -852,61 +874,7 @@ async def schedule_reminder_email(booking_id: uuid.UUID, booking_time: time, use
     # For now, just log that reminder would be sent
     logger.info(f"Reminder would be sent for booking {booking_id} to {user_email} 24 hours before {booking_time}")
 
-# Add these endpoints to consultation_router.py
 
-# ============================================================
-# SINGLE BOOKING ENDPOINTS
-# ============================================================
-
-@router.get("/bookings/{booking_id}", response_model=ConsultationBookingResponse)
-async def get_booking(
-    booking_id: uuid.UUID,
-    current_user: dict = Depends(get_current_user),
-    db: AsyncSession = Depends(get_user_db)
-):
-    """Get single booking by ID"""
-    user_id = current_user.get("user_id")
-    user_role = current_user.get("role", "client")
-    
-    # Build query
-    query = select(Booking, ConsultationType, Coach).join(
-        ConsultationType, Booking.consultation_type_id == ConsultationType.id
-    ).outerjoin(
-        Coach, Booking.coach_id == Coach.id
-    ).where(Booking.id == booking_id)
-    
-    # Non-admin users can only see their own bookings
-    if user_role != "admin":
-        query = query.where(Booking.user_id == user_id)
-    
-    result = await db.execute(query)
-    row = result.first()
-    
-    if not row:
-        raise HTTPException(status_code=404, detail="Booking not found")
-    
-    booking, consultation_type, coach = row
-    
-    return ConsultationBookingResponse(
-        id=booking.id,
-        reference=booking.reference,
-        consultation_type_id=consultation_type.id,
-        consultation_type_name=consultation_type.name,
-        coach_id=booking.coach_id,
-        coach_name=coach.full_name if coach else None,
-        booking_date=booking.scheduled_date,
-        booking_time=booking.scheduled_time.strftime("%H:%M"),
-        format=booking.format,
-        status=booking.status,
-        price_charged=booking.price_charged,
-        currency=booking.currency,
-        notes=booking.notes,
-        scheduled_date=booking.scheduled_date,
-        scheduled_time=booking.scheduled_time,
-        created_at=booking.created_at,
-        cancelled_at=booking.cancelled_at,
-        completed_at=booking.completed_at
-    )
 
 
 @router.get("/bookings/{booking_id}/history", response_model=List[BookingHistoryResponse])
@@ -1024,6 +992,59 @@ async def get_booking_notes(
         for note in notes
     ]
 
+# ============================================================
+# SINGLE BOOKING ENDPOINTS
+# ============================================================
+
+@router.get("/bookings/{booking_id}", response_model=ConsultationBookingResponse)
+async def get_booking(
+    booking_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Get single booking by ID"""
+    user_id = current_user.get("user_id")
+    user_role = current_user.get("role", "client")
+    
+    # Build query
+    query = select(Booking, ConsultationType, Coach).join(
+        ConsultationType, Booking.consultation_type_id == ConsultationType.id
+    ).outerjoin(
+        Coach, Booking.coach_id == Coach.id
+    ).where(Booking.id == booking_id)
+    
+    # Non-admin users can only see their own bookings
+    if user_role != "admin":
+        query = query.where(Booking.user_id == user_id)
+    
+    result = await db.execute(query)
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    
+    booking, consultation_type, coach = row
+    
+    return ConsultationBookingResponse(
+        id=booking.id,
+        reference=booking.reference,
+        consultation_type_id=consultation_type.id,
+        consultation_type_name=consultation_type.name,
+        coach_id=booking.coach_id,
+        coach_name=coach.full_name if coach else None,
+        booking_date=booking.scheduled_date,
+        booking_time=booking.scheduled_time.strftime("%H:%M"),
+        format=booking.format,
+        status=booking.status,
+        price_charged=booking.price_charged,
+        currency=booking.currency,
+        notes=booking.notes,
+        scheduled_date=booking.scheduled_date,
+        scheduled_time=booking.scheduled_time,
+        created_at=booking.created_at,
+        cancelled_at=booking.cancelled_at,
+        completed_at=booking.completed_at
+    )
 
 # ============================================================
 # ELIGIBILITY ENDPOINTS
@@ -1209,7 +1230,7 @@ async def leave_waitlist(
 # REMINDER ENDPOINTS
 # ============================================================
 
-@router.post("/bookings/{booking_id}/remind")
+@router.post("/bookings/remind/{booking_id}")
 async def send_reminder(
     booking_id: uuid.UUID,
     background_tasks: BackgroundTasks,
@@ -1254,7 +1275,7 @@ async def send_reminder(
     background_tasks.add_task(
         send_consultation_reminder_email,
         client_email=user.email,
-        client_name=user.full_name,
+        client_name=str(user.first_name+" "+user.last_name),
         consultation_title=consultation_type.name,
         booking_date=booking.scheduled_date,
         booking_time=booking.scheduled_time.strftime("%H:%M"),
@@ -1366,7 +1387,7 @@ async def get_coach_availability(
             schedule = next((s for s in regular_schedule if s.day_of_week == day_of_week), None)
             if schedule and schedule.open_time and schedule.close_time:
                 slots = generate_time_slots(schedule.open_time, schedule.close_time, schedule.slot_interval_minutes or 60)
-                booked_times = [b.scheduled_time for b in bookings if b.scheduled_date == current]
+                booked_times = [b.scheduled_time for b in bookings if b.scheduled_date == current and b.status!="cancelled"]
                 availability.append({
                     "date": current,
                     "available": True,

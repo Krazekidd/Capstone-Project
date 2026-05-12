@@ -476,11 +476,8 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     const st2Avg = sortedSenior.length > 1 ? parseFloat(sortedSenior[sortedSenior.length - 2]?.avg) : null;
     const adminAvg = sortedAdmin.length > 0 ? parseFloat(sortedAdmin[sortedAdmin.length - 1]?.avg) : null;
     
-    // Fallback to trainer's base rating if no assessments
-    const baseRating = t.rating || 0;
-    const finalSt1Avg = st1Avg !== null ? st1Avg : (baseRating > 0 ? baseRating : null);
-    
-    const raterScores = [finalSt1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
+    // Only use actual assessments, no fallbacks for missing senior trainer assessments
+    const raterScores = [st1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
     const weights = raterScores.length === 3 ? [0.35, 0.35, 0.30] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
     const weightedAvg = raterScores.length ? +(raterScores.reduce((s, v, i) => s + v * weights[i], 0)).toFixed(2) : null;
     const stdDev = raterScores.length >= 2
@@ -492,7 +489,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     const st2Assessor = sortedSenior.length > 1 ? sortedSenior[sortedSenior.length - 2]?.assessor_name : null;
     const adminAssessor = sortedAdmin.length > 0 ? sortedAdmin[sortedAdmin.length - 1]?.assessor_name : null;
     
-    return { st1Avg: finalSt1Avg, st2Avg, adminAvg, weightedAvg, stdDev, st1Name: st1Assessor, st2Name: st2Assessor, adminName: adminAssessor };
+    return { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev, st1Name: st1Assessor, st2Name: st2Assessor, adminName: adminAssessor };
   };
 
   const gradeColor = (s) => {
@@ -935,9 +932,9 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             <div style={{ marginBottom: 6 }}>
               <div className="admin-grade-overview-label">Contributing Grades</div>
               <div className="admin-raters">
-                <RaterLine label={`1 · Senior Trainer${st1Name ? ` (${st1Name})` : ''}`} score={st1Avg} />
-                <RaterLine label={`2 · Senior Trainer${st2Name ? ` (${st2Name})` : ''}`} score={st2Avg} />
-                <RaterLine label={`3 · Admin${adminName ? ` (${adminName})` : ''}`} score={adminAvg} />
+                {st1Avg !== null && <RaterLine label={`1 · Senior Trainer${st1Name ? ` (${st1Name})` : ''}`} score={st1Avg} />}
+                {st2Avg !== null && <RaterLine label={`2 · Senior Trainer${st2Name ? ` (${st2Name})` : ''}`} score={st2Avg} />}
+                {adminAvg !== null && <RaterLine label={`3 · Admin${adminName ? ` (${adminName})` : ''}`} score={adminAvg} />}
               </div>
             </div>
             <div className="admin-grade-key" style={{ marginBottom: 14 }}>

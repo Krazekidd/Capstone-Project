@@ -377,7 +377,7 @@ export default function Account() {
 
   // Profile - derived from auth context (no local state needed)
   const profilePic = null;
-  const username = userData?.firstName && userData?.lastName ? `${userData.firstName} ${userData.lastName}` : userData?.email || "User";
+  const username = userData?.firstName && userData?.lastName ? `${userData.firstName} ${userData.lastName}` : userData?.firstName || userData?.email || "User";
   const birthday = userData?.birthday || "";
   const memberSince = new Date(userData?.created_at || Date.now()).getFullYear();
   

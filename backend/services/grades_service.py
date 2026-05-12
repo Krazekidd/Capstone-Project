@@ -135,12 +135,13 @@ async def get_grades_for_trainer_month(db: AsyncSession, trainer_id: str, month_
     return [_to_response(g) for g in grades]
 
 
-async def get_all_trainers_with_grades(db: AsyncSession) -> list:
+async def get_all_trainers_with_grades(db: AsyncSession, senior_trainer_id: str = None) -> list:
     """
     Return every non-senior trainer with:
       - profile fields (id, name, role, exp, img)
       - grades keyed by month_index
       - client ratings per month (avg rating per calendar month, indices 0-10)
+    If senior_trainer_id is provided, only return grades submitted by that senior trainer
     """
     from models.models import Trainer, TrainerRating, User
     from sqlalchemy.orm import selectinload
@@ -165,6 +166,10 @@ async def get_all_trainers_with_grades(db: AsyncSession) -> list:
         grades_by_month_grouped = {}
         
         for g in t.grades:
+            # Filter by senior trainer ID if provided
+            if senior_trainer_id and str(g.submitted_by) != senior_trainer_id:
+                continue
+                
             month_idx = g.month_index
             if month_idx not in grades_by_month_grouped:
                 grades_by_month_grouped[month_idx] = []
@@ -191,32 +196,38 @@ async def get_all_trainers_with_grades(db: AsyncSession) -> list:
                 # Single grade, use as-is
                 grades_by_month[month_idx] = month_grades[0]
             else:
-                # Multiple grades, compute averages
-                avg_scores = {}
-                score_fields = ["performance", "motivation", "interaction", "knowledge", "punctuality"]
-                
-                for field in score_fields:
-                    values = [g["scores"].get(field, 0) for g in month_grades]
-                    avg_scores[field] = round(sum(values) / len(values), 2) if values else 0
-                
-                avg_overall = round(sum(g["overall_avg"] for g in month_grades) / len(month_grades), 2)
-                
-                # Use the most recent submission timestamp for the averaged grade
-                most_recent = max(month_grades, key=lambda g: g["submitted_at"])
-                
-                grades_by_month[month_idx] = {
-                    "id": f"averaged_{month_idx}",  # Special ID for averaged grades
-                    "scores": avg_scores,
-                    "overall_avg": avg_overall,
-                    "notes": f"Averaged from {len(month_grades)} senior trainer grades",
-                    "submitted_by": None,  # Multiple submitters
-                    "submitted_at": most_recent["submitted_at"],
-                    "finalised": True,
-                    "locked": True,  # Averaged grades are locked
-                    "hours_remaining": None,
-                    "individual_grades": month_grades,  # Include individual grades for reference
-                    "grade_count": len(month_grades),
-                }
+                # Multiple grades - only average if not filtered by specific senior trainer
+                if senior_trainer_id:
+                    # When filtered, there shouldn't be multiple grades, but if there are, use the most recent
+                    most_recent = max(month_grades, key=lambda g: g["submitted_at"])
+                    grades_by_month[month_idx] = most_recent
+                else:
+                    # Multiple grades from different senior trainers, compute averages
+                    avg_scores = {}
+                    score_fields = ["performance", "motivation", "interaction", "knowledge", "punctuality"]
+                    
+                    for field in score_fields:
+                        values = [g["scores"].get(field, 0) for g in month_grades]
+                        avg_scores[field] = round(sum(values) / len(values), 2) if values else 0
+                    
+                    avg_overall = round(sum(g["overall_avg"] for g in month_grades) / len(month_grades), 2)
+                    
+                    # Use most recent submission timestamp for averaged grade
+                    most_recent = max(month_grades, key=lambda g: g["submitted_at"])
+                    
+                    grades_by_month[month_idx] = {
+                        "id": f"averaged_{month_idx}",  # Special ID for averaged grades
+                        "scores": avg_scores,
+                        "overall_avg": avg_overall,
+                        "notes": f"Averaged from {len(month_grades)} senior trainer grades",
+                        "submitted_by": None,  # Multiple submitters
+                        "submitted_at": most_recent["submitted_at"],
+                        "finalised": True,
+                        "locked": True,  # Averaged grades are locked
+                        "hours_remaining": None,
+                        "individual_grades": month_grades,  # Include individual grades for reference
+                        "grade_count": len(month_grades),
+                    }
 
         # Build per-month client ratings array (indices 0-11 = Jan-Dec)
         # Group ratings by month of created_at, average per month slot

@@ -1549,9 +1549,10 @@ export const consultationsAPI = {
 };
 export const gradesAPI = {
   // GET /api/grades/trainers — all non-senior trainers with grades + client ratings
-  getTrainersForGrading: async () => {
+  getTrainersForGrading: async (seniorTrainerId = null) => {
     try {
-      const response = await axiosInstance.get('/api/grades/trainers');
+      const params = seniorTrainerId ? { senior_trainer_id: seniorTrainerId } : {};
+      const response = await axiosInstance.get('/api/grades/trainers', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch trainers' };

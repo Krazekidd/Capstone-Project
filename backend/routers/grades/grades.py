@@ -29,9 +29,11 @@ router = APIRouter(prefix="/api/grades", tags=["grades"])
 async def list_trainers_for_grading(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
+    senior_trainer_id: str = Query(None, description="Filter grades by specific senior trainer ID"),
 ):
-    """Return all non-senior trainers with their grades and per-month client ratings."""
-    return await svc_get_trainers(db)
+    """Return all non-senior trainers with their grades and client ratings.
+    If senior_trainer_id is provided, only return grades submitted by that senior trainer."""
+    return await svc_get_trainers(db, senior_trainer_id)
 
 
 @router.post("", response_model=GradeResponse, status_code=201)

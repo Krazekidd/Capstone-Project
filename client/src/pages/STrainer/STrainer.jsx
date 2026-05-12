@@ -308,9 +308,9 @@ function TrainerRow({ trainer, grades, onGrade }) {
             return (
               <button
                 key={m}
-                className={`sd-dot-btn${md.avg!==null?" sd-dot-btn--graded":""}`}
+                className={`sd-dot-btn${md.avg!==null?" sd-dot-btn--graded":""}${md.g?.submittedBy ? " sd-dot-btn--my-grade" : ""}`}
                 style={{"--dc":c}}
-                title={md.avg!==null?`${m}: ${md.avg?.toFixed(1)}/10 — ${gradeLbl(md.avg)}`:`${m}: Not graded`}
+                title={md.avg!==null?`${m}: ${md.avg?.toFixed(1)}/10 — ${gradeLbl(md.avg)}${md.g?.submittedBy ? ` (Your grade)` : ''}`:`${m}: Not graded`}
                 onClick={e=>{ e.stopPropagation(); onGrade(trainer,mi); }}
               >
                 <span className="sd-dot-m">{m}</span>
@@ -516,7 +516,8 @@ export default function SeniorTrainerPage() {
 
   /* Load trainers + their grades from the API */
   useEffect(()=>{
-    gradesAPI.getTrainersForGrading()
+    const currentUserId = localStorage.getItem("user_id");
+    gradesAPI.getTrainersForGrading(currentUserId)
       .then(data=>{
         // data is an array of trainer objects with a `grades` map keyed by month_index
         // Normalise grades into the same shape the UI expects
@@ -531,6 +532,7 @@ export default function SeniorTrainerPage() {
               submittedAt: new Date(g.submitted_at).getTime(),
               finalised: g.finalised,
               _gradeId: g.id,
+              submittedBy: g.submitted_by,
             };
           });
         });

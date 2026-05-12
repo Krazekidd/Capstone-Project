@@ -822,6 +822,16 @@ button {
     background: rgba(255, 255, 255, 0.06);
 }
 
+.sd-dot-btn--my-grade {
+    border-color: var(--orange);
+    background: rgba(242, 101, 34, 0.15);
+    box-shadow: 0 0 0 1px rgba(242, 101, 34, 0.3);
+}
+
+.sd-dot-btn--my-grade:hover {
+    background: rgba(242, 101, 34, 0.25);
+}
+
 .sd-dot-m {
     font-family: var(--fc);
     font-size: 8px;

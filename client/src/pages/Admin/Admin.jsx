@@ -547,21 +547,8 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     const raterScores = [st1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
     const weights = raterScores.length === 3 ? [0.25, 0.25, 0.50] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
     const weightedAvg = raterScores.length ? +(raterScores.reduce((s, v, i) => s + v * weights[i], 0)).toFixed(2) : null;
-    
-    // Calculate weighted standard deviation using the formula: s_w = SQRT [ SUM( w_i * (x_i - x̄_w)^2 ) / ( SUM( w_i ) - 1 ) ]
     const stdDev = raterScores.length >= 2
-      ? (() => {
-          const sumWeights = weights.reduce((a, b) => a + b, 0);
-          const weightedVariance = raterScores.reduce((sum, score, i) => {
-            const diff = score - weightedAvg;
-            return sum + (weights[i] * diff * diff);
-          }, 0);
-          
-          // Use weighted population standard deviation when sum of weights = 1 to avoid division by zero
-          // Otherwise use weighted sample standard deviation with Bessel's correction
-          const denominator = sumWeights === 1 ? sumWeights : sumWeights - 1;
-          return +(Math.sqrt(weightedVariance / denominator)).toFixed(2);
-        })()
+      ? +(Math.sqrt(raterScores.reduce((s, v) => { const m = raterScores.reduce((a, b) => a + b, 0) / raterScores.length; return s + (v - m) ** 2; }, 0) / raterScores.length)).toFixed(2)
       : null;
     
     // Get assessor names for display

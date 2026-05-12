@@ -131,9 +131,9 @@ def get_ml_label(score):
 
 @router.get("", response_model=ExcursionListResponse)
 async def get_all_excursions(
-    level: Optional[str] = Query(None, regex="^(beginner|intermediate|advanced)$"),
+    level: Optional[str] = Query(None, pattern="^(beginner|intermediate|advanced)$"),
     search: Optional[str] = None,
-    sort_by: str = Query("recommended", regex="^(recommended|date|price-asc|price-desc|level)$"),
+    sort_by: str = Query("recommended", pattern="^(recommended|date|price-asc|price-desc|level)$"),
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):

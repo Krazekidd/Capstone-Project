@@ -185,6 +185,27 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   const [gradeLog, setGradeLog] = useState({});
   const [overviewTrainer, setOverviewTrainer] = useState(null);
 
+  // Load all trainer assessments on mount
+  useEffect(() => {
+    const loadAllAssessments = async () => {
+      if (!trainers || trainers.length === 0) return;
+      
+      const assessmentsByTrainer = {};
+      for (const trainer of trainers) {
+        try {
+          const assessments = await adminAPI.getTrainerAssessments(trainer.id);
+          assessmentsByTrainer[trainer.id] = assessments;
+        } catch (err) {
+          console.error(`Failed to load assessments for ${trainer.name}:`, err);
+          assessmentsByTrainer[trainer.id] = [];
+        }
+      }
+      setTrainerAssessments(assessmentsByTrainer);
+    };
+    
+    loadAllAssessments();
+  }, [trainers]);
+
   // Load gradeLog from localStorage on mount so it persists across sessions
   useEffect(() => {
     const savedGradeLog = localStorage.getItem('gradeLog');
@@ -275,27 +296,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     const now = new Date();
     const assessmentDate = now.toISOString().split('T')[0];
     
-    // Update local state immediately
-    setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
-    setAssessHistory(prev => [{
-      trainer: assessTrainer.name, 
-      perf: scores.perf, 
-      motiv: scores.motiv,
-      interact: scores.interact, 
-      knowledge: scores.knowledge,
-      punct: scores.punct,
-      avg: a, 
-      standing: s.label,
-      month: now.toLocaleString("default", { month: "long", year: "numeric" }),
-      date: now.toLocaleDateString()
-    }, ...prev]);
-    
-    // Update trainer rating locally
-    setTrainers(prev => prev.map(t => t.id === assessTrainer.id ? { ...t, rating: a } : t));
-    toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
-    setAssessTrainer(null);
-    
-    // Persist to backend
+    // Persist to backend first
     try {
       const backendPayload = {
         trainer_id: assessTrainer.id,
@@ -315,11 +316,24 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
       console.log('Saving assessment payload:', backendPayload);
       await adminAPI.saveTrainerAssessment(backendPayload);
       
+      // Refresh assessments from backend to get the latest data
       const updatedAssessments = await adminAPI.getTrainerAssessments(assessTrainer.id);
       setTrainerAssessments(prev => ({ ...prev, [assessTrainer.id]: updatedAssessments }));
+      
+      // Update grade log for timing purposes only
+      setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
+      
+      // Update trainer rating locally from backend response
+      setTrainers(prev => prev.map(t => t.id === assessTrainer.id ? { ...t, rating: a } : t));
+      
+      toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
+      setAssessTrainer(null);
+      
+      // Refresh trainers data to get updated ratings
+      await onRefresh();
     } catch (err) {
-      console.error("Backend save failed (grade saved locally):", err);
-      toast("Assessment saved locally only. Backend error: " + (err.detail || err.message));
+      console.error("Backend save failed:", err);
+      toast("Failed to save assessment: " + (err.detail || err.message));
     } finally {
       setLoading(false);
     }
@@ -419,10 +433,9 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     }
   };
 
-  // Build history from both local state and backend assessments
-  const allHistory = [
-    ...assessHistory,
-    ...Object.values(trainerAssessments).flat().map(a => ({
+  // Build history from backend assessments only (to avoid duplicates)
+  const allHistory = Object.values(trainerAssessments).flat().map(a => {
+    return {
       trainer: a.trainer_name || a.trainer_id,
       perf: a.performance_score,
       motiv: a.motivation_score,
@@ -431,10 +444,13 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
       punct: a.punctuality_score,
       avg: a.average_score,
       standing: a.standing,
+      assessor_role: a.assessor_role || 'admin', // Add fallback back to prevent undefined issues
+      assessor_name: a.assessor_name || 'Unknown',
+      assessment_date: a.assessment_date,
       month: new Date(a.assessment_date).toLocaleString("default", { month: "long", year: "numeric" }),
       date: new Date(a.assessment_date).toLocaleDateString()
-    }))
-  ];
+    };
+  });
 
   const historyByMonth = {};
   allHistory.forEach(a => {
@@ -444,18 +460,39 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   });
 
   const getGradeOverview = (t) => {
-    const tHistory = allHistory.filter(h => h.trainer === t.name).map(h => parseFloat(h.avg)).filter(v => !isNaN(v) && v > 0);
+    // Get all assessments for this trainer
+    const tAssessments = allHistory.filter(h => h.trainer === t.name);
+    
+    // Separate assessments by role
+    const seniorAssessments = tAssessments.filter(h => h.assessor_role === 'senior_trainer');
+    const adminAssessments = tAssessments.filter(h => h.assessor_role === 'admin');
+    
+    // Get the most recent assessments (sorted by date)
+    const sortedSenior = seniorAssessments.sort((a, b) => new Date(a.assessment_date) - new Date(b.assessment_date));
+    const sortedAdmin = adminAssessments.sort((a, b) => new Date(a.assessment_date) - new Date(b.assessment_date));
+    
+    // Get the scores (use most recent from each category)
+    const st1Avg = sortedSenior.length > 0 ? parseFloat(sortedSenior[sortedSenior.length - 1]?.avg) : null;
+    const st2Avg = sortedSenior.length > 1 ? parseFloat(sortedSenior[sortedSenior.length - 2]?.avg) : null;
+    const adminAvg = sortedAdmin.length > 0 ? parseFloat(sortedAdmin[sortedAdmin.length - 1]?.avg) : null;
+    
+    // Fallback to trainer's base rating if no assessments
     const baseRating = t.rating || 0;
-    const st1Avg = baseRating > 0 ? baseRating : null;
-    const st2Avg = tHistory.length > 1 ? +(tHistory.slice(0, -1).reduce((a, b) => a + b, 0) / tHistory.slice(0, -1).length).toFixed(2) : null;
-    const adminAvg = tHistory.length > 0 ? +tHistory[tHistory.length - 1].toFixed(2) : null;
-    const raterScores = [st1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
+    const finalSt1Avg = st1Avg !== null ? st1Avg : (baseRating > 0 ? baseRating : null);
+    
+    const raterScores = [finalSt1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
     const weights = raterScores.length === 3 ? [0.35, 0.35, 0.30] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
     const weightedAvg = raterScores.length ? +(raterScores.reduce((s, v, i) => s + v * weights[i], 0)).toFixed(2) : null;
     const stdDev = raterScores.length >= 2
       ? +(Math.sqrt(raterScores.reduce((s, v) => { const m = raterScores.reduce((a, b) => a + b, 0) / raterScores.length; return s + (v - m) ** 2; }, 0) / raterScores.length)).toFixed(2)
       : null;
-    return { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev };
+    
+    // Get assessor names for display
+    const st1Assessor = sortedSenior.length > 0 ? sortedSenior[sortedSenior.length - 1]?.assessor_name : null;
+    const st2Assessor = sortedSenior.length > 1 ? sortedSenior[sortedSenior.length - 2]?.assessor_name : null;
+    const adminAssessor = sortedAdmin.length > 0 ? sortedAdmin[sortedAdmin.length - 1]?.assessor_name : null;
+    
+    return { st1Avg: finalSt1Avg, st2Avg, adminAvg, weightedAvg, stdDev, st1Name: st1Assessor, st2Name: st2Assessor, adminName: adminAssessor };
   };
 
   const gradeColor = (s) => {
@@ -871,10 +908,10 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
 
       {/* Grade Overview Modal */}
       {overviewTrainer && (() => {
-        const { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev } = getGradeOverview(overviewTrainer);
+        const { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev, st1Name, st2Name, adminName } = getGradeOverview(overviewTrainer);
         const wc = gradeColor(weightedAvg);
         const sd = sdColor(stdDev);
-        const RaterLine = ({ label, score }) => (
+        const RaterLine = ({ label, score, name }) => (
           <div className="admin-rater-row">
             <span className="admin-rater-label">{label}</span>
             {score !== null && score > 0 ? (
@@ -886,6 +923,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
                 <span className="admin-rater-badge" style={{ background: `${gradeColor(score)}22`, color: gradeColor(score), border: `1px solid ${gradeColor(score)}55` }}>
                   {gradeLabel(score)}
                 </span>
+                {name && <span className="admin-rater-name" style={{ fontSize: 10, color: "var(--muted)", marginLeft: 8 }}>{name}</span>}
               </>
             ) : (
               <span className="admin-rater-none" style={{ gridColumn: "2 / -1" }}>Not graded</span>
@@ -897,14 +935,15 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             <div style={{ marginBottom: 6 }}>
               <div className="admin-grade-overview-label">Contributing Grades</div>
               <div className="admin-raters">
-                <RaterLine label="1 · Senior Trainer" score={st1Avg} />
-                <RaterLine label="2 · Senior Trainer" score={st2Avg} />
-                <RaterLine label="3 · Admin" score={adminAvg} />
+                <RaterLine label={`1 · Senior Trainer${st1Name ? ` (${st1Name})` : ''}`} score={st1Avg} />
+                <RaterLine label={`2 · Senior Trainer${st2Name ? ` (${st2Name})` : ''}`} score={st2Avg} />
+                <RaterLine label={`3 · Admin${adminName ? ` (${adminName})` : ''}`} score={adminAvg} />
               </div>
             </div>
             <div className="admin-grade-key" style={{ marginBottom: 14 }}>
-              <span><span className="admin-key-dot" style={{ background: "#22C55E" }} />≥ 8.5 Excellent</span>
+              <span><span className="admin-key-dot" style={{ background: "#22C55E" }} />&gt;= 8.5 Excellent</span>
               <span><span className="admin-key-dot" style={{ background: "#F59E0B" }} />6–8.4 Good</span>
+              <span><span className="admin-key-dot" style={{ background: "#EF4444" }} />&lt; 6 Needs Work</span>
               <span><span className="admin-key-dot" style={{ background: "#EF4444" }} />Below 6 Needs Work</span>
             </div>
             <div className="admin-overview-divider" />

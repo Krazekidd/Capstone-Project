@@ -1637,6 +1637,9 @@ class TrainerAssessmentResponse(BaseModel):
     assessment_date: date
     notes: Optional[str] = None
     created_at: datetime
+    assessor_id: Optional[uuid.UUID] = None
+    assessor_name: Optional[str] = None
+    assessor_role: Optional[str] = None
 
     model_config = {"from_attributes": True}
 # ---------------------------------------------------------------------------

@@ -545,7 +545,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     
     // Only use actual assessments, no fallbacks for missing senior trainer assessments
     const raterScores = [st1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
-    const weights = raterScores.length === 3 ? [0.35, 0.35, 0.30] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
+    const weights = raterScores.length === 3 ? [0.25, 0.25, 0.50] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
     const weightedAvg = raterScores.length ? +(raterScores.reduce((s, v, i) => s + v * weights[i], 0)).toFixed(2) : null;
     const stdDev = raterScores.length >= 2
       ? +(Math.sqrt(raterScores.reduce((s, v) => { const m = raterScores.reduce((a, b) => a + b, 0) / raterScores.length; return s + (v - m) ** 2; }, 0) / raterScores.length)).toFixed(2)
@@ -1033,7 +1033,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             <div className="admin-overview-divider" />
             <div style={{ marginBottom: 16 }}>
               <div className="admin-overview-sub-label">
-                Overall Weighted Avg <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 10 }}>· ST1 35% · ST2 35% · Admin 30%</span>
+                Overall Weighted Avg <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 10 }}>· ST1 25% · ST2 25% · Admin 50%</span>
               </div>
               {weightedAvg !== null ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>

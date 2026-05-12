@@ -1737,7 +1737,7 @@ const SchedulePage = ({ schedule }) => (
 // ═══════════════════════════════════════════════════════════
 const OrdersPage = ({ orders, setOrders, toast }) => {
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [allOrders, setAllOrders] = useState([]);
 
   useEffect(() => {
     loadOrders();
@@ -1747,18 +1747,17 @@ const OrdersPage = ({ orders, setOrders, toast }) => {
     setLoading(true);
     try {
       const ordersData = await adminAPI.getAdminOrders();
-      const pendingOrders = ordersData.filter(o => o.order_status === "pending" || o.order_status === "processing");
-      const completedOrders = ordersData.filter(o => o.order_status === "delivered" || o.order_status === "completed");
-
-      setOrders(pendingOrders);
-      setHistory(completedOrders.map(o => ({
-        id: o.order_reference,
-        client: o.client_name,
-        items: o.items.map(i => `${i.name} x${i.quantity}`).join(", "),
-        amount: o.total,
-        status: "Collected",
-        date: new Date(o.placed_at).toLocaleDateString()
-      })));
+      console.log('Loaded orders:', ordersData);
+      
+      if (Array.isArray(ordersData)) {
+        setAllOrders(ordersData);
+        // Filter pending orders (not delivered/completed/cancelled)
+        const pending = ordersData.filter(o => 
+          o.status === "pending" || o.status === "processing"
+        );
+        setOrders(pending);
+        console.log('Pending orders count:', pending.length);
+      }
     } catch (err) {
       console.error("Failed to load orders:", err);
       toast("Failed to load orders: " + (err.detail || err.message));
@@ -1767,16 +1766,34 @@ const OrdersPage = ({ orders, setOrders, toast }) => {
     }
   };
 
-  const markCollected = async (orderId) => {
-    try {
-      await adminAPI.updateOrderStatus(orderId, { order_status: "delivered" });
-      await loadOrders();
-      toast(`Order ${orderId} marked as collected`);
-    } catch (err) {
-      console.error("Failed to update order:", err);
-      toast("Failed to update order status");
-    }
-  };
+const markCollected = async (order) => {
+  try {
+    await adminAPI.updateOrderStatus(order.id, { status: "delivered" });
+    toast(`Order ${order.order_number} marked as collected. Notification sent to customer.`);
+    await loadOrders(); // Refresh the list
+  } catch (err) {
+    console.error("Failed to update order:", err);
+    toast("Failed to update order status");
+  }
+};
+
+const sendNotification = async (order) => {
+  try {
+    await adminAPI.notifyOrderReady(order.id);
+    toast(`Notification sent to ${order.user_name || order.shipping_address?.customer_name}`);
+  } catch (err) {
+    console.error("Failed to send notification:", err);
+    toast("Failed to send notification: " + (err.detail || err.message));
+  }
+};
+
+  if (loading && allOrders.length === 0) {
+    return (
+      <div className="page-content">
+        <div className="loading-container">Loading orders...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-content">
@@ -1784,49 +1801,86 @@ const OrdersPage = ({ orders, setOrders, toast }) => {
       <div style={{ marginBottom: 16 }}>
         <button className="btn btn-ghost" onClick={loadOrders}>⟳ Refresh</button>
       </div>
+      
       <div className="g2">
         <div>
-          <div className="card-title" style={{ color: "var(--orange)", marginBottom: 14 }}>⚠ Ready for Pickup</div>
-          {orders.filter(o => o.order_status !== "delivered").map(o => (
-            <div key={o.order_reference} className="order-alert">
-              <div className="order-icon">📦</div>
-              <div className="order-info">
-                <div className="order-title">{o.order_reference} — {o.client_name}</div>
-                <div className="order-detail">
-                  📱 {o.client_phone}<br />
-                  🛍 {o.items.map(i => `${i.name} x${i.quantity}`).join(", ")}<br />
-                  💰 ${o.total} · 📅 {new Date(o.placed_at).toLocaleDateString()}
-                  {o.pickup_notes && <><br />📝 {o.pickup_notes}</>}
+          <div className="card-title" style={{ color: "var(--orange)", marginBottom: 14 }}>
+            ⚠ Ready for Pickup ({orders.length})
+          </div>
+          
+          {orders.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted)" }}>
+              <div style={{ fontSize: 48, marginBottom: 10 }}>📦</div>
+              <p>No pending pickups ✓</p>
+            </div>
+          ) : (
+            orders.map((order) => (
+              <div key={order.id} className="order-alert">
+                <div className="order-icon">📦</div>
+                <div className="order-info">
+                  <div className="order-title">
+                    {order.order_number} — {order.user_name || order.shipping_address?.customer_name || "Unknown"}
+                  </div>
+                  <div className="order-detail">
+                    📱 {order.shipping_address?.phone || "No phone"}<br />
+                    🛍 {order.items.map(item => `${item.product_name} x${item.quantity}`).join(", ")}<br />
+                    💰 ${order.total_amount.toLocaleString()} · 📅 {new Date(order.created_at).toLocaleDateString()}
+                    {order.notes && <><br />📝 {order.notes}</>}
+                    {order.shipping_address?.notes && <><br />📝 Delivery notes: {order.shipping_address.notes}</>}
+                  </div>
+                </div>
+                <div className="order-actions">
+                  <button 
+                    className="btn btn-green btn-sm" 
+                    onClick={() => markCollected(order)}
+                  >
+                    ✓ Mark Collected & Send Confirmation
+                  </button>
+                  <button 
+                    className="btn btn-cyan btn-sm" 
+                    onClick={() => sendNotification(order)}
+                  >
+                    📨 Send Reminder
+                  </button>
+
                 </div>
               </div>
-              <div className="order-actions">
-                <button className="btn btn-green btn-sm" onClick={() => markCollected(o.id)}>✓ Collected</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => toast(`Notification sent to ${o.client_name}`)}>📨 Notify</button>
-              </div>
-            </div>
-          ))}
-          {orders.filter(o => o.order_status !== "delivered").length === 0 &&
-            <div style={{ textAlign: "center", padding: "30px 0", color: "var(--muted)" }}>No pending pickups ✓</div>
-          }
+            ))
+          )}
         </div>
+
         <div className="card">
-          <div className="card-title">📋 Order History</div>
+          <div className="card-title">📋 Completed Orders</div>
           <div className="tbl-wrap">
             <table>
               <thead>
-                <tr><th>Order #</th><th>Client</th><th>Items</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+                <tr>
+                  <th>Order #</th>
+                  <th>Client</th>
+                  <th>Items</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                </tr>
               </thead>
               <tbody>
-                {history.map(o => (
-                  <tr key={o.id}>
-                    <td style={{ fontFamily: "monospace", fontSize: 11 }}>{o.id}</td>
-                    <td>{o.client}</td>
-                    <td style={{ fontSize: 12 }}>{o.items}</td>
-                    <td style={{ color: "var(--green)", fontWeight: 600 }}>${o.amount}</td>
-                    <td><Badge cls="badge-green">{o.status}</Badge></td>
-                    <td style={{ fontSize: 11 }}>{o.date}</td>
+                {allOrders.filter(o => o.status === "delivered" || o.status === "completed").map(order => (
+                  <tr key={order.id}>
+                    <td style={{ fontFamily: "monospace", fontSize: 11 }}>{order.order_number}</td>
+                    <td>{order.user_name || order.shipping_address?.customer_name}</td>
+                    <td style={{ fontSize: 12 }}>
+                      {order.items.map(item => `${item.product_name} x${item.quantity}`).join(", ")}
+                    </td>
+                    <td style={{ color: "var(--green)", fontWeight: 600 }}>${order.total_amount.toLocaleString()}</td>
+                    <td style={{ fontSize: 11 }}>{new Date(order.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
+                {allOrders.filter(o => o.status === "delivered" || o.status === "completed").length === 0 && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: "center", padding: "20px", color: "var(--muted)" }}>
+                      No completed orders
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -1905,9 +1959,14 @@ export default function Admin() {
       setExcursions(excursionsData.excursions || []);
 
       // Load orders
-      const ordersData = await adminAPI.getAdminOrders();
-      setOrders(ordersData.filter(o => o.order_status !== "delivered"));
-
+       const ordersData = await adminAPI.getAdminOrders();
+      if (Array.isArray(ordersData)) {
+        const pendingOrders = ordersData.filter(o => o.status === "pending" || o.status === "processing");
+        setOrders(pendingOrders);
+        console.log('Set pending orders:', pendingOrders.length);
+      } else {
+        setOrders([]);
+      }
     } catch (err) {
       console.error("Failed to load admin data:", err);
       toast("Failed to load data: " + (err.detail || err.message));

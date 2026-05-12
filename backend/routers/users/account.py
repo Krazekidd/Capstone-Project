@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func,desc, asc
 import uuid
@@ -52,6 +52,7 @@ from schemas import (
 )
 from ..auth.auth import get_current_user
 from config.config import settings
+from email_service import send_birthday_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/account", tags=["account"])
@@ -2507,13 +2508,13 @@ async def admin_delete_trainer(
 # ============================================================
 # ADMIN - CLIENTS WITH STATUS ENDPOINTS
 # ============================================================
-@router.get("/admin/clients-with-status", response_model=List[ClientWithStatusResponse])
+@router.get("/admin/clients-with-status", response_model=List[dict])
 async def admin_get_clients_with_status(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Admin endpoint to get all clients with their status"""
-    from models import ClientStatus
+    """Admin endpoint to get all clients with their status from all three tables"""
+    from models import Client, User, ClientStatus
     
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -2528,54 +2529,23 @@ async def admin_get_clients_with_status(
     
     clients = []
     for client, email, status in rows:
-        # Create ClientAccount object
-        client_account = ClientAccount(
-            id=client.id,
-            name=client.name,
-            email=email,
-            gender=client.gender,
-            phone_number=client.phone_number,
-            birthday=client.birthday,
-            height=client.height,
-            weight=client.weight,
-            profile_image=client.profile_image,
-            created_at=client.created_at,
-            updated_at=client.updated_at
-        )
-        
-        # Create ClientStatusResponse object
-        status_response = ClientStatusResponse(
-            id=status.id if status else uuid.uuid4(),
-            client_id=client.id,
-            status=status.status if status else "Active",
-            membership_type=status.membership_type if status else None,
-            membership_expiry=status.membership_expiry if status else None,
-            last_active_date=status.last_active_date if status else None,
-            notes=status.notes if status else None,
-            created_at=status.created_at if status else datetime.utcnow(),
-            updated_at=status.updated_at if status else datetime.utcnow()
-        ) if status else None
-        
-        # If no status record exists, create a default one
-        if not status_response:
-            status_response = ClientStatusResponse(
-                id=uuid.uuid4(),
-                client_id=client.id,
-                status="Active",
-                membership_type=None,
-                membership_expiry=None,
-                last_active_date=None,
-                notes=None,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-        
-        clients.append(ClientWithStatusResponse(
-            client=client_account,
-            status=status_response
-        ))
+        clients.append({
+            "id": str(client.id),
+            "name": client.name,
+            "email": email,
+            "phone_number": client.phone_number,
+            "height": client.height,
+            "weight": client.weight,
+            "birthday": client.birthday.isoformat() if client.birthday else None,
+            "status": status.status if status else "Active",
+            "membership_plan": status.membership_type if status else "Standard",
+            "fitness_goal": client.fitness_goals or "General Fitness",
+            "last_visit": status.last_active_date.isoformat() if status and status.last_active_date else None,
+            "created_at": client.created_at.isoformat() if client.created_at else None
+        })
     
     return clients
+
 @router.put("/admin/client-status/{client_id}", response_model=APIResponse)
 async def admin_update_client_status(
     client_id: uuid.UUID,
@@ -2604,6 +2574,8 @@ async def admin_update_client_status(
             client_update_fields["name"] = status_data["name"]
         if "phone_number" in status_data:
             client_update_fields["phone_number"] = status_data["phone_number"]
+        if "fitness_goal" in status_data:
+            client_update_fields["fitness_goal"] = status_data["fitness_goal"]
         
         if client_update_fields:
             await db.execute(
@@ -2631,10 +2603,6 @@ async def admin_update_client_status(
                     .where(Client.id == client_id)
                     .values(fitness_goals=status_data["fitness_goal"])
                 )
-            if "progress_percentage" in status_data:
-                # Note: progress_percentage is not in ClientStatus model
-                # You may need to add this column to ClientStatus or store elsewhere
-                pass  # Skip or add logic for progress tracking
             client_status.updated_at = datetime.utcnow()
         else:
             # Create new ClientStatus record
@@ -2668,7 +2636,6 @@ async def admin_update_client_status(
         logger.error(f"Error updating client status: {e}", exc_info=True)
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-        
 # ============================================================
 # ADMIN - ORDERS ENDPOINTS
 # ============================================================
@@ -2743,6 +2710,7 @@ async def admin_get_orders(
         logger.error(f"Error getting admin orders: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to fetch orders: {str(e)}")
         
+from email_service import send_order_collected_email
 
 @router.put("/admin/orders/{order_id}/status", response_model=APIResponse)
 async def admin_update_order_status(
@@ -2751,29 +2719,142 @@ async def admin_update_order_status(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Admin endpoint to update order status"""
-    from models import ShopOrder
+    """Admin endpoint to update order status and send email notifications"""
+    from models import ShopOrder, ShopOrderItem, User, Client
     
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    order_id = order_id
-    
+    # Get order with relationships
     result = await db.execute(
-        select(ShopOrder).where(ShopOrder.id == order_id)
+        select(ShopOrder, User, Client)
+        .join(User, ShopOrder.user_id == User.id)
+        .outerjoin(Client, User.id == Client.id)
+        .where(ShopOrder.id == order_id)
     )
-    order = result.scalar_one_or_none()
+    row = result.first()
     
-    if not order:
+    if not row:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if "status" in status_data:
-        order.status = status_data["status"]
-    # TODO: Add payment_status and pickup_notes fields to ShopOrder
+    order, user, client = row
+    
+    old_status = order.status
+    new_status = status_data.get("status")
+    
+    if not new_status:
+        raise HTTPException(status_code=400, detail="Status field required")
+    
+    # Update order status
+    order.status = new_status
+    order.updated_at = datetime.utcnow()
     
     await db.commit()
     
-    return APIResponse(success=True, message="Order status updated")
+    # Send email notification when order is marked as delivered/ready
+    if new_status == "delivered" and old_status != "delivered":
+        # Get order items
+        items_result = await db.execute(
+            select(ShopOrderItem).where(ShopOrderItem.shop_order_id == order.id)
+        )
+        items = items_result.scalars().all()
+        
+        order_items = [
+            {
+                "product_name": item.product_name,
+                "quantity": item.quantity,
+                "product_price": float(item.unit_price)
+            }
+            for item in items
+        ]
+        
+        customer_name = client.name if client else f"{user.first_name} {user.last_name}".strip()
+        if not customer_name:
+            customer_name = user.email.split('@')[0]
+        
+        # Send email asynchronously (use background task if needed)
+        email_sent = await send_order_collected_email(
+            to_email=user.email,
+            customer_name=customer_name,
+            order_number=order.order_number,
+            order_items=order_items,
+            total_amount=float(order.total_amount)
+        )
+        
+        if email_sent:
+            logger.info(f"Order ready notification sent for order {order.order_number}")
+        else:
+            logger.warning(f"Failed to send order ready notification for order {order.order_number}")
+    
+    return APIResponse(
+        success=True,
+        message=f"Order status updated from {old_status} to {new_status}",
+        data={"email_sent": new_status == "delivered"}
+    )
+
+
+@router.post("/admin/orders/{order_id}/notify")
+async def admin_notify_order_ready(
+    order_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Admin endpoint to manually send order ready notification"""
+    from models import ShopOrder, ShopOrderItem, User, Client
+    from email_service import send_order_ready_email
+    
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    result = await db.execute(
+        select(ShopOrder, User, Client)
+        .join(User, ShopOrder.user_id == User.id)
+        .outerjoin(Client, User.id == Client.id)
+        .where(ShopOrder.id == order_id)
+    )
+    row = result.first()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    order, user, client = row
+    
+    # Get order items
+    items_result = await db.execute(
+        select(ShopOrderItem).where(ShopOrderItem.shop_order_id == order.id)
+    )
+    items = items_result.scalars().all()
+    
+    order_items = [
+        {
+            "product_name": item.product_name,
+            "quantity": item.quantity,
+            "product_price": float(item.unit_price)
+        }
+        for item in items
+    ]
+    
+    customer_name = client.name if client else f"{user.first_name} {user.last_name}".strip()
+    if not customer_name:
+        customer_name = user.email.split('@')[0]
+    
+    # Send email notification
+    email_sent = await send_order_ready_email(
+        to_email=user.email,
+        customer_name=customer_name,
+        order_number=order.order_number,
+        order_items=order_items,
+        total_amount=float(order.total_amount)
+    )
+    
+    if email_sent:
+        return APIResponse(
+            success=True,
+            message=f"Notification sent to {user.email} for order {order.order_number}",
+            data=None
+        )
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send email notification")
 # ============================================================
 # ADMIN - DASHBOARD STATS ENDPOINTS
 # ============================================================
@@ -2833,25 +2914,25 @@ async def get_today_birthdays(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Admin endpoint to get clients whose birthday is today"""
-    from sqlalchemy import func
+    from sqlalchemy import extract, func
     
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
     today = datetime.utcnow().date()
     
-    # Find clients with birthday today (comparing month and day)
-    # Note: This handles cases where birthday is stored as DATE
+    # Use SQLAlchemy's extract function to get month and day
     result = await db.execute(
         select(Client, User.email)
         .join(User, Client.id == User.id)
         .where(
-            (Client.birthday).month == today.month,
-            (Client.birthday).day == today.day,
+            extract('month', Client.birthday) == today.month,
+            extract('day', Client.birthday) == today.day,
             Client.birthday.isnot(None)
         )
     )
     rows = result.all()
+    
     birthdays = []
     for client, email in rows:
         age = today.year - client.birthday.year if client.birthday else None
@@ -2862,7 +2943,15 @@ async def get_today_birthdays(
             "birthday": client.birthday.isoformat() if client.birthday else None,
             "age": age
         })
-    
+        if client.birthday == today:
+            success = await(
+                send_birthday_email(
+                email = email, 
+                name = client.name, 
+                message="Happy Birthday! 🎉 We're so glad you're part of the GymPro family. Enjoy a complimentary training session on us this month!"
+            )
+            )
+        
     return birthdays
 
 @router.post("/admin/send-birthday-email")
@@ -2872,7 +2961,7 @@ async def send_birthday_email_to_client(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Admin endpoint to send birthday email to client"""
-    from email_service import send_birthday_email
+    from models import Client, User
     
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -2893,13 +2982,22 @@ async def send_birthday_email_to_client(
     
     client, email = row
     
-    # Send email
-    success = await send_birthday_email(email, client.name, message)
+    # Send birthday email
+    email_sent = await send_birthday_email(
+        to_email=email,
+        customer_name=client.name,
+        message=message,
+        special_offer="Free personal training session this month!"
+    )
     
-    if success:
-        return APIResponse(success=True, message=f"Birthday wishes sent to {client.name}!")
+    if email_sent:
+        return APIResponse(
+            success=True,
+            message=f"Birthday wishes sent to {client.name}!",
+            data=None
+        )
     else:
-        raise HTTPException(status_code=500, detail="Failed to send email")
+        raise HTTPException(status_code=500, detail="Failed to send email - check logs")
 
 # ============================================================
 # PROGRESS PHOTOS ENDPOINTS

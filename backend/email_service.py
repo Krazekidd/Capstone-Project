@@ -2,6 +2,9 @@ from datetime import datetime, date
 import logging
 import json
 from brevo import Brevo
+from typing import List, Dict, Any, Optional
+from datetime import datetime
+
 from brevo.transactional_emails import (
     SendTransacEmailRequestSender,
     SendTransacEmailRequestToItem,
@@ -999,6 +1002,637 @@ async def send_consultation_reschedule_email(
     
     await send_email(client_email, subject, html_content)
 
+async def send_order_collected_email(
+    to_email: str,
+    customer_name: str,
+    order_number: str,
+    order_items: List[Dict[str, Any]],
+    total_amount: float,
+    pickup_location: str = "GymPro Store - 56 Hope Road, Kingston",
+    thank_you_message: str = "Thank you for shopping with GymPro!"
+) -> bool:
+    """
+    Send email notification that order has been collected/picked up using Brevo API
+    """
+    if not settings.BREVO_API_KEY:
+        logger.error("BREVO_API_KEY not configured. Cannot send email.")
+        print(f"\n{'='*50}\n📧 ORDER COLLECTED EMAIL (DEV MODE)\n{'='*50}\nTO: {to_email}\nORDER: {order_number}\nTOTAL: ${total_amount}\n{'='*50}\n")
+        return True
+    
+    try:
+        # Format order items for HTML
+        items_html = ""
+        items_text = ""
+        for item in order_items:
+            item_total = item['product_price'] * item['quantity']
+            items_html += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;">{item['product_name']}</td>
+                <td style="padding: 10px; text-align: center;">x{item['quantity']}</td>
+                <td style="padding: 10px; text-align: right;">${item['product_price']:.2f}</td>
+                <td style="padding: 10px; text-align: right;">${item_total:.2f}</td>
+            </tr>
+            """
+            items_text += f"- {item['product_name']} x{item['quantity']} - ${item_total:.2f}\n"
+        
+        # HTML email template - Order Collected
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Order Collected - GymPro</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    margin: 0;
+                    padding: 0;
+                    background-color: #f5f5f5;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 20px auto;
+                    background: white;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                }}
+                .header h1 {{
+                    margin: 0;
+                    font-size: 28px;
+                }}
+                .content {{
+                    padding: 30px;
+                }}
+                .greeting {{
+                    font-size: 18px;
+                    margin-bottom: 20px;
+                }}
+                .order-details {{
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin: 20px 0;
+                }}
+                .order-title {{
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #28a745;
+                    margin-bottom: 15px;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 15px 0;
+                }}
+                th {{
+                    background: #e9ecef;
+                    padding: 10px;
+                    text-align: left;
+                    font-weight: 600;
+                }}
+                .total-row {{
+                    border-top: 2px solid #dee2e6;
+                    font-weight: bold;
+                    background: #f8f9fa;
+                }}
+                .total-amount {{
+                    font-size: 18px;
+                    color: #28a745;
+                }}
+                .checkmark {{
+                    font-size: 48px;
+                    text-align: center;
+                    margin: 20px 0;
+                }}
+                .feedback {{
+                    background: #e7f3ff;
+                    border-left: 4px solid #667eea;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                }}
+                .button {{
+                    display: inline-block;
+                    background: #28a745;
+                    color: white;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    margin-top: 20px;
+                    font-weight: 600;
+                }}
+                .footer {{
+                    text-align: center;
+                    padding: 20px;
+                    font-size: 12px;
+                    color: #6c757d;
+                    border-top: 1px solid #dee2e6;
+                    background: #f8f9fa;
+                }}
+                .badge {{
+                    display: inline-block;
+                    background: #28a745;
+                    color: white;
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>✅ Order Collected!</h1>
+                </div>
+                <div class="content">
+                    <div class="greeting">
+                        Dear <strong>{customer_name}</strong>,
+                    </div>
+                    
+                    <div class="checkmark">
+                        🎉 ✓ ✓ ✓ 🎉
+                    </div>
+                    
+                    <p>Great news! Your order has been successfully <strong>collected</strong> from our store.</p>
+                    
+                    <div class="order-details">
+                        <div class="order-title">
+                            Order #{order_number}
+                            <span class="badge">COLLECTED</span>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th style="text-align: center;">Qty</th>
+                                    <th style="text-align: right;">Price</th>
+                                    <th style="text-align: right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items_html}
+                                <tr class="total-row">
+                                    <td colspan="3" style="padding: 10px; text-align: right; font-weight: bold;">Total Paid:</td>
+                                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #28a745;">
+                                        ${total_amount:.2f}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="feedback">
+                        <strong>💬 We'd love your feedback!</strong><br />
+                        <p style="margin: 10px 0 0 0;">How was your pickup experience? Let us know so we can serve you better!</p>
+                        <center>
+                            <a href="{settings.FRONTEND_URL}/shop/orders/{order_number}/review" class="button" style="background: #667eea; margin-top: 10px;">Leave a Review →</a>
+                        </center>
+                    </div>
+                    
+                    <p><strong>What's next?</strong></p>
+                    <ul>
+                        <li>✨ Enjoy your new items!</li>
+                        <li>📸 Share your haul on social media and tag us @GymPro</li>
+                        <li>🔄 Come back for more fitness essentials</li>
+                    </ul>
+                    
+                    <p>{thank_you_message}</p>
+                    
+                    <center>
+                        <a href="{settings.FRONTEND_URL}/shop" class="button">Shop Again →</a>
+                    </center>
+                </div>
+                <div class="footer">
+                    <p><strong>GymPro Fitness Center</strong><br />
+                    56 Hope Road, Kingston<br />
+                    📞 (876) 555-0123<br />
+                    ✉️ support@gympro.com</p>
+                    <p style="font-size: 11px;">Thank you for choosing GymPro! We appreciate your business.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Plain text version
+        text_content = f"""
+        ORDER #{order_number} COLLECTED!
+        
+        Dear {customer_name},
+        
+        Your order has been successfully collected from our store.
+        
+        ORDER SUMMARY:
+        {items_text}
+        Total Paid: ${total_amount:.2f}
+        
+        Thank you for shopping with GymPro! We hope you enjoy your items.
+        
+        What's next?
+        - Enjoy your new items!
+        - Share your haul on social media and tag us @GymPro
+        - Come back for more fitness essentials
+        
+        {thank_you_message}
+        
+        GymPro Fitness Center
+        56 Hope Road, Kingston
+        (876) 555-0123
+        """
+        
+        # Create recipients list
+        recipients = [SendTransacEmailRequestToItem(email=to_email, name=customer_name)]
+        
+        # Send email using the existing client
+        result = client.transactional_emails.send_transac_email(
+            subject=f"✅ Order #{order_number} Collected - Thank you, {customer_name}!",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=recipients,
+            reply_to=SendTransacEmailRequestToItem(email="support@gympro.com", name="GymPro Support")
+        )
+        
+        logger.info(f"Order collected email sent to {to_email} for order {order_number}. Message ID: {result.message_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error sending order collected email: {str(e)}")
+        return False
+        
+async def send_order_ready_email(
+    to_email: str,
+    customer_name: str,
+    order_number: str,
+    order_items: List[Dict[str, Any]],
+    total_amount: float,
+    pickup_location: str = "GymPro Store - 56 Hope Road, Kingston",
+    pickup_instructions: str = "Please bring your ID and order confirmation to the front desk.",
+    cc_emails: Optional[List[str]] = None
+) -> bool:
+    """
+    Send email notification that order is ready for pickup using Brevo API
+    """
+    if not settings.BREVO_API_KEY:
+        logger.error("BREVO_API_KEY not configured. Cannot send email.")
+        print(f"\n{'='*50}\n📧 ORDER READY EMAIL (DEV MODE)\n{'='*50}\nTO: {to_email}\nORDER: {order_number}\nTOTAL: ${total_amount}\n{'='*50}\n")
+        return True  # Return True in dev mode so it doesn't break functionality
+    
+    try:
+        # Format order items for HTML
+        items_html = ""
+        items_text = ""
+        for item in order_items:
+            item_total = item['product_price'] * item['quantity']
+            items_html += f"""
+            <tr style="border-bottom: 1px solid #eee;">
+                <td style="padding: 10px;">{item['product_name']}</td>
+                <td style="padding: 10px; text-align: center;">x{item['quantity']}</td>
+                <td style="padding: 10px; text-align: right;">${item['product_price']:.2f}</td>
+                <td style="padding: 10px; text-align: right;">${item_total:.2f}</td>
+            </tr>
+            """
+            items_text += f"- {item['product_name']} x{item['quantity']} - ${item_total:.2f}\n"
+        
+        # HTML email template
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Order Ready for Pickup</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    margin: 0;
+                    padding: 0;
+                    background-color: #f5f5f5;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 20px auto;
+                    background: white;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                }}
+                .header h1 {{
+                    margin: 0;
+                    font-size: 28px;
+                }}
+                .content {{
+                    padding: 30px;
+                }}
+                .greeting {{
+                    font-size: 18px;
+                    margin-bottom: 20px;
+                }}
+                .order-details {{
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin: 20px 0;
+                }}
+                .order-title {{
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #667eea;
+                    margin-bottom: 15px;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 15px 0;
+                }}
+                th {{
+                    background: #e9ecef;
+                    padding: 10px;
+                    text-align: left;
+                    font-weight: 600;
+                }}
+                .total-row {{
+                    border-top: 2px solid #dee2e6;
+                    font-weight: bold;
+                    background: #f8f9fa;
+                }}
+                .total-amount {{
+                    font-size: 18px;
+                    color: #28a745;
+                }}
+                .pickup-info {{
+                    background: #e7f3ff;
+                    border-left: 4px solid #667eea;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                }}
+                .pickup-info strong {{
+                    color: #667eea;
+                }}
+                .button {{
+                    display: inline-block;
+                    background: #667eea;
+                    color: white;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    margin-top: 20px;
+                    font-weight: 600;
+                }}
+                .footer {{
+                    text-align: center;
+                    padding: 20px;
+                    font-size: 12px;
+                    color: #6c757d;
+                    border-top: 1px solid #dee2e6;
+                    background: #f8f9fa;
+                }}
+                .badge {{
+                    display: inline-block;
+                    background: #28a745;
+                    color: white;
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎉 Order Ready for Pickup!</h1>
+                </div>
+                <div class="content">
+                    <div class="greeting">
+                        Dear <strong>{customer_name}</strong>,
+                    </div>
+                    
+                    <p>Great news! Your order is now ready for pickup at our store.</p>
+                    
+                    <div class="order-details">
+                        <div class="order-title">
+                            Order #{order_number}
+                            <span class="badge">READY</span>
+                        </div>
+                        
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th style="text-align: center;">Qty</th>
+                                    <th style="text-align: right;">Price</th>
+                                    <th style="text-align: right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {items_html}
+                                <tr class="total-row">
+                                    <td colspan="3" style="padding: 10px; text-align: right; font-weight: bold;">Total:</td>
+                                    <td style="padding: 10px; text-align: right; font-weight: bold; color: #28a745;">
+                                        ${total_amount:.2f}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="pickup-info">
+                        <strong>📍 Pickup Location</strong><br />
+                        {pickup_location}<br /><br />
+                        <strong>📝 Instructions</strong><br />
+                        {pickup_instructions}
+                    </div>
+                    
+                    <p><strong>What to bring:</strong></p>
+                    <ul>
+                        <li>Your order confirmation (this email)</li>
+                        <li>A valid government-issued ID</li>
+                    </ul>
+                    
+                    <p>Our staff will be happy to assist you with your pickup. Orders are held for 7 days.</p>
+                    
+                    <center>
+                        <a href="{settings.FRONTEND_URL}/my-orders" class="button">View My Orders</a>
+                    </center>
+                </div>
+                <div class="footer">
+                    <p><strong>GymPro Fitness Center</strong><br />
+                    56 Hope Road, Kingston<br />
+                    📞 (876) 555-0123<br />
+                    ✉️ support@gympro.com</p>
+                    <p style="font-size: 11px;">This is an automated message. Please do not reply directly to this email.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create recipients list
+        recipients = [SendTransacEmailRequestToItem(email=to_email, name=customer_name)]
+        
+        # Send email using the existing client
+        result = client.transactional_emails.send_transac_email(
+            subject=f"📦 Your GymPro Order #{order_number} is Ready for Pickup!",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=recipients,
+            reply_to=SendTransacEmailRequestToItem(email="support@gympro.com", name="GymPro Support")
+        )
+        
+        logger.info(f"Order ready email sent to {to_email} for order {order_number}. Message ID: {result.message_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error sending order ready email: {str(e)}")
+        return False
+
+async def send_birthday_email(
+    to_email: str,
+    customer_name: str,
+    message: str = "Happy Birthday! 🎉 We're so glad you're part of the GymPro family!",
+    special_offer: Optional[str] = None
+) -> bool:
+    """
+    Send birthday wishes to client using Brevo API
+    """
+    if not settings.BREVO_API_KEY:
+        logger.error("BREVO_API_KEY not configured. Cannot send email.")
+        print(f"\n{'='*50}\n🎂 BIRTHDAY EMAIL (DEV MODE)\n{'='*50}\nTO: {to_email}\nNAME: {customer_name}\nMESSAGE: {message}\n{'='*50}\n")
+        return True  # Return True in dev mode
+    
+    try:
+        # HTML email template for birthday
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Happy Birthday from GymPro!</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    background-color: #f5f5f5;
+                }}
+                .container {{
+                    max-width: 500px;
+                    margin: 30px auto;
+                    background: white;
+                    border-radius: 20px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                    color: white;
+                    text-align: center;
+                    padding: 40px 20px;
+                }}
+                .header h1 {{
+                    margin: 0;
+                    font-size: 32px;
+                }}
+                .content {{
+                    padding: 30px;
+                    text-align: center;
+                }}
+                .message {{
+                    font-size: 18px;
+                    margin: 20px 0;
+                    color: #333;
+                }}
+                .offer {{
+                    background: #fff3e0;
+                    padding: 15px;
+                    border-radius: 10px;
+                    margin: 20px 0;
+                    border-left: 4px solid #ff6900;
+                }}
+                .offer strong {{
+                    color: #ff6900;
+                }}
+                .button {{
+                    display: inline-block;
+                    background: #ff6900;
+                    color: white;
+                    padding: 12px 24px;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    margin-top: 20px;
+                    font-weight: 600;
+                }}
+                .footer {{
+                    text-align: center;
+                    padding: 20px;
+                    font-size: 12px;
+                    color: #999;
+                    border-top: 1px solid #eee;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🎂 Happy Birthday!</h1>
+                    <p style="font-size: 24px; margin: 10px 0 0 0;">{customer_name}!</p>
+                </div>
+                <div class="content">
+                    <div class="message">
+                        {message}
+                    </div>
+                    {f'<div class="offer"><strong>🎁 Special Birthday Offer:</strong><br />{special_offer}</div>' if special_offer else ''}
+                    <p>We hope you have an amazing day filled with joy and celebration!</p>
+                    <center>
+                        <a href="{settings.FRONTEND_URL}/account" class="button">Claim Your Gift →</a>
+                    </center>
+                </div>
+                <div class="footer">
+                    <p><strong>GymPro Fitness Center</strong><br />Your health, our passion</p>
+                    <p>📞 (876) 555-0123 | ✉️ support@gympro.com</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create recipients list
+        recipients = [SendTransacEmailRequestToItem(email=to_email, name=customer_name)]
+        
+        # Send email using the existing client
+        result = client.transactional_emails.send_transac_email(
+            subject=f"🎂 Happy Birthday, {customer_name}!",
+            html_content=html_content,
+            sender=DEFAULT_SENDER,
+            to=recipients
+        )
+        
+        logger.info(f"Birthday email sent to {to_email} for {customer_name}. Message ID: {result.message_id}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error sending birthday email: {str(e)}")
+        return False
 
 async def send_waitlist_notification_email(
     client_email: str,

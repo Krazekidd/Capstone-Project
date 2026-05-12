@@ -2446,6 +2446,7 @@ body {
 .rev-stars {
     display: flex;
     gap: 2px;
+    fill-opacity: white;
 }
 
 .rev-comment {

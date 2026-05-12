@@ -4130,72 +4130,221 @@ async def update_strength_record(
 # ============================================================
 # TRAINER RATINGS ENDPOINTS
 # ============================================================
-@router.get("/trainer-ratings", response_model=TrainerRatingsSummaryResponse)
-async def get_trainer_ratings(
+@router.get("/trainer-ratings", response_model=dict)
+async def get_my_trainer_ratings(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Get client's trainer ratings"""
-    try:
-        user_id = current_user["user_id"]
-        
-        result = await db.execute(
-            select(TrainerRating).where(TrainerRating.client_id == user_id)
-            .order_by(desc(TrainerRating.created_at))
-        )
-        ratings = result.scalars().all()
-        
-        # Calculate average rating
-        avg_rating = sum(rating.rating for rating in ratings) / len(ratings) if ratings else 0
-        
-        return TrainerRatingsSummaryResponse(
-            ratings=[
-                TrainerRatingResponse(
-                    id=str(rating.id),
-                    trainer_id=str(rating.trainer_id),
-                    rating=rating.rating,
-                    review=rating.review,
-                    session_date=rating.session_date,
-                    is_verified=rating.is_verified,
-                    created_at=rating.created_at
-                )
-                for rating in ratings
-            ],
-            average_rating=round(avg_rating, 1),
-            total_ratings=len(ratings)
-        )
-        
-    except Exception as e:
-        logger.error(f"Error getting trainer ratings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to get trainer ratings")
+    """Get current user's trainer ratings"""
+    from models import TrainerRating, Trainer
+    
+    user_id = current_user["user_id"]
+    
+    result = await db.execute(
+        select(TrainerRating, Trainer.name)
+        .join(Trainer, TrainerRating.trainer_id == Trainer.id)
+        .where(TrainerRating.user_id == user_id)
+        .order_by(desc(TrainerRating.created_at))
+    )
+    rows = result.all()
+    
+    ratings_list = []
+    for rating, trainer_name in rows:
+        ratings_list.append({
+            "id": str(rating.id),
+            "trainer_id": str(rating.trainer_id),
+            "trainer_name": trainer_name,
+            "rating": rating.rating,
+            "review": rating.review,
+            "session_date": rating.session_date.isoformat() if rating.session_date else None,
+            "is_verified": rating.is_verified,
+            "created_at": rating.created_at.isoformat()
+        })
+    
+    avg_rating = sum(r.rating for r, _ in rows) / len(rows) if rows else 0
+    
+    return {
+        "success": True,
+        "data": {
+            "ratings": ratings_list,
+            "average_rating": round(avg_rating, 1),
+            "total_ratings": len(ratings_list)
+        }
+    }
 
-@router.post("/trainer-ratings", response_model=APIResponse)
+@router.post("/trainer-ratings", response_model=dict)
 async def rate_trainer(
     rating_data: dict,
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
     """Rate a trainer"""
-    try:
-        user_id = current_user["user_id"]
+    from models import TrainerRating, Trainer
+    
+    user_id = current_user["user_id"]
+    
+    if current_user["role"] != "client":
+        raise HTTPException(status_code=400, detail="Only clients can rate trainers")
+    
+    trainer_id = rating_data.get("trainer_id")
+    rating = rating_data.get("rating")
+    review = rating_data.get("review", "")
+    session_date = rating_data.get("session_date")
+    
+    if not trainer_id or not rating:
+        raise HTTPException(status_code=400, detail="trainer_id and rating are required")
+    
+    # Verify trainer exists
+    trainer_result = await db.execute(
+        select(Trainer).where(Trainer.id == trainer_id)
+    )
+    trainer = trainer_result.scalar_one_or_none()
+    
+    if not trainer:
+        raise HTTPException(status_code=404, detail="Trainer not found")
+    
+    # Check if rating already exists for this trainer and user
+    existing_result = await db.execute(
+        select(TrainerRating)
+        .where(TrainerRating.trainer_id == trainer_id)
+        .where(TrainerRating.user_id == user_id)
+    )
+    existing = existing_result.scalar_one_or_none()
+    
+    if existing:
+        # Update existing rating
+        existing.rating = rating
+        existing.review = review
+        if session_date:
+            existing.session_date = datetime.strptime(session_date, "%Y-%m-%d").date()
+        existing.updated_at = datetime.utcnow()
         
+        await db.commit()
+        
+        # Update trainer's average rating
+        await _update_trainer_average_rating(db, trainer_id)
+        
+        return {
+            "success": True,
+            "message": f"Rating updated for {trainer.name}",
+            "data": {"rating_id": str(existing.id)}
+        }
+    else:
+        # Create new rating
         new_rating = TrainerRating(
-            trainer_id=uuid.UUID(rating_data["trainer_name"]),
-            client_id=user_id,
-            rating=rating_data["rating"],
-            review=rating_data.get("comment", ""),
-            session_date=date.today()
+            trainer_id=trainer_id,
+            user_id=user_id,
+            rating=rating,
+            review=review,
+            session_date=datetime.strptime(session_date, "%Y-%m-%d").date() if session_date else datetime.utcnow().date(),
+            is_verified=True
         )
         db.add(new_rating)
         await db.commit()
+        await db.refresh(new_rating)
         
-        return APIResponse(success=True, message="Trainer rated successfully", data=None)
+        # Update trainer's average rating
+        await _update_trainer_average_rating(db, trainer_id)
         
-    except Exception as e:
-        logger.error(f"Error rating trainer: {e}", exc_info=True)
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to rate trainer")
+        return {
+            "success": True,
+            "message": f"Rated {trainer.name} {rating} stars",
+            "data": {"rating_id": str(new_rating.id)}
+        }
 
+@router.put("/trainer-ratings/{rating_id}", response_model=dict)
+async def update_trainer_rating(
+    rating_id: uuid.UUID,
+    rating_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Update a trainer rating"""
+    from models import TrainerRating
+    
+    user_id = current_user["user_id"]
+    
+    result = await db.execute(
+        select(TrainerRating).where(
+            TrainerRating.id == rating_id,
+            TrainerRating.user_id == user_id
+        )
+    )
+    rating = result.scalar_one_or_none()
+    
+    if not rating:
+        raise HTTPException(status_code=404, detail="Rating not found")
+    
+    if "rating" in rating_data:
+        rating.rating = rating_data["rating"]
+    if "review" in rating_data:
+        rating.review = rating_data["review"]
+    rating.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    
+    # Update trainer's average rating
+    await _update_trainer_average_rating(db, rating.trainer_id)
+    
+    return {
+        "success": True,
+        "message": "Rating updated successfully",
+        "data": {"rating_id": str(rating.id)}
+    }
+
+@router.delete("/trainer-ratings/{rating_id}", response_model=dict)
+async def delete_trainer_rating(
+    rating_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Delete a trainer rating"""
+    from models import TrainerRating
+    
+    user_id = current_user["user_id"]
+    
+    result = await db.execute(
+        select(TrainerRating).where(
+            TrainerRating.id == rating_id,
+            TrainerRating.user_id == user_id
+        )
+    )
+    rating = result.scalar_one_or_none()
+    
+    if not rating:
+        raise HTTPException(status_code=404, detail="Rating not found")
+    
+    trainer_id = rating.trainer_id
+    
+    await db.delete(rating)
+    await db.commit()
+    
+    # Update trainer's average rating
+    await _update_trainer_average_rating(db, trainer_id)
+    
+    return {
+        "success": True,
+        "message": "Rating deleted successfully",
+        "data": None
+    }
+
+async def _update_trainer_average_rating(db: AsyncSession, trainer_id: uuid.UUID):
+    """Helper function to update trainer's average rating"""
+    from models import TrainerRating, Trainer
+    from sqlalchemy import func
+    
+    result = await db.execute(
+        select(func.avg(TrainerRating.rating))
+        .where(TrainerRating.trainer_id == trainer_id)
+    )
+    avg_rating = result.scalar() or 0
+    
+    await db.execute(
+        update(Trainer)
+        .where(Trainer.id == trainer_id)
+        .values(rating=float(avg_rating))
+    )
+    await db.commit()
 # ============================================================
 # BADGES ENDPOINTS
 # ============================================================

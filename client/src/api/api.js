@@ -699,6 +699,54 @@ export const excursionsAPI = {
 };
 // Add this to api.js - Trainer API endpoints
 export const trainerAPI = {
+ // Trainer Ratings (Clients rating trainers)
+  getTrainerRatings: async () => {
+    try {
+      const response = await axiosInstance.get('/account/trainer-ratings');
+      return response.data;
+    } catch (error) {
+      console.error('Get trainer ratings error:', error.response?.data);
+      return { ratings: [], average_rating: 0, total_ratings: 0 };
+    }
+  },
+  
+  rateTrainer: async (trainerId, rating, review = '', sessionDate = null) => {
+    try {
+      const response = await axiosInstance.post('/account/trainer-ratings', { 
+        trainer_id: trainerId,
+        rating, 
+        review,
+        session_date: sessionDate || new Date().toISOString().split('T')[0]
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Rate trainer error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to rate trainer' };
+    }
+  },
+  
+  updateTrainerRating: async (ratingId, rating, review) => {
+    try {
+      const response = await axiosInstance.put(`/account/trainer-ratings/${ratingId}`, {
+        rating,
+        review
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Update trainer rating error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to update trainer rating' };
+    }
+  },
+
+  deleteTrainerRating: async (ratingId) => {
+    try {
+      const response = await axiosInstance.delete(`/account/trainer-ratings/${ratingId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Delete trainer rating error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to delete trainer rating' };
+    }
+  },
   // Trainer Profile
   getProfile: async () => {
     try {
@@ -1003,7 +1051,81 @@ export const shopAPI = {
   },
 
 };
+export const getAllTrainersForRating = async () => {
+  try {
+    // Get all trainers from your backend
+    const response = await axiosInstance.get('/account/admin/all-trainers');
+    return {
+      success: true,
+      data: {
+        trainers: response.data.map(trainer => ({
+          id: trainer.id,
+          name: trainer.name,
+          profile_image: trainer.profile_image,
+          rating: trainer.rating
+        }))
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching trainers:', error);
+    return {
+      success: false,
+      data: { trainers: [] },
+      error: error.response?.data || { detail: 'Failed to fetch trainers' }
+    };
+  }
+};
 
+export const createTrainerRating = async (trainerId, ratingData) => {
+  try {
+    const response = await axiosInstance.post('/account/trainer-ratings', {
+      trainer_id: trainerId,
+      rating: ratingData.rating,
+      review: ratingData.review,
+      session_date: ratingData.session_date || new Date().toISOString().split('T')[0]
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating rating:', error);
+    throw error.response?.data || { detail: 'Failed to create rating' };
+  }
+};
+
+export const getUserRatings = async () => {
+  try {
+    const response = await axiosInstance.get('/account/trainer-ratings');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user ratings:', error);
+    return {
+      success: true,
+      data: { ratings: [], average_rating: 0, total_ratings: 0 }
+    };
+  }
+};
+
+export const updateTrainerRating = async (ratingId, ratingData) => {
+  try {
+    const response = await axiosInstance.put(`/account/trainer-ratings/${ratingId}`, {
+      rating: ratingData.rating,
+      review: ratingData.review
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating rating:', error);
+    throw error.response?.data || { detail: 'Failed to update rating' };
+  }
+};
+
+export const deleteTrainerRating = async (ratingId) => {
+  try {
+    const response = await axiosInstance.delete(`/account/trainer-ratings/${ratingId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error deleting rating:', error);
+    throw error.response?.data || { detail: 'Failed to delete rating' };
+  }
+};
 export const adminAPI = {
   getAllClients: async () => {
     try {
@@ -1541,14 +1663,10 @@ export const consultationsAPI = {
   },
 
   // Reschedule a consultation
-  rescheduleBooking: async (bookingId, payload) => {
+  rescheduleBooking: async (bookingId, newDate, newTime, reason=null) => {
     try {
-      const payload ={
-        new_date: newDate,
-        new_time: newTime,
-        reason: reason
-      }
-      const response = await axiosInstance.patch(`/consultations/bookings/reschedule/${bookingId}`, {payload});
+      const payload = {new_date:newDate, new_time:newTime, reason};
+      const response = await axiosInstance.patch(`/consultations/bookings/reschedule/${bookingId}`,payload);
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to reschedule booking' };

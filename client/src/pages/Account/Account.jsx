@@ -170,7 +170,7 @@ function BodyAvatar({ gender, chest, waist, hips, thigh, arm, shoulders }) {
       <path d="M73 44 Q80 47.5 87 44" stroke="#8a4e2e" strokeWidth="2.2" fill="none" strokeLinecap="round"/>
       <rect x="73" y="53" width="14" height="14" rx="5" fill="url(#skinM)"/>
       <ellipse cx="80" cy="74" rx={sw} ry="14" fill="#ff6b1a" opacity="0.9"/>
-      <path d={`M${L} 74 Q${L-2} 112 ${wL} 134 Q56 150 80 152 Q104 150 ${wR} 134 Q${R+2} 112 ${R} 74Z`} fill="#1e2536"/>
+      <path d={`M${L} 74 Q${L-2} 112 ${wL} 134 Q56 150 80 152 Q112 150 ${wR} 134 Q${R+2} 112 ${R} 74Z`} fill="#1e2536"/>
       <line x1="80" y1="76" x2="80" y2="138" stroke="rgba(255,107,26,0.12)" strokeWidth="1.5"/>
       <path d={`M${wL} 134 Q48 158 80 162 Q112 158 ${wR} 134 Q104 150 80 152 Q56 150 ${wL} 134Z`} fill="#161e2c"/>
       <ellipse cx="80" cy="163" rx={hw} ry="12" fill="#161e2c"/>
@@ -209,17 +209,13 @@ function GameBadge({ badge, earned }) {
             <stop offset="100%" stopColor="transparent"/>
           </linearGradient>
         </defs>
-        {/* Shield */}
         <path d="M50 6 L90 20 L90 58 Q90 90 50 104 Q10 90 10 58 L10 20 Z"
           fill={`url(#g${badge.id})`} stroke={earned ? badge.shine : "#333345"} strokeWidth="1.5"
           filter={earned ? `url(#gl${badge.id})` : "none"} opacity={earned ? 1 : 0.35}/>
-        {/* Highlight */}
         <path d="M50 10 L86 23 L86 55 Q86 86 50 99 Q14 86 14 55 L14 23 Z"
           fill={`url(#sh${badge.id})`}/>
-        {/* Inner ring */}
         <path d="M50 18 L80 29 L80 56 Q80 79 50 90 Q20 79 20 56 L20 29 Z"
           fill="none" stroke={earned ? `${badge.shine}50` : "transparent"} strokeWidth="1"/>
-        {/* Star */}
         {earned
           ? <path d="M50 30 L54 42 L67 42 L57 50 L61 62 L50 54 L39 62 L43 50 L33 42 L46 42 Z"
               fill={badge.shine} filter={`url(#gl${badge.id})`} opacity="0.95"/>
@@ -229,10 +225,8 @@ function GameBadge({ badge, earned }) {
               <circle cx="50" cy="53" r="2" fill="#555"/>
             </g>
         }
-        {/* Ribbon base */}
         <rect x="34" y="97" width="32" height="10" rx="2" fill={earned ? badge.color : "#222"} opacity={earned ? 0.95 : 0.3}/>
         <path d="M36 107 L50 120 L64 107" fill={earned ? badge.color : "#222"} opacity={earned ? 0.9 : 0.3}/>
-        {/* Shine line */}
         {earned && <path d="M20 20 Q28 16 36 22" fill="none" stroke={`${badge.shine}70`} strokeWidth="2" strokeLinecap="round"/>}
       </svg>
       <div className="gbadge-name">{badge.name}</div>
@@ -469,15 +463,12 @@ export default function Account() {
   // Target
   const [activeTarget, setActiveTarget] = useState(null);
 
-  // Reviews
-  const [reviews, setReviews] = useState([
-    { id:1, trainer:"Coach Alex Reid",  rating:5, comment:"Absolutely incredible. Best trainer at the gym.", privacy:"public",  draft:false, date:"Feb 2026" },
-    { id:2, trainer:"Coach Marcus Lee", rating:4, comment:"Great session structure, really organised.",       privacy:"private", draft:false, date:"Jan 2026" },
-  ]);
+  // Reviews - Updated structure for backend integration
+  const [reviews, setReviews] = useState([]);
   const [trainers, setTrainers] = useState([]);
   const [trainersLoading, setTrainersLoading] = useState(false);
   const [ratingsLoading, setRatingsLoading] = useState(false);
-  const [rDraft, setRDraft] = useState({ trainer:TRAINER_LIST[0], rating:0, comment:"", privacy:"public" });
+  const [rDraft, setRDraft] = useState({ trainer: "", rating: 0, comment: "", privacy: "public" });
   const [editRev, setEditRev] = useState(null);
   const [delRevId, setDelRevId] = useState(null);
   const [revTab, setRevTab] = useState("posted");
@@ -517,6 +508,7 @@ export default function Account() {
     showToast("Logged out — see you next time! 👋");
     navigate("/");
   };
+  
   // Log Water Intake to API
   const logWaterToAPI = async (cups) => {
     try {
@@ -525,6 +517,7 @@ export default function Account() {
       console.error("Failed to log water intake:", err);
     }
   };  
+  
   // ML data fetch — calls all 3 ML endpoints in parallel
   const fetchMLData = async () => {
     const w = parseFloat(meas.weight), h = parseFloat(meas.height);
@@ -619,6 +612,7 @@ export default function Account() {
       console.error('Failed to load water intake:', waterErr);
     }
   }
+  
   // Load goals from API on component mount
   const fetchGoals = async () => {
     try {
@@ -653,16 +647,43 @@ export default function Account() {
     try {
       setTrainersLoading(true);
       const trainersData = await getAllTrainersForRating();
+      console.log('Trainers API response:', trainersData);
+      
+      // Handle different response formats
+      let trainersList = [];
       if (trainersData?.success && trainersData?.data?.trainers) {
-        setTrainers(trainersData.data.trainers);
+        trainersList = trainersData.data.trainers;
+      } else if (Array.isArray(trainersData)) {
+        trainersList = trainersData;
+      } else if (trainersData?.trainers) {
+        trainersList = trainersData.trainers;
+      }
+      
+      if (trainersList.length > 0) {
+        setTrainers(trainersList);
         // Set default trainer to first trainer if available
-        if (trainersData.data.trainers.length > 0) {
-          setRDraft(prev => ({ ...prev, trainer: trainersData.data.trainers[0].name }));
-        }
+        setRDraft(prev => ({ ...prev, trainer: trainersList[0].name }));
+      } else {
+        // Fallback to static trainer list if no trainers from API
+        const fallbackTrainers = TRAINER_LIST.map((name, idx) => ({
+          id: `trainer_${idx}`,
+          name: name,
+          profile_image: TRAINER_PHOTOS[name]
+        }));
+        setTrainers(fallbackTrainers);
+        setRDraft(prev => ({ ...prev, trainer: fallbackTrainers[0].name }));
       }
     } catch (error) {
       console.error('Error fetching trainers:', error);
-      showToast('⚠️ Failed to load trainers');
+      // Fallback to static trainer list
+      const fallbackTrainers = TRAINER_LIST.map((name, idx) => ({
+        id: `trainer_${idx}`,
+        name: name,
+        profile_image: TRAINER_PHOTOS[name]
+      }));
+      setTrainers(fallbackTrainers);
+      setRDraft(prev => ({ ...prev, trainer: fallbackTrainers[0].name }));
+      showToast('⚠️ Using demo trainer list');
     } finally {
       setTrainersLoading(false);
     }
@@ -672,20 +693,31 @@ export default function Account() {
     try {
       setRatingsLoading(true);
       const ratingsData = await getUserRatings();
+      console.log('User ratings API response:', ratingsData);
+      
+      let ratingsList = [];
       if (ratingsData?.success && ratingsData?.data?.ratings) {
-        // Transform backend ratings to frontend format
-        const formattedRatings = ratingsData.data.ratings.map(rating => ({
-          id: rating.id,
-          trainer: rating.trainer_name,
-          trainer_id: rating.trainer_id,
-          rating: rating.rating,
-          comment: rating.review || '',
-          privacy: 'public', // Backend doesn't have privacy field, default to public
-          draft: false,
-          date: new Date(rating.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
-        }));
-        setReviews(formattedRatings);
+        ratingsList = ratingsData.data.ratings;
+      } else if (Array.isArray(ratingsData)) {
+        ratingsList = ratingsData;
+      } else if (ratingsData?.ratings) {
+        ratingsList = ratingsData.ratings;
       }
+      
+      // Transform backend ratings to frontend format
+      const formattedRatings = ratingsList.map(rating => ({
+        id: rating.id,
+        trainer: rating.trainer_name,
+        trainer_id: rating.trainer_id,
+        rating: rating.rating,
+        comment: rating.review || '',
+        privacy: 'public',
+        draft: false,
+        date: rating.created_at 
+          ? new Date(rating.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+          : new Date().toLocaleDateString("en-GB", { month: "short", year: "numeric" })
+      }));
+      setReviews(formattedRatings);
     } catch (error) {
       console.error('Error fetching user ratings:', error);
       // Don't show toast for this error as it's not critical
@@ -1056,9 +1088,18 @@ export default function Account() {
     setAiLoading(false);
   };
 
+  // ============================================================
+  // TRAINER REVIEW FUNCTIONS - UPDATED FOR BACKEND INTEGRATION
+  // ============================================================
+  
   const postReview = async () => {
     if (!rDraft.rating || !rDraft.comment.trim()) {
       showToast("⚠️ Rating and comment required.");
+      return;
+    }
+
+    if (!rDraft.trainer) {
+      showToast("⚠️ Please select a trainer.");
       return;
     }
 
@@ -1069,22 +1110,23 @@ export default function Account() {
       const selectedTrainer = trainers.find(t => t.name === rDraft.trainer);
       if (!selectedTrainer) {
         showToast("⚠️ Trainer not found.");
+        setRatingsLoading(false);
         return;
       }
 
       const ratingData = {
         rating: rDraft.rating,
         review: rDraft.comment.trim(),
-        privacy: rDraft.privacy,
         session_date: new Date().toISOString().split('T')[0] // Today's date
       };
 
       const ratingResponse = await createTrainerRating(selectedTrainer.id, ratingData);
+      console.log('Rating response:', ratingResponse);
       
       if (ratingResponse?.success) {
         // Add the new review to local state
         const newReview = {
-          id: ratingResponse.data.rating_id,
+          id: ratingResponse.data?.rating_id || Date.now(),
           trainer: rDraft.trainer,
           trainer_id: selectedTrainer.id,
           rating: rDraft.rating,
@@ -1095,15 +1137,81 @@ export default function Account() {
         };
         
         setReviews(prev => [...prev, newReview]);
-        setRDraft({ trainer: trainers.length > 0 ? trainers[0].name : TRAINER_LIST[0], rating: 0, comment: "", privacy: "public" });
+        setRDraft({ 
+          trainer: trainers.length > 0 ? trainers[0].name : "", 
+          rating: 0, 
+          comment: "", 
+          privacy: "public" 
+        });
         showToast("✓ Review posted!");
       } else {
-        showToast("⚠️ Failed to post review.");
+        showToast(ratingResponse?.message || "⚠️ Failed to post review.");
       }
     } catch (error) {
       console.error('Error posting review:', error);
-      showToast("⚠️ Failed to post review.");
+      const errorMsg = error?.detail || error?.message || "⚠️ Failed to post review.";
+      showToast(errorMsg);
     } finally {
+      setRatingsLoading(false);
+    }
+  };
+
+  const updateExistingReview = async () => {
+    if (!editRev) return;
+    
+    if (!editRev.rating || !editRev.comment.trim()) {
+      showToast("⚠️ Rating and comment required.");
+      return;
+    }
+
+    try {
+      setRatingsLoading(true);
+      
+      const ratingData = {
+        rating: editRev.rating,
+        review: editRev.comment.trim()
+      };
+      
+      const updateResponse = await updateTrainerRating(editRev.id, ratingData);
+      
+      if (updateResponse?.success) {
+        // Update local state
+        setReviews(prev => prev.map(r => 
+          r.id === editRev.id 
+            ? { ...editRev, comment: editRev.comment.trim() }
+            : r
+        ));
+        setEditRev(null);
+        showToast("✓ Review updated!");
+      } else {
+        showToast(updateResponse?.message || "⚠️ Failed to update review.");
+      }
+    } catch (error) {
+      console.error('Error updating review:', error);
+      showToast("⚠️ Failed to update review.");
+    } finally {
+      setRatingsLoading(false);
+    }
+  };
+
+  const handleDeleteReview = async () => {
+    if (!delRevId) return;
+    
+    try {
+      setRatingsLoading(true);
+      const deleteResponse = await deleteTrainerRating(delRevId);
+      
+      if (deleteResponse?.success) {
+        setReviews(prev => prev.filter(r => r.id !== delRevId));
+        showToast("✓ Review deleted.");
+      } else {
+        showToast(deleteResponse?.message || "⚠️ Failed to delete review.");
+      }
+    } catch (error) {
+      console.error('Error deleting review:', error);
+      showToast("⚠️ Failed to delete review.");
+    } finally {
+      setDelRevId(null);
       setRatingsLoading(false);
     }
   };
@@ -1111,8 +1219,19 @@ export default function Account() {
   const saveDraft = () => {
     if(!rDraft.comment.trim()){showToast("⚠️ Write something first.");return;}
     setReviews(r=>[...r,{...rDraft,id:Date.now(),draft:true,date:"Draft"}]);
-    setRDraft({trainer:TRAINER_LIST[0],rating:0,comment:"",privacy:"public"});
+    setRDraft({trainer:trainers.length > 0 ? trainers[0].name : "",rating:0,comment:"",privacy:"public"});
     showToast("✓ Saved as draft.");
+  };
+
+  const startEditReview = (review) => {
+    setEditRev({
+      id: review.id,
+      trainer: review.trainer,
+      trainer_id: review.trainer_id,
+      rating: review.rating,
+      comment: review.comment,
+      privacy: review.privacy || 'public'
+    });
   };
 
   const sendChat = () => {
@@ -1158,7 +1277,7 @@ export default function Account() {
         setMeas(m=>({...m,weight:parseFloat(d.weight)||"",chest:parseFloat(d.chest)||"",waist:parseFloat(d.waist)||""}));
         setRestoreMeas(null); setShowMeasHist(false); showToast("✓ Measurement restored.");
       }} onCancel={()=>setRestoreMeas(null)}/>}
-      {delRevId && <Confirm msg="Permanently delete this review? This cannot be undone." onOk={()=>{setReviews(r=>r.filter(x=>x.id!==delRevId));setDelRevId(null);showToast("✓ Review deleted.");}} onCancel={()=>setDelRevId(null)}/>}
+      {delRevId && <Confirm msg="Permanently delete this review? This cannot be undone." onOk={handleDeleteReview} onCancel={()=>setDelRevId(null)}/>}
 
       {/* History drawers */}
       {showMeasHist && <HistoryDrawer title="Measurement" entries={measHist} onClose={()=>setShowMeasHist(false)} onRestore={e=>setRestoreMeas(e)}/>}
@@ -1259,7 +1378,7 @@ export default function Account() {
           </div>
           <div className="hero-info">
             <div className="hero-name">{username}</div>
-            <div className="hero-handle">@marcus.lifts · Member since {memberSince} · {tz}</div>
+            <div className="hero-handle">{userData?.email} · Member since {memberSince} · {tz}</div>
             <div className="hero-tags">
               <span className="htag" style={{color:level.color,borderColor:level.color,background:`${level.color}18`}}>⚡ {level.label}</span>
               <span className="htag orange">🔥 {streak}-Wk Streak</span>
@@ -1778,7 +1897,6 @@ export default function Account() {
                     <path d="M33 48 Q40 52 47 48" stroke="#8a4e2e" strokeWidth="2" fill="none" strokeLinecap="round"/>
                     <circle cx="40" cy="60" r="8" fill="#ff6b1a"/>
                     <text x="40" y="64" textAnchor="middle" fill="white" fontSize="9" fontWeight="800">AI</text>
-                    {/* Circuit lines */}
                     <line x1="8" y1="40" x2="22" y2="40" stroke="#ff6b1a" strokeWidth="1" opacity="0.5"/>
                     <line x1="58" y1="40" x2="72" y2="40" stroke="#ff6b1a" strokeWidth="1" opacity="0.5"/>
                     <circle cx="8" cy="40" r="2" fill="#ff6b1a" opacity="0.7"/>
@@ -1847,7 +1965,7 @@ export default function Account() {
               trainers.map(t=>(
                 <div key={t.id} className={`trainer-card${rDraft.trainer===t.name?" on":""}`} onClick={()=>setRDraft(d=>({...d,trainer:t.name}))}>
                   <div className="trainer-photo">
-                    <img src={t.profile_image || `https://images.unsplash.com/photo-${t.id}?w=200&q=80`} alt={t.name} loading="lazy"/>
+                    <img src={t.profile_image || `https://ui-avatars.com/api/?name=${encodeURIComponent(t.name)}&background=ff6b1a&color=fff`} alt={t.name} loading="lazy"/>
                   </div>
                   <div className="trainer-name">{t.name.replace("Coach ","")}</div>
                 </div>
@@ -1858,48 +1976,110 @@ export default function Account() {
           </div>
 
           <div className="review-form">
-            <div className="rev-sublbl">✍️ {editRev?"Edit Review":"Write a Review"} — {editRev?editRev.trainer:rDraft.trainer}</div>
+            <div className="rev-sublbl">
+              ✍️ {editRev ? "Edit Review" : "Write a Review"} — {editRev ? editRev.trainer : rDraft.trainer || (trainers[0]?.name || "Select Trainer")}
+            </div>
             <div className="form-row" style={{marginBottom:12}}>
               <div className="field">
                 <label>Trainer</label>
-                <select value={editRev?editRev.trainer:rDraft.trainer}
-                  onChange={e=>editRev?setEditRev(r=>({...r,trainer:e.target.value})):setRDraft(d=>({...d,trainer:e.target.value}))}
-                  disabled={trainersLoading}>
-                  {trainers.map(t=><option key={t.id} value={t.name}>{t.name}</option>)}
+                <select 
+                  value={editRev ? editRev.trainer : rDraft.trainer || (trainers[0]?.name || "")}
+                  onChange={e => editRev 
+                    ? setEditRev(r => ({...r, trainer: e.target.value}))
+                    : setRDraft(d => ({...d, trainer: e.target.value}))
+                  }
+                  disabled={trainersLoading || !!editRev}
+                >
+                  {trainers.map(t => (
+                    <option key={t.id} value={t.name}>{t.name}</option>
+                  ))}
                 </select>
               </div>
               <div className="field">
                 <label>Visibility</label>
-                <select value={editRev?editRev.privacy:rDraft.privacy}
-                  onChange={e=>editRev?setEditRev(r=>({...r,privacy:e.target.value})):setRDraft(d=>({...d,privacy:e.target.value}))}>
-                  <option value="public">🌐 Public</option><option value="private">🔒 Private</option>
+                <select 
+                  value={editRev ? editRev.privacy : rDraft.privacy}
+                  onChange={e => editRev 
+                    ? setEditRev(r => ({...r, privacy: e.target.value}))
+                    : setRDraft(d => ({...d, privacy: e.target.value}))
+                  }
+                >
+                  <option value="public">🌐 Public</option>
+                  <option value="private">🔒 Private</option>
                 </select>
               </div>
             </div>
+            
             <div style={{marginBottom:12}}>
               <label className="field-lbl">Rating</label>
               <div className="star-row">
-                {[1,2,3,4,5].map(s=>{
-                  const val=editRev?editRev.rating:rDraft.rating;
-                  return <span key={s} className={`star${val>=s?" on":""}`}
-                    onClick={()=>editRev?setEditRev(r=>({...r,rating:s})):setRDraft(d=>({...d,rating:s}))}>★</span>;
+                {[1,2,3,4,5].map(s => {
+                  const val = editRev ? editRev.rating : rDraft.rating;
+                  return (
+                    <span 
+                      key={s} 
+                      className={`star${val >= s ? " on" : ""}`}
+                      onClick={() => editRev 
+                        ? setEditRev(r => ({...r, rating: s}))
+                        : setRDraft(d => ({...d, rating: s}))
+                      }
+                      style={{ cursor: 'pointer' }}
+                    >
+                      ★
+                    </span>
+                  );
                 })}
               </div>
             </div>
-            <textarea className="rev-ta" rows={3}
-              value={editRev?editRev.comment:rDraft.comment}
-              onChange={e=>editRev?setEditRev(r=>({...r,comment:e.target.value})):setRDraft(d=>({...d,comment:e.target.value}))}
-              placeholder="Describe your experience — methodology, results, communication…"/>
-            <div style={{display:"flex",gap:8,marginTop:12}}>
-              {editRev?(
-                <><button className="btn-accent" onClick={()=>{setReviews(r=>r.map(x=>x.id===editRev.id?editRev:x));setEditRev(null);showToast("✓ Review updated!");}}>Update</button>
-                  <button className="btn-ghost" onClick={()=>setEditRev(null)}>Cancel</button></>
-              ):(
-                <><button className="btn-accent" onClick={postReview}>🌐 Post Review</button>
-                  <button className="btn-ghost" onClick={saveDraft}>💾 Save Draft</button></>
+            
+            <textarea 
+              className="rev-ta" 
+              rows={3}
+              value={editRev ? editRev.comment : rDraft.comment}
+              onChange={e => editRev 
+                ? setEditRev(r => ({...r, comment: e.target.value}))
+                : setRDraft(d => ({...d, comment: e.target.value}))
+              }
+              placeholder="Describe your experience — methodology, results, communication…"
+            />
+            
+            <div style={{display:"flex", gap:8, marginTop:12}}>
+              {editRev ? (
+                <>
+                  <button 
+                    className="btn-accent" 
+                    onClick={updateExistingReview} 
+                    disabled={ratingsLoading}
+                  >
+                    {ratingsLoading ? "Updating..." : "Update"}
+                  </button>
+                  <button 
+                    className="btn-ghost" 
+                    onClick={() => setEditRev(null)}
+                    disabled={ratingsLoading}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    className="btn-accent" 
+                    onClick={postReview} 
+                    disabled={ratingsLoading || !rDraft.rating || !rDraft.comment.trim()}
+                  >
+                    {ratingsLoading ? "Posting..." : "🌐 Post Review"}
+                  </button>
+                  <button 
+                    className="btn-ghost" 
+                    onClick={saveDraft}
+                    disabled={ratingsLoading}
+                  >
+                    💾 Save Draft
+                  </button>
+                </>
               )}
             </div>
-
           </div>
 
           <div className="chart-tabs" style={{marginTop:20}}>
@@ -1907,33 +2087,64 @@ export default function Account() {
             <button className={`ctab${revTab==="drafts"?" on":""}`} onClick={()=>setRevTab("drafts")}>Drafts ({draftRevs.length})</button>
           </div>
 
+          {ratingsLoading && revTab === "posted" && postedRevs.length === 0 && (
+            <div className="loading-overlay" style={{textAlign: "center", padding: "20px"}}>
+              <div className="spinner"></div>
+              <p>Loading reviews...</p>
+            </div>
+          )}
+
           <div className="review-list">
-            {(revTab==="posted"?postedRevs:draftRevs).map(rev=>(
+            {(revTab === "posted" ? postedRevs : draftRevs).map(rev => (
               <div key={rev.id} className="rev-card">
                 <div className="rev-card-top">
                   <div className="rev-trainer-photo">
-                    <img src={
-                      trainers.find(t => t.name === rev.trainer)?.profile_image || 
-                      TRAINER_PHOTOS[rev.trainer] || 
-                      `https://images.unsplash.com/photo-${rev.trainer_id || 'default'}?w=200&q=80`
-                    } alt={rev.trainer} />
+                    <img 
+                      src={
+                        trainers.find(t => t.name === rev.trainer)?.profile_image || 
+                        TRAINER_PHOTOS[rev.trainer] || 
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(rev.trainer)}&background=ff6b1a&color=fff`
+                      } 
+                      alt={rev.trainer} 
+                    />
                   </div>
                   <div style={{flex:1}}>
                     <div className="rev-trainer-name">{rev.trainer}</div>
-                    <div className="rev-stars">{[1,2,3,4,5].map(s=><span key={s} className={`star sm${rev.rating>=s?" on":""}`}>★</span>)}</div>
+                    <div className="rev-stars">
+                      {[1,2,3,4,5].map(s => (
+                        <span key={s} className={`star sm${rev.rating >= s ? " on" : ""}`}>★</span>
+                      ))}
+                    </div>
                   </div>
-                  <div style={{display:"flex",gap:6,alignItems:"flex-start",flexWrap:"wrap"}}>
-                    <span className={`priv-tag ${rev.privacy}`}>{rev.privacy==="public"?"🌐":"🔒"} {rev.privacy}</span>
+                  <div style={{display:"flex", gap:6, alignItems:"flex-start", flexWrap:"wrap"}}>
+                    <span className={`priv-tag ${rev.privacy}`}>
+                      {rev.privacy === "public" ? "🌐" : "🔒"} {rev.privacy}
+                    </span>
                     <span className="date-tag">{rev.date}</span>
-                    <button className="action-btn" onClick={()=>setEditRev({...rev})}>✏️</button>
-                    <button className="action-btn del" onClick={()=>setDelRevId(rev.id)}>🗑️</button>
+                    {revTab === "posted" && (
+                      <>
+                        <button 
+                          className="action-btn" 
+                          onClick={() => startEditReview(rev)}
+                          disabled={ratingsLoading}
+                        >
+                          ✏️
+                        </button>
+                        <button 
+                          className="action-btn del" 
+                          onClick={() => setDelRevId(rev.id)}
+                          disabled={ratingsLoading}
+                        >
+                          🗑️
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 <p className="rev-comment">{rev.comment}</p>
               </div>
             ))}
           </div>
-
         </div>
 
         {/* ═══════════ BADGES ═══════════ */}
@@ -2001,7 +2212,4 @@ export default function Account() {
       )}
     </>
   );
-
-  // Moved up to avoid hoisting issue
-  function handleAskAI() { askAI(); }
 }

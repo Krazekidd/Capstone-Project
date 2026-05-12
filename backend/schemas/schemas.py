@@ -1266,7 +1266,39 @@ class UpdateTrainerRatingRequest(BaseModel):
     review: Optional[str] = None
     session_date: Optional[date] = None
 
+class TrainerRatingResponseSchema(BaseModel):
+    """Response schema for trainer rating"""
+    id: str
+    trainer_id: str
+    trainer_name: str
+    rating: int
+    review: Optional[str] = None
+    session_date: Optional[str] = None
+    is_verified: bool
+    created_at: str
 
+    model_config = {"from_attributes": True}
+
+
+class TrainerRatingsResponse(BaseModel):
+    """Response wrapper for trainer ratings"""
+    success: bool
+    data: dict
+    message: Optional[str] = None
+
+
+class CreateRatingRequest(BaseModel):
+    """Request schema for creating a trainer rating"""
+    trainer_id: str
+    rating: int = Field(ge=1, le=5)
+    review: Optional[str] = None
+    session_date: Optional[str] = None
+
+
+class UpdateRatingRequest(BaseModel):
+    """Request schema for updating a trainer rating"""
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    review: Optional[str] = None
 # ---------------------------------------------------------------------------
 # Client Status Schemas
 # ---------------------------------------------------------------------------

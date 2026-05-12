@@ -1069,6 +1069,15 @@ export const adminAPI = {
       throw error.response?.data || { detail: 'Failed to update client status' };
     }
   },
+notifyOrderReady: async (orderId) => {
+  try {
+    const response = await axiosInstance.post(`/account/admin/orders/${orderId}/notify`);
+    return response.data;
+  } catch (error) {
+    console.error('Notify order ready error:', error.response?.data);
+    throw error.response?.data || { detail: 'Failed to send notification' };
+  }
+},
   // Additional admin functions
   getMemberStats: async () => {
     try {

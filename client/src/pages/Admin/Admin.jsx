@@ -185,15 +185,18 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   const [gradeLog, setGradeLog] = useState({});
   const [overviewTrainer, setOverviewTrainer] = useState(null);
 
-  // Load gradeLog from backend on mount so it persists across sessions
-  // When backend is ready, uncomment this:
-  // useEffect(() => {
-  //   adminAPI.getGradeLogs().then(data => {
-  //     const log = {};
-  //     data.forEach(g => { log[g.trainer_id] = { date: g.graded_at }; });
-  //     setGradeLog(log);
-  //   }).catch(err => console.error("Failed to load grade logs:", err));
-  // }, []);
+  // Load gradeLog from localStorage on mount so it persists across sessions
+  useEffect(() => {
+    const savedGradeLog = localStorage.getItem('gradeLog');
+    if (savedGradeLog) {
+      try {
+        setGradeLog(JSON.parse(savedGradeLog));
+      } catch (err) {
+        console.error("Failed to parse grade log from localStorage:", err);
+        setGradeLog({});
+      }
+    }
+  }, []);
 
   // Save grade log to localStorage whenever it changes
   useEffect(() => {
@@ -203,20 +206,46 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   const avg = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
   const standing = getStanding(avg.toFixed(1));
 
-  const getGradeStatus = (trainerId) => {
+  const getGradeStatus = (trainer) => {
+    const trainerId = trainer.id;
     const log = gradeLog[trainerId];
     if (!log) return { canGrade: true, canEdit: false, label: "Grade Trainer" };
     const graded = new Date(log.date);
     const now = new Date();
     const hoursDiff = (now - graded) / (1000 * 60 * 60);
     const sameMonth = graded.getMonth() === now.getMonth() && graded.getFullYear() === now.getFullYear();
-    if (sameMonth && hoursDiff > 24) return { canGrade: false, canEdit: false, label: "Graded This Month" };
-    if (sameMonth && hoursDiff <= 24) return { canGrade: true, canEdit: true, label: "Edit Grade" };
+    
+    // Senior trainers only need 1 assessment per month (admin only)
+    // Regular trainers need 3 assessments per month (1 admin + 2 senior trainers)
+    if (trainer.is_senior) {
+      if (sameMonth && hoursDiff > 24) return { canGrade: false, canEdit: false, label: "Graded This Month" };
+      if (sameMonth && hoursDiff <= 24) return { canGrade: true, canEdit: true, label: "Edit Grade" };
+    } else {
+      // For regular trainers, check if they have all required assessments
+      const assessments = trainerAssessments[trainerId] || [];
+      const currentMonthAssessments = assessments.filter(a => {
+        const assessmentDate = new Date(a.assessment_date);
+        return assessmentDate.getMonth() === now.getMonth() && 
+               assessmentDate.getFullYear() === now.getFullYear();
+      });
+      
+      if (currentMonthAssessments.length >= 3) {
+        return { canGrade: false, canEdit: false, label: "Fully Assessed" };
+      }
+      
+      if (sameMonth && hoursDiff > 24) {
+        return { canGrade: true, canEdit: false, label: "Add Assessment" };
+      }
+      if (sameMonth && hoursDiff <= 24) {
+        return { canGrade: true, canEdit: true, label: "Edit Assessment" };
+      }
+    }
+    
     return { canGrade: true, canEdit: false, label: "Grade Trainer" };
   };
 
   const openAssess = async (t) => {
-    const status = getGradeStatus(t.id);
+    const status = getGradeStatus(t);
     if (!status.canGrade) { 
       toast("This trainer has already been graded this month."); 
       return; 
@@ -632,7 +661,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
           {trainers.map(t => {
             const a = t.rating || 0;
             const s = getStanding(a);
-            const status = getGradeStatus(t.id);
+            const status = getGradeStatus(t);
             return (
               <div key={t.id} className="trainer-assess-card">
                 <div className="trainer-avatar" style={{
@@ -1835,6 +1864,32 @@ const OrdersPage = ({ orders, setOrders, toast }) => {
     </div>
   );
 };
+
+// ═══════════════════════════════════════════════════════════
+// REVIEWS PAGE
+// ═══════════════════════════════════════════════════════════
+const ReviewsPage = () => (
+  <div className="page-content">
+    <div className="section-label">Client <span>Reviews</span></div>
+    <div className="card">
+      {ALL_REVIEWS.map(r => (
+        <div key={r.id} className="review-item" style={{ marginBottom: 16 }}>
+          <div className="review-header">
+            <span className="reviewer-name">{r.client}</span>
+            <Stars n={r.stars} />
+            <Badge cls={r.type === "public" ? "badge-green" : "badge-cyan"}>
+              {r.type}
+            </Badge>
+          </div>
+          <div className="review-text">{r.text}</div>
+          <div className="review-meta" style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+            {r.date} • {r.trainer}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 // ═══════════════════════════════════════════════════════════
 // LIVE CHAT PAGE

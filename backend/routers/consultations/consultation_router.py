@@ -631,8 +631,9 @@ async def reschedule_consultation(
         
         # Get the booking
         result = await db.execute(
-            select(Booking, ConsultationType)
+            select(Booking, ConsultationType, User)
             .join(ConsultationType, Booking.consultation_type_id == ConsultationType.id)
+            .join(User, Booking.user_id == User.id)
             .where(Booking.id == booking_id)
             .where(Booking.user_id == user_id)
         )

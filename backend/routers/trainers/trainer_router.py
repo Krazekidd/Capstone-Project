@@ -3,19 +3,80 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func, desc
 from database import get_user_db
 from models import (
-    User, Trainer, Client, BodyMeasurement, Attendance, 
-    NutritionPlan, NutritionGoals, TrainingSchedule, ProgressPhoto,
-    SavedConversation, ConversationMessage
+    # Core user models
+    User,
+    
+    # Role-specific profiles
+    Trainer,
+    Client,
+    
+    # Client progress & tracking
+    BodyMeasurement,
+    Attendance,
+    
+    # Nutrition & training
+    NutritionPlan,
+    NutritionGoals,
+    TrainingSchedule,
+    
+    # Photos & media
+    ProgressPhoto,
+    
+    # Communication
+    SavedConversation,
+    ConversationMessage,
+    
+    # Trainer evaluation
+    TrainerAssessment,
+    TrainerRating,
+    TrainerGrade,
 )
-from schemas import APIResponse
+from schemas import (
+    # Generic response
+    APIResponse,
+    
+    # Account/profile schemas
+    TrainerAccount,
+    ClientAccount,
+    UpdateTrainerProfileRequest,  # Add if missing
+    
+    # Progress & measurements
+    BodyMeasurements,
+    ClientProgressRequest,  
+    # Attendance
+    AttendanceResponse,
+    AttendanceCheckIn,
+    AttendanceCheckOut,
+    AttendanceLogRequest,  
+    
+    # Notes
+    ClientNoteRequest,   
+    ClientNoteResponse, 
+    
+    # Ratings & assessments
+    TrainerRatingResponse,
+    TrainerRatingsSummaryResponse,
+    TrainerAssessmentRequest,
+    TrainerAssessmentResponse,
+    
+    # Grades
+    GradeResponse,
+    GradeScores,
+    
+    # Performance
+    TrainerPerformanceResponse, 
+    
+    # Client status
+    ClientWithStatusResponse,
+)
 from ..auth.auth import get_current_user
 from typing import Optional, List, Dict, Any
 import uuid
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/trainers", tags=["trainers"])
+router = APIRouter(prefix="/trainers", tags=["trainers"])
 
 # ============================================================
 # TRAINER PROFILE MANAGEMENT
@@ -37,7 +98,7 @@ async def get_trainer_profile(
         result = await db.execute(
             select(Trainer, User.email, User.first_name, User.last_name)
             .join(User, Trainer.id == User.id)
-            .where(Trainer.id == user_id.bytes)
+            .where(Trainer.id == user_id)
         )
         row = result.first()
         if not row:
@@ -46,7 +107,7 @@ async def get_trainer_profile(
         trainer, email, first_name, last_name = row
         
         profile_data = {
-            "id": str(uuid.UUID(bytes=trainer.id)),
+            "id": trainer.id,
             "name": trainer.name,
             "email": email,
             "first_name": first_name,
@@ -90,7 +151,7 @@ async def update_trainer_profile(
             raise HTTPException(status_code=403, detail="Access denied. Trainer role required.")
         
         result = await db.execute(
-            select(Trainer).where(Trainer.id == user_id.bytes)
+            select(Trainer).where(Trainer.id == user_id)
         )
         trainer = result.scalar_one_or_none()
         if not trainer:
@@ -150,7 +211,7 @@ async def get_trainer_clients(
             client, email, first_name, last_name = row
             
             client_data = {
-                "id": str(uuid.UUID(bytes=client.id)),
+                "id": client.id,
                 "name": client.name,
                 "email": email,
                 "first_name": first_name,
@@ -200,7 +261,7 @@ async def get_client_details(
         result = await db.execute(
             select(Client, User.email, User.first_name, User.last_name)
             .join(User, Client.id == User.id)
-            .where(Client.id == client_uuid.bytes)
+            .where(Client.id == client_uuid)
         )
         row = result.first()
         if not row:
@@ -209,7 +270,7 @@ async def get_client_details(
         client, email, first_name, last_name = row
         
         client_data = {
-            "id": str(uuid.UUID(bytes=client.id)),
+            "id": client.id,
             "name": client.name,
             "email": email,
             "first_name": first_name,
@@ -260,7 +321,7 @@ async def update_client_progress(
         
         # Create new body measurement entry
         measurement = BodyMeasurement(
-            user_id=client_uuid.bytes,
+            user_id=client_uuid,
             recorded_at=datetime.utcnow(),
             weight=progress_data.get('weight'),
             height=progress_data.get('height'),
@@ -317,7 +378,8 @@ async def get_client_progress_history(
         
         result = await db.execute(
             select(BodyMeasurement)
-            .where(BodyMeasurement.user_id == client_uuid.bytes)
+            .where(BodyMeasurement.user_id == client_uuid
+            )
             .order_by(desc(BodyMeasurement.recorded_at))
             .limit(limit)
         )
@@ -391,7 +453,7 @@ async def add_client_note(
         
         # For now, store as a conversation message
         conversation = SavedConversation(
-            user_id=client_uuid.bytes,
+            user_id=client_uuid,
             session_id=f"trainer_notes_{client_id}_{user_id}",
             title=f"Trainer Notes - {datetime.utcnow().strftime('%Y-%m-%d')}",
             message_count=1,
@@ -448,7 +510,7 @@ async def get_client_notes(
             select(SavedConversation, ConversationMessage)
             .join(ConversationMessage, SavedConversation.id == ConversationMessage.conversation_id)
             .where(
-                SavedConversation.user_id == client_uuid.bytes,
+                SavedConversation.user_id == client_uuid,
                 SavedConversation.session_id.like(f"trainer_notes_{client_id}%")
             )
             .order_by(desc(SavedConversation.created_at))
@@ -500,7 +562,7 @@ async def get_client_attendance(
         
         result = await db.execute(
             select(Attendance)
-            .where(Attendance.user_id == client_uuid.bytes)
+            .where(Attendance.user_id == client_uuid)
             .order_by(desc(Attendance.check_in_time))
             .limit(50)
         )
@@ -548,7 +610,7 @@ async def log_client_attendance(
         client_uuid = uuid.UUID(client_id)
         
         attendance = Attendance(
-            user_id=client_uuid.bytes,
+            user_id=client_uuid,
             check_in_time=datetime.utcnow(),
             check_out_time=datetime.utcnow() if attendance_data.get('check_out_time') else None,
             duration_minutes=attendance_data.get('duration_minutes'),
@@ -606,7 +668,7 @@ async def get_at_risk_clients(
         at_risk_clients = []
         for client, email in result.all():
             client_data = {
-                "id": str(uuid.UUID(bytes=client.id)),
+                "id": client.id,
                 "name": client.name,
                 "email": email,
                 "last_activity": client.updated_at.isoformat() if client.updated_at else None,

@@ -1898,3 +1898,66 @@ class MLRecommendationsResponse(BaseModel):
     recommendations: List[MLScoreResponse]
     user_context: dict
 
+# Add to schemas.py
+
+class UpdateTrainerProfileRequest(BaseModel):
+    """Request schema for updating trainer profile"""
+    name: Optional[str] = None
+    certification: Optional[str] = None
+    specialties: Optional[List[str]] = None
+    bio: Optional[str] = None
+    experience_years: Optional[int] = None
+    hourly_rate: Optional[float] = None
+    trainer_level: Optional[str] = None
+    profile_image: Optional[str] = None
+
+
+class ClientNoteRequest(BaseModel):
+    """Request schema for adding client note"""
+    note: str
+    note_type: str = "general"
+
+
+class ClientNoteResponse(BaseModel):
+    """Response schema for client note"""
+    id: uuid.UUID
+    title: str
+    note: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+class AttendanceLogRequest(BaseModel):
+    """Request schema for logging attendance"""
+    check_out_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class TrainerPerformanceResponse(BaseModel):
+    """Response schema for trainer performance"""
+    internal_rating: Optional[float] = None
+    client_rating: Optional[float] = None
+    overall_score: Optional[float] = None
+    chart_data: Optional[dict] = None
+    assessments: Optional[List[TrainerAssessmentResponse]] = None
+    ratings_summary: Optional[TrainerRatingsSummaryResponse] = None
+
+
+class ClientProgressRequest(BaseModel):
+    """Request schema for updating client progress"""
+    weight: Optional[float] = None
+    height: Optional[float] = None
+    body_fat: Optional[float] = None
+    chest: Optional[float] = None
+    waist: Optional[float] = None
+    shoulders: Optional[float] = None
+    arm_left: Optional[float] = None
+    arm_right: Optional[float] = None
+    neck: Optional[float] = None
+    hips: Optional[float] = None
+    thigh_left: Optional[float] = None
+    thigh_right: Optional[float] = None
+    calf_left: Optional[float] = None
+    calf_right: Optional[float] = None
+    glutes: Optional[float] = None

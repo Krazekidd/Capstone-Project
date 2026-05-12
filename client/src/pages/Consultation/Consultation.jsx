@@ -1145,7 +1145,9 @@ export default function ConsultationPage() {
 
   const handleRescheduleBooking = async (bookingId, newDate, newTime, reason) => {
     try {
-      await consultationsAPI.rescheduleBooking(bookingId, newDate, newTime, reason);
+      
+      const payload =  {newDate, newTime, reason};
+      await consultationsAPI.rescheduleBooking(bookingId,payload);
       await loadMyBookings();
       alert("Consultation rescheduled successfully.");
     } catch (err) {

@@ -17,7 +17,7 @@ from routers.ml.ml.progress import router as ml_progress_router
 from routers.ml.ml.food import router as ml_food_router
 from routers.users.account import router as account_router
 from routers.users.user_profile import router as user_profile_router
-from routers.trainers.trainer_api import router as trainer_api_router
+from routers.trainers.trainer_router import router as trainer_api_router
 from routers.evaluations.evaluation import router as evaluation_router
 from routers.grades.grades import router as grades_router
 from routers.ratings.ratings import router as ratings_router

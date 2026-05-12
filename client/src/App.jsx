@@ -21,18 +21,18 @@ function App() {
         {/* Login page – no Layout (no universal navbar) */}
         <Route path="/login" element={<Login />} />
             {/* Wrapping all routes that need the navbar/footer */}
-            <Route element={<Layout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/membership" element={<Membership />} />
-              <Route path="/consultation" element={<Consultation />} />
-              <Route path="/account" element={<Account />} />
-              <Route path="/excursions" element={<Excursions />} />
-              <Route path="/trainer" element={<TrainerPage />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/STrainer" element={<STrainer />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/membership" element={<Membership />} />
+            <Route path="/consultation" element={<Consultation />} />
+            <Route path="/account" element={<Account />} />
+            <Route path="/excursions" element={<Excursions />} />
+            <Route path="/trainer" element={<TrainerPage />} />
+            <Route path="/STrainer" element={<STrainer />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+            <Route path="/admin" element={<Admin />} />
         {/* Reset Password page – no Layout (no universal navbar) */}
         <Route path="/reset-password" element={<ResetPassword />} />
         {/* No Navbar for Shop route */}

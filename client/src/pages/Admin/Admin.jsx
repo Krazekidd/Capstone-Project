@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import "./Admin.css";
-import { authAPI, accountAPI, progressAPI, excursionsAPI, adminAPI } from "../../api/api";
+import { authAPI, accountAPI, progressAPI, excursionsAPI, adminAPI, gradesAPI } from "../../api/api";
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -184,16 +184,65 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   const [confirmDeleteTrainer, setConfirmDeleteTrainer] = useState(null);
   const [gradeLog, setGradeLog] = useState({});
   const [overviewTrainer, setOverviewTrainer] = useState(null);
+  const [overviewData, setOverviewData] = useState(null);
+  const [loadingOverview, setLoadingOverview] = useState(false);
 
-  // Load gradeLog from backend on mount so it persists across sessions
-  // When backend is ready, uncomment this:
-  // useEffect(() => {
-  //   adminAPI.getGradeLogs().then(data => {
-  //     const log = {};
-  //     data.forEach(g => { log[g.trainer_id] = { date: g.graded_at }; });
-  //     setGradeLog(log);
-  //   }).catch(err => console.error("Failed to load grade logs:", err));
-  // }, []);
+  // Load all trainer assessments on mount
+  useEffect(() => {
+    const loadAllAssessments = async () => {
+      if (!trainers || trainers.length === 0) return;
+      
+      const assessmentsByTrainer = {};
+      for (const trainer of trainers) {
+        try {
+          const assessments = await adminAPI.getTrainerAssessments(trainer.id);
+          assessmentsByTrainer[trainer.id] = assessments;
+        } catch (err) {
+          console.error(`Failed to load assessments for trainer ${trainer.name}:`, err);
+          assessmentsByTrainer[trainer.id] = [];
+        }
+      }
+      setTrainerAssessments(assessmentsByTrainer);
+    };
+
+    loadAllAssessments();
+  }, [trainers]);
+
+  // Load overview data when trainer is selected
+  useEffect(() => {
+    const loadOverviewData = async () => {
+      if (!overviewTrainer) {
+        setOverviewData(null);
+        return;
+      }
+
+      setLoadingOverview(true);
+      try {
+        const data = await getGradeOverview(overviewTrainer);
+        setOverviewData(data);
+      } catch (err) {
+        console.error("Failed to load overview data:", err);
+        setOverviewData(null);
+      } finally {
+        setLoadingOverview(false);
+      }
+    };
+
+    loadOverviewData();
+  }, [overviewTrainer]);
+
+  // Load gradeLog from localStorage on mount so it persists across sessions
+  useEffect(() => {
+    const savedGradeLog = localStorage.getItem('gradeLog');
+    if (savedGradeLog) {
+      try {
+        setGradeLog(JSON.parse(savedGradeLog));
+      } catch (err) {
+        console.error("Failed to parse grade log from localStorage:", err);
+        setGradeLog({});
+      }
+    }
+  }, []);
 
   // Save grade log to localStorage whenever it changes
   useEffect(() => {
@@ -203,20 +252,46 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   const avg = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
   const standing = getStanding(avg.toFixed(1));
 
-  const getGradeStatus = (trainerId) => {
+  const getGradeStatus = (trainer) => {
+    const trainerId = trainer.id;
     const log = gradeLog[trainerId];
     if (!log) return { canGrade: true, canEdit: false, label: "Grade Trainer" };
     const graded = new Date(log.date);
     const now = new Date();
     const hoursDiff = (now - graded) / (1000 * 60 * 60);
     const sameMonth = graded.getMonth() === now.getMonth() && graded.getFullYear() === now.getFullYear();
-    if (sameMonth && hoursDiff > 24) return { canGrade: false, canEdit: false, label: "Graded This Month" };
-    if (sameMonth && hoursDiff <= 24) return { canGrade: true, canEdit: true, label: "Edit Grade" };
+    
+    // Senior trainers only need 1 assessment per month (admin only)
+    // Regular trainers need 3 assessments per month (1 admin + 2 senior trainers)
+    if (trainer.is_senior) {
+      if (sameMonth && hoursDiff > 24) return { canGrade: false, canEdit: false, label: "Graded This Month" };
+      if (sameMonth && hoursDiff <= 24) return { canGrade: true, canEdit: true, label: "Edit Grade" };
+    } else {
+      // For regular trainers, check if they have all required assessments
+      const assessments = trainerAssessments[trainerId] || [];
+      const currentMonthAssessments = assessments.filter(a => {
+        const assessmentDate = new Date(a.assessment_date);
+        return assessmentDate.getMonth() === now.getMonth() && 
+               assessmentDate.getFullYear() === now.getFullYear();
+      });
+      
+      if (currentMonthAssessments.length >= 3) {
+        return { canGrade: false, canEdit: false, label: "Fully Assessed" };
+      }
+      
+      if (sameMonth && hoursDiff > 24) {
+        return { canGrade: true, canEdit: false, label: "Add Assessment" };
+      }
+      if (sameMonth && hoursDiff <= 24) {
+        return { canGrade: true, canEdit: true, label: "Edit Assessment" };
+      }
+    }
+    
     return { canGrade: true, canEdit: false, label: "Grade Trainer" };
   };
 
   const openAssess = async (t) => {
-    const status = getGradeStatus(t.id);
+    const status = getGradeStatus(t);
     if (!status.canGrade) { 
       toast("This trainer has already been graded this month."); 
       return; 
@@ -246,27 +321,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     const now = new Date();
     const assessmentDate = now.toISOString().split('T')[0];
     
-    // Update local state immediately
-    setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
-    setAssessHistory(prev => [{
-      trainer: assessTrainer.name, 
-      perf: scores.perf, 
-      motiv: scores.motiv,
-      interact: scores.interact, 
-      knowledge: scores.knowledge,
-      punct: scores.punct,
-      avg: a, 
-      standing: s.label,
-      month: now.toLocaleString("default", { month: "long", year: "numeric" }),
-      date: now.toLocaleDateString()
-    }, ...prev]);
-    
-    // Update trainer rating locally
-    setTrainers(prev => prev.map(t => t.id === assessTrainer.id ? { ...t, rating: a } : t));
-    toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
-    setAssessTrainer(null);
-    
-    // Persist to backend
+    // Persist to backend first
     try {
       const backendPayload = {
         trainer_id: assessTrainer.id,
@@ -286,11 +341,24 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
       console.log('Saving assessment payload:', backendPayload);
       await adminAPI.saveTrainerAssessment(backendPayload);
       
+      // Refresh assessments from backend to get the latest data
       const updatedAssessments = await adminAPI.getTrainerAssessments(assessTrainer.id);
       setTrainerAssessments(prev => ({ ...prev, [assessTrainer.id]: updatedAssessments }));
+      
+      // Update grade log for timing purposes only
+      setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
+      
+      // Update trainer rating locally from backend response
+      setTrainers(prev => prev.map(t => t.id === assessTrainer.id ? { ...t, rating: a } : t));
+      
+      toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
+      setAssessTrainer(null);
+      
+      // Refresh trainers data to get updated ratings
+      await onRefresh();
     } catch (err) {
-      console.error("Backend save failed (grade saved locally):", err);
-      toast("Assessment saved locally only. Backend error: " + (err.detail || err.message));
+      console.error("Backend save failed:", err);
+      toast("Failed to save assessment: " + (err.detail || err.message));
     } finally {
       setLoading(false);
     }
@@ -390,10 +458,9 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     }
   };
 
-  // Build history from both local state and backend assessments
-  const allHistory = [
-    ...assessHistory,
-    ...Object.values(trainerAssessments).flat().map(a => ({
+  // Build history from backend assessments only (to avoid duplicates)
+  const allHistory = Object.values(trainerAssessments).flat().map(a => {
+    return {
       trainer: a.trainer_name || a.trainer_id,
       perf: a.performance_score,
       motiv: a.motivation_score,
@@ -402,10 +469,13 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
       punct: a.punctuality_score,
       avg: a.average_score,
       standing: a.standing,
+      assessor_role: a.assessor_role || 'admin', // Add fallback back to prevent undefined issues
+      assessor_name: a.assessor_name || 'Unknown',
+      assessment_date: a.assessment_date,
       month: new Date(a.assessment_date).toLocaleString("default", { month: "long", year: "numeric" }),
       date: new Date(a.assessment_date).toLocaleDateString()
-    }))
-  ];
+    };
+  });
 
   const historyByMonth = {};
   allHistory.forEach(a => {
@@ -414,19 +484,79 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     historyByMonth[m].push(a);
   });
 
-  const getGradeOverview = (t) => {
-    const tHistory = allHistory.filter(h => h.trainer === t.name).map(h => parseFloat(h.avg)).filter(v => !isNaN(v) && v > 0);
-    const baseRating = t.rating || 0;
-    const st1Avg = baseRating > 0 ? baseRating : null;
-    const st2Avg = tHistory.length > 1 ? +(tHistory.slice(0, -1).reduce((a, b) => a + b, 0) / tHistory.slice(0, -1).length).toFixed(2) : null;
-    const adminAvg = tHistory.length > 0 ? +tHistory[tHistory.length - 1].toFixed(2) : null;
+  const getGradeOverview = async (t) => {
+    // Get all assessments for this trainer from admin system
+    const tAssessments = allHistory.filter(h => h.trainer === t.name);
+    
+    // Also fetch senior trainer grades from grades system
+    let seniorGradesFromAPI = [];
+    try {
+      console.log('Fetching grades for trainer:', t.name, 'ID:', t.id);
+      const gradesData = await gradesAPI.getGradesForTrainer(t.id);
+      console.log('Grades API response:', gradesData);
+      if (gradesData && gradesData.grades && Array.isArray(gradesData.grades)) {
+        // Convert grades data to match assessment format
+        seniorGradesFromAPI = gradesData.grades
+          .filter(gradeData => {
+            // Only include May grades (month 4) for demo
+            const isMay = gradeData.month_index === 4;
+            const isFinalised = gradeData.finalised;
+            console.log(`Month ${gradeData.month_index}: May=${isMay}, Finalised=${isFinalised}`);
+            return isMay && isFinalised;
+          })
+          .map(gradeData => ({
+            trainer: t.name,
+            perf: gradeData.scores?.performance || 0,
+            motiv: gradeData.scores?.motivation || 0,
+            interact: gradeData.scores?.interaction || 0,
+            knowledge: gradeData.scores?.knowledge || 0,
+            punct: gradeData.scores?.punctuality || 0,
+            avg: gradeData.overall_avg || Object.values(gradeData.scores || {}).reduce((a, b) => a + b, 0) / 5,
+            standing: gradeData.overall_avg >= 8.5 ? "Excellent" : gradeData.overall_avg >= 6 ? "Good" : "Needs Work",
+            assessor_role: 'senior_trainer',
+            assessor_name: 'Senior Trainer', // We could get actual name from user data
+            assessment_date: new Date(gradeData.submitted_at).toISOString().split('T')[0],
+            month: new Date(gradeData.submitted_at).toLocaleString("default", { month: "long", year: "numeric" }),
+            date: new Date(gradeData.submitted_at).toLocaleDateString()
+          }));
+      }
+    } catch (err) {
+      console.error("Failed to load senior trainer grades:", err);
+    }
+    
+    // Combine admin assessments with senior trainer grades
+    const allAssessmentsCombined = [...tAssessments, ...seniorGradesFromAPI];
+    console.log('Combined assessments:', allAssessmentsCombined);
+    
+    // Separate assessments by role
+    const seniorAssessments = allAssessmentsCombined.filter(h => h.assessor_role === 'senior_trainer');
+    const adminAssessments = allAssessmentsCombined.filter(h => h.assessor_role === 'admin');
+    console.log('Senior assessments:', seniorAssessments);
+    console.log('Admin assessments:', adminAssessments);
+    
+    // Get the most recent assessments (sorted by date)
+    const sortedSenior = seniorAssessments.sort((a, b) => new Date(a.assessment_date) - new Date(b.assessment_date));
+    const sortedAdmin = adminAssessments.sort((a, b) => new Date(a.assessment_date) - new Date(b.assessment_date));
+    
+    // Get the scores (use most recent from each category)
+    const st1Avg = sortedSenior.length > 0 ? parseFloat(sortedSenior[sortedSenior.length - 1]?.avg) : null;
+    const st2Avg = sortedSenior.length > 1 ? parseFloat(sortedSenior[sortedSenior.length - 2]?.avg) : null;
+    const adminAvg = sortedAdmin.length > 0 ? parseFloat(sortedAdmin[sortedAdmin.length - 1]?.avg) : null;
+    
+    // Only use actual assessments, no fallbacks for missing senior trainer assessments
     const raterScores = [st1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
     const weights = raterScores.length === 3 ? [0.35, 0.35, 0.30] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
     const weightedAvg = raterScores.length ? +(raterScores.reduce((s, v, i) => s + v * weights[i], 0)).toFixed(2) : null;
     const stdDev = raterScores.length >= 2
       ? +(Math.sqrt(raterScores.reduce((s, v) => { const m = raterScores.reduce((a, b) => a + b, 0) / raterScores.length; return s + (v - m) ** 2; }, 0) / raterScores.length)).toFixed(2)
       : null;
-    return { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev };
+    
+    // Get assessor names for display
+    const st1Assessor = sortedSenior.length > 0 ? sortedSenior[sortedSenior.length - 1]?.assessor_name : null;
+    const st2Assessor = sortedSenior.length > 1 ? sortedSenior[sortedSenior.length - 2]?.assessor_name : null;
+    const adminAssessor = sortedAdmin.length > 0 ? sortedAdmin[sortedAdmin.length - 1]?.assessor_name : null;
+    
+    return { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev, st1Name: st1Assessor, st2Name: st2Assessor, adminName: adminAssessor };
   };
 
   const gradeColor = (s) => {
@@ -632,7 +762,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
           {trainers.map(t => {
             const a = t.rating || 0;
             const s = getStanding(a);
-            const status = getGradeStatus(t.id);
+            const status = getGradeStatus(t);
             return (
               <div key={t.id} className="trainer-assess-card">
                 <div className="trainer-avatar" style={{
@@ -842,10 +972,30 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
 
       {/* Grade Overview Modal */}
       {overviewTrainer && (() => {
-        const { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev } = getGradeOverview(overviewTrainer);
+        if (loadingOverview) {
+          return (
+            <Modal title={`Grade Overview: <span style="color:var(--cyan)">${overviewTrainer.name}</span>`} onClose={() => setOverviewTrainer(null)}>
+              <div style={{ textAlign: "center", padding: "40px", color: "var(--muted)" }}>
+                Loading grade data...
+              </div>
+            </Modal>
+          );
+        }
+
+        if (!overviewData) {
+          return (
+            <Modal title={`Grade Overview: <span style="color:var(--cyan)">${overviewTrainer.name}</span>`} onClose={() => setOverviewTrainer(null)}>
+              <div style={{ textAlign: "center", padding: "40px", color: "var(--muted)" }}>
+                Failed to load grade data.
+              </div>
+            </Modal>
+          );
+        }
+
+        const { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev, st1Name, st2Name, adminName } = overviewData;
         const wc = gradeColor(weightedAvg);
         const sd = sdColor(stdDev);
-        const RaterLine = ({ label, score }) => (
+        const RaterLine = ({ label, score, name }) => (
           <div className="admin-rater-row">
             <span className="admin-rater-label">{label}</span>
             {score !== null && score > 0 ? (
@@ -857,6 +1007,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
                 <span className="admin-rater-badge" style={{ background: `${gradeColor(score)}22`, color: gradeColor(score), border: `1px solid ${gradeColor(score)}55` }}>
                   {gradeLabel(score)}
                 </span>
+                {name && <span className="admin-rater-name" style={{ fontSize: 10, color: "var(--muted)", marginLeft: 8 }}>{name}</span>}
               </>
             ) : (
               <span className="admin-rater-none" style={{ gridColumn: "2 / -1" }}>Not graded</span>
@@ -868,14 +1019,15 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             <div style={{ marginBottom: 6 }}>
               <div className="admin-grade-overview-label">Contributing Grades</div>
               <div className="admin-raters">
-                <RaterLine label="1 · Senior Trainer" score={st1Avg} />
-                <RaterLine label="2 · Senior Trainer" score={st2Avg} />
-                <RaterLine label="3 · Admin" score={adminAvg} />
+                {st1Avg !== null && <RaterLine label={`1 · Senior Trainer${st1Name ? ` (${st1Name})` : ''}`} score={st1Avg} />}
+                {st2Avg !== null && <RaterLine label={`2 · Senior Trainer${st2Name ? ` (${st2Name})` : ''}`} score={st2Avg} />}
+                {adminAvg !== null && <RaterLine label={`3 · Admin${adminName ? ` (${adminName})` : ''}`} score={adminAvg} />}
               </div>
             </div>
             <div className="admin-grade-key" style={{ marginBottom: 14 }}>
-              <span><span className="admin-key-dot" style={{ background: "#22C55E" }} />≥ 8.5 Excellent</span>
+              <span><span className="admin-key-dot" style={{ background: "#22C55E" }} />&gt;= 8.5 Excellent</span>
               <span><span className="admin-key-dot" style={{ background: "#F59E0B" }} />6–8.4 Good</span>
+              <span><span className="admin-key-dot" style={{ background: "#EF4444" }} />&lt; 6 Needs Work</span>
               <span><span className="admin-key-dot" style={{ background: "#EF4444" }} />Below 6 Needs Work</span>
             </div>
             <div className="admin-overview-divider" />
@@ -1889,6 +2041,32 @@ const sendNotification = async (order) => {
     </div>
   );
 };
+
+// ═══════════════════════════════════════════════════════════
+// REVIEWS PAGE
+// ═══════════════════════════════════════════════════════════
+const ReviewsPage = () => (
+  <div className="page-content">
+    <div className="section-label">Client <span>Reviews</span></div>
+    <div className="card">
+      {ALL_REVIEWS.map(r => (
+        <div key={r.id} className="review-item" style={{ marginBottom: 16 }}>
+          <div className="review-header">
+            <span className="reviewer-name">{r.client}</span>
+            <Stars n={r.stars} />
+            <Badge cls={r.type === "public" ? "badge-green" : "badge-cyan"}>
+              {r.type}
+            </Badge>
+          </div>
+          <div className="review-text">{r.text}</div>
+          <div className="review-meta" style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+            {r.date} • {r.trainer}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 // ═══════════════════════════════════════════════════════════
 // LIVE CHAT PAGE

@@ -17,6 +17,7 @@ from services.grades_service import (
     update_grade as svc_update,
     get_grades_for_trainer as svc_get_grades,
     get_all_trainers_with_grades as svc_get_trainers,
+    get_grades_for_trainer_month as svc_get_trainer_month_grades,
 )
 from utils.auth import require_admin_or_senior_trainer
 from routers.auth.auth import get_current_user
@@ -28,9 +29,11 @@ router = APIRouter(prefix="/api/grades", tags=["grades"])
 async def list_trainers_for_grading(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
+    senior_trainer_id: str = Query(None, description="Filter grades by specific senior trainer ID"),
 ):
-    """Return all non-senior trainers with their grades and per-month client ratings."""
-    return await svc_get_trainers(db)
+    """Return all non-senior trainers with their grades and client ratings.
+    If senior_trainer_id is provided, only return grades submitted by that senior trainer."""
+    return await svc_get_trainers(db, senior_trainer_id)
 
 
 @router.post("", response_model=GradeResponse, status_code=201)
@@ -59,3 +62,14 @@ async def get_grades(
     current_user=Depends(get_current_user),
 ):
     return await svc_get_grades(db, trainer_id)
+
+
+@router.get("/trainer-month")
+async def get_trainer_month_grades(
+    trainer_id: str = Query(..., description="Trainer UUID to fetch grades for"),
+    month_index: int = Query(..., description="Month index (0-11 for Jan-Dec)"),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get all grades for a specific trainer and month from different senior trainers"""
+    return await svc_get_trainer_month_grades(db, trainer_id, month_index)

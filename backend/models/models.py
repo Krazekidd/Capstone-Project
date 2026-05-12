@@ -1432,6 +1432,7 @@ class TrainerGrade(Base):
         CheckConstraint('month_index BETWEEN 0 AND 11', name='check_grade_month_index'),
         Index('idx_trainer_grades_trainer_id', 'trainer_id'),
         Index('idx_trainer_grades_submitted_by', 'submitted_by'),
+        Index('idx_trainer_grades_unique_trainer_month_submitter', 'trainer_id', 'month_index', 'submitted_by', unique=True),
     )
 
 class ShopCartItem(Base):

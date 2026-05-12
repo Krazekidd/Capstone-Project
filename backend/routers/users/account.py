@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func,desc, asc
+from sqlalchemy.orm import selectinload
 import uuid
 import json
 import logging
@@ -2337,7 +2338,7 @@ async def get_trainer_assessments(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Get assessment history for a trainer"""
-    from models import TrainerAssessment
+    from models import TrainerAssessment, Trainer
     
     if current_user["role"] not in ["admin", "trainer"]:
         raise HTTPException(status_code=403, detail="Not authorized")
@@ -2350,30 +2351,59 @@ async def get_trainer_assessments(
     
     result = await db.execute(
         select(TrainerAssessment)
-        .where(TrainerAssessment.trainer_id == trainer_id)
+        .options(selectinload(TrainerAssessment.assessor))
+                .where(TrainerAssessment.trainer_id == trainer_id)
         .order_by(TrainerAssessment.assessment_date.desc())
     )
     assessments = result.scalars().all()
     
-    return [
-        TrainerAssessmentResponse(
-            id=a.id,
-            trainer_id=a.trainer_id,
-            trainer_name=trainer_name,
-            performance_score=float(a.performance_score) if a.performance_score else 0,
-            motivation_score=float(a.motivation_score) if a.motivation_score else 0,
-            interaction_score=float(a.interaction_score) if a.interaction_score else 0,
-            knowledge_score=float(a.knowledge_score) if a.knowledge_score else 0,
-            punctuality_score=float(a.punctuality_score) if a.punctuality_score else 0,
-            average_score=float(a.average_score) if a.average_score else 0,
-            standing=a.standing or "",
-            assessment_date=a.assessment_date,
-            notes=a.notes,
-            created_at=a.created_at
+    async def get_assessor_role(assessor_user):
+        if not assessor_user:
+            return None
+        
+        # Check if user has admin role
+        if assessor_user.role == 'admin':
+            return 'admin'
+        
+        # Check if user has trainer profile and is senior
+        if assessor_user.role == 'trainer':
+            # Get trainer profile to check is_senior
+            trainer_result = await db.execute(
+                select(Trainer).where(Trainer.id == assessor_user.id)
+            )
+            trainer_profile = trainer_result.scalar_one_or_none()
+            if trainer_profile and trainer_profile.is_senior:
+                return 'senior_trainer'
+        
+        return 'trainer'  # default for regular trainers
+    
+    assessment_responses = []
+    for a in assessments:
+        assessor_role = await get_assessor_role(a.assessor)
+        
+        assessment_responses.append(
+            TrainerAssessmentResponse(
+                id=a.id,
+                trainer_id=a.trainer_id,
+                trainer_name=trainer_name,
+                performance_score=float(a.performance_score) if a.performance_score else 0,
+                motivation_score=float(a.motivation_score) if a.motivation_score else 0,
+                interaction_score=float(a.interaction_score) if a.interaction_score else 0,
+                knowledge_score=float(a.knowledge_score) if a.knowledge_score else 0,
+                punctuality_score=float(a.punctuality_score) if a.punctuality_score else 0,
+                average_score=float(a.average_score) if a.average_score else 0,
+                standing=a.standing or "",
+                assessment_date=a.assessment_date,
+                notes=a.notes,
+                created_at=a.created_at,
+                assessor_id=a.assessor_id,
+                assessor_name=f"{a.assessor.first_name} {a.assessor.last_name}" if a.assessor else None,
+                assessor_role=assessor_role
+            )
         )
-        for a in assessments
-    ]
-# Add these endpoints to account.py
+    
+    return assessment_responses
+
 
 @router.post("/admin/trainers", response_model=APIResponse)
 async def admin_create_trainer(
@@ -2413,6 +2443,7 @@ async def admin_create_trainer(
             name=f"{trainer_data.get('firstName')} {trainer_data.get('lastName')}",
             certification=trainer_data.get("role", "Trainer"),
             trainer_level=2 if trainer_data.get("role") == "Senior Trainer" else 1,
+            is_senior=True if trainer_data.get("role") == "Senior Trainer" else False,
             experience_years=trainer_data.get("experience", 0),
             specialties=[trainer_data.get("expertise", "Strength")],
             rating=0

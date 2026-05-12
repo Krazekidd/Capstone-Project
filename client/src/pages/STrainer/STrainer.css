@@ -822,6 +822,16 @@ button {
     background: rgba(255, 255, 255, 0.06);
 }
 
+.sd-dot-btn--my-grade {
+    border-color: var(--orange);
+    background: rgba(242, 101, 34, 0.15);
+    box-shadow: 0 0 0 1px rgba(242, 101, 34, 0.3);
+}
+
+.sd-dot-btn--my-grade:hover {
+    background: rgba(242, 101, 34, 0.25);
+}
+
 .sd-dot-m {
     font-family: var(--fc);
     font-size: 8px;
@@ -854,16 +864,39 @@ button {
 }
 
 .sd-dot-edit {
-    color: var(--warning);
+color: var(--warning);
 }
 
 .sd-dot-lock {
-    color: var(--muted);
+color: var(--muted);
+}
+
+.sd-dot-count {
+position: absolute;
+top: 2px;
+right: 2px;
+background: var(--orange);
+color: var(--white);
+font-family: var(--fc);
+font-size: 9px;
+font-weight: 700;
+width: 16px;
+height: 16px;
+border-radius: 50%;
+display: flex;
+align-items: center;
+justify-content: center;
+line-height: 1;
+border: 1px solid var(--black);
 }
 
 /* Row right summary */
 .sd-trainer-row-summary {
-    display: flex;
+display: flex;
+flex-direction: column;
+align-items: flex-end;
+gap: 3px;
+padding-left: 12px;
     flex-direction: column;
     align-items: flex-end;
     gap: 3px;

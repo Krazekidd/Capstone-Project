@@ -1696,9 +1696,10 @@ export const consultationsAPI = {
 };
 export const gradesAPI = {
   // GET /api/grades/trainers — all non-senior trainers with grades + client ratings
-  getTrainersForGrading: async () => {
+  getTrainersForGrading: async (seniorTrainerId = null) => {
     try {
-      const response = await axiosInstance.get('/api/grades/trainers');
+      const params = seniorTrainerId ? { senior_trainer_id: seniorTrainerId } : {};
+      const response = await axiosInstance.get('/api/grades/trainers', { params });
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch trainers' };
@@ -1712,6 +1713,18 @@ export const gradesAPI = {
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to fetch grades' };
+    }
+  },
+
+  // GET /api/grades/trainer-month?trainer_id=<uuid>&month_index=<int>
+  getTrainerMonthGrades: async (trainerId, monthIndex) => {
+    try {
+      const response = await axiosInstance.get('/api/grades/trainer-month', { 
+        params: { trainer_id: trainerId, month_index: monthIndex } 
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch trainer month grades' };
     }
   },
 

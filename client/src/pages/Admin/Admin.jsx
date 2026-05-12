@@ -514,7 +514,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             avg: gradeData.overall_avg || Object.values(gradeData.scores || {}).reduce((a, b) => a + b, 0) / 5,
             standing: gradeData.overall_avg >= 8.5 ? "Excellent" : gradeData.overall_avg >= 6 ? "Good" : "Needs Work",
             assessor_role: 'senior_trainer',
-            assessor_name: 'Senior Trainer', // We could get actual name from user data
+            assessor_name: gradeData.submitted_by_name || 'Senior Trainer', // Use actual name from user data
             assessment_date: new Date(gradeData.submitted_at).toISOString().split('T')[0],
             month: new Date(gradeData.submitted_at).toLocaleString("default", { month: "long", year: "numeric" }),
             date: new Date(gradeData.submitted_at).toLocaleDateString()

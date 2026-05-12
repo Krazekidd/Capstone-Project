@@ -12,6 +12,7 @@ import uuid
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from models.models import TrainerGrade, Trainer, TrainerRating
 from schemas.schemas import GradeSubmitRequest, GradeResponse, GradeListResponse
@@ -38,6 +39,10 @@ def _is_locked(submitted_at: datetime) -> bool:
 def _to_response(grade: TrainerGrade) -> GradeResponse:
     locked = _is_locked(grade.submitted_at)
     hrs = _hours_remaining(grade.submitted_at) if not locked else None
+    submitted_by_name = None
+    if grade.submitter:
+        # Get the full name from the related User model
+        submitted_by_name = f"{grade.submitter.first_name} {grade.submitter.last_name}".strip()
     return GradeResponse(
         id=str(grade.id),
         trainer_id=str(grade.trainer_id),
@@ -46,6 +51,7 @@ def _to_response(grade: TrainerGrade) -> GradeResponse:
         overall_avg=float(grade.overall_avg),
         notes=grade.notes,
         submitted_by=str(grade.submitted_by),
+        submitted_by_name=submitted_by_name,
         submitted_at=grade.submitted_at.isoformat(),
         finalised=grade.finalised,
         locked=locked,
@@ -114,6 +120,7 @@ async def get_grades_for_trainer(db: AsyncSession, trainer_id: str) -> GradeList
     result = await db.execute(
         select(TrainerGrade)
         .where(TrainerGrade.trainer_id == UUID(trainer_id))
+        .options(selectinload(TrainerGrade.submitter))
         .order_by(TrainerGrade.submitted_at.desc())
     )
     grades = result.scalars().all()
@@ -129,6 +136,7 @@ async def get_grades_for_trainer_month(db: AsyncSession, trainer_id: str, month_
         select(TrainerGrade)
         .where(TrainerGrade.trainer_id == UUID(trainer_id))
         .where(TrainerGrade.month_index == month_index)
+        .options(selectinload(TrainerGrade.submitter))
         .order_by(TrainerGrade.submitted_at.desc())
     )
     grades = result.scalars().all()
@@ -144,7 +152,6 @@ async def get_all_trainers_with_grades(db: AsyncSession, senior_trainer_id: str 
     If senior_trainer_id is provided, only return grades submitted by that senior trainer
     """
     from models.models import Trainer, TrainerRating, User
-    from sqlalchemy.orm import selectinload
     from sqlalchemy import extract
 
     # Load all non-senior trainers with their grades and ratings
@@ -152,7 +159,7 @@ async def get_all_trainers_with_grades(db: AsyncSession, senior_trainer_id: str 
         select(Trainer)
         .where(Trainer.is_senior == False)
         .options(
-            selectinload(Trainer.grades),
+            selectinload(Trainer.grades).selectinload(TrainerGrade.submitter),
             selectinload(Trainer.trainer_ratings),
             selectinload(Trainer.user),
         )
@@ -177,12 +184,18 @@ async def get_all_trainers_with_grades(db: AsyncSession, senior_trainer_id: str 
             locked = _is_locked(g.submitted_at)
             hrs = _hours_remaining(g.submitted_at) if not locked else None
             
+            # Get submitter name
+            submitted_by_name = None
+            if g.submitter:
+                submitted_by_name = f"{g.submitter.first_name} {g.submitter.last_name}".strip()
+            
             grade_data = {
                 "id": str(g.id),
                 "scores": g.scores,
                 "overall_avg": float(g.overall_avg),
                 "notes": g.notes,
                 "submitted_by": str(g.submitted_by) if g.submitted_by else None,
+                "submitted_by_name": submitted_by_name,
                 "submitted_at": g.submitted_at.isoformat(),
                 "finalised": g.finalised,
                 "locked": locked,
@@ -269,7 +282,6 @@ async def get_senior_trainer_performance(db: AsyncSession, trainer_id: str) -> d
         "myClient": [float]     # 12 values for Jan-Dec (1-5 scale)
     }
     """
-    from sqlalchemy.orm import selectinload
     from sqlalchemy import extract
     
     # Load senior trainer with their grades and ratings

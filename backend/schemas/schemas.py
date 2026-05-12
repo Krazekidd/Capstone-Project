@@ -1829,6 +1829,7 @@ class GradeResponse(BaseModel):
     overall_avg: float
     notes: Optional[str]
     submitted_by: str
+    submitted_by_name: Optional[str] = None
     submitted_at: str
     finalised: bool
     locked: bool

@@ -79,13 +79,7 @@ export default function Login() {
 
   // Check if already logged in and redirect based on role
   useEffect(() => {
-    // Check auth context first
-    if (isLoggedIn && user) {
-      const isSenior = user.role === 'trainer' && !!user.is_senior;
-      const redirectPath = isSenior ? '/STrainer' : getRedirectPath(user.role);
-      navigate(redirectPath);
-      return;
-    }
+
     
     // Fallback to token check via localStorage
     const token = authAPI.getToken();

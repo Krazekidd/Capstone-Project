@@ -139,7 +139,6 @@ class Client(Base):
     health_conditions = relationship("ClientHealthCondition", back_populates="client", cascade="all, delete-orphan")
     water_intake_records = relationship("ClientWaterIntake", back_populates="client", cascade="all, delete-orphan")
     strength_records = relationship("ClientStrengthRecord", back_populates="client", cascade="all, delete-orphan")
-    client_status = relationship("ClientStatus", back_populates="client", uselist=False, cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
@@ -240,6 +239,7 @@ class UserMembership(Base):
     # Relationships
     user = relationship("User", back_populates="user_memberships")
     plan = relationship("MembershipPlan", back_populates="user_memberships")
+    client_status = relationship("ClientStatus", back_populates="user_memberships", uselist=False, cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
@@ -1082,28 +1082,34 @@ class TrainerRating(Base):
     )
 
 
+# Update TrainerAssessment model in models.py
+
 class TrainerAssessment(Base):
     __tablename__ = "trainer_assessments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     trainer_id = Column(UUID(as_uuid=True), ForeignKey("trainers.id", ondelete="CASCADE"), nullable=False)
-    assessor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))  # Admin who assessed
-    assessment_date = Column(Date, nullable=False)
-    technical_score = Column(Numeric(5, 2))  # 0-100
-    communication_score = Column(Numeric(5, 2))  # 0-100
-    professionalism_score = Column(Numeric(5, 2))  # 0-100
-    overall_score = Column(Numeric(5, 2))  # 0-100
-    strengths = Column(Text)
-    areas_for_improvement = Column(Text)
+    assessor_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    assessment_date = Column(Date, nullable=False, default=_utcnow)
+    
+    # All 5 scoring categories
+    performance_score = Column(Numeric(5, 2))  # perf - Performance & Results
+    motivation_score = Column(Numeric(5, 2))   # motiv - Motivation & Energy
+    interaction_score = Column(Numeric(5, 2))  # interact - Client Interaction
+    knowledge_score = Column(Numeric(5, 2))    # knowledge - Technical Knowledge
+    punctuality_score = Column(Numeric(5, 2))  # punct - Punctuality
+    
+    average_score = Column(Numeric(5, 2))      # Calculated average
+    standing = Column(String(20))              # EXCELLENT, GOOD, WARNING, CRITICAL
     notes = Column(Text)
-    status = Column(String(20), nullable=False, default='completed')  # pending, completed, failed
+    
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    assessor_user = relationship("User", foreign_keys=[assessor_id])
     trainer = relationship("Trainer", back_populates="trainer_assessments")
-
+    assessor = relationship("User", foreign_keys=[assessor_id])
+    
     # Indexes
     __table_args__ = (
         Index('idx_trainer_assessments_trainer_id', 'trainer_id'),
@@ -1323,7 +1329,7 @@ class ClientStatus(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=False, unique=True)
-    status = Column(String(50), nullable=False, default='active')  # active, inactive, suspended, trial
+    status = Column(String(50),ForeignKey("user_memberships.status"), nullable=False)
     membership_type = Column(String(50))  # basic, premium, elite
     membership_expiry = Column(Date)
     last_active_date = Column(Date)
@@ -1332,7 +1338,7 @@ class ClientStatus(Base):
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
 
     # Relationships
-    client = relationship("Client", back_populates="client_status")
+    user_memberships = relationship("UserMembership", back_populates="client_status")
 
     # Indexes
     __table_args__ = (

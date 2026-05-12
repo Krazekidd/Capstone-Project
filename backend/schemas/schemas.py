@@ -1604,47 +1604,41 @@ class ProgressPhotoCreate(BaseModel):
 # Trainer Assessment Schemas
 # ---------------------------------------------------------------------------
 
+# Add/Update these schemas in schemas.py
+
 class TrainerAssessmentScores(BaseModel):
-    technical_score: Optional[float] = None
-    communication_score: Optional[float] = None
-    professionalism_score: Optional[float] = None
-    overall_score: Optional[float] = None
-
-    model_config = {"from_attributes": True}
-
+    """Scores for trainer assessment"""
+    perf: float = Field(..., ge=1, le=10, description="Performance & Results score")
+    motiv: float = Field(..., ge=1, le=10, description="Motivation & Energy score")
+    interact: float = Field(..., ge=1, le=10, description="Client Interaction score")
+    knowledge: float = Field(..., ge=1, le=10, description="Technical Knowledge score")
+    punct: float = Field(..., ge=1, le=10, description="Punctuality score")
 
 class TrainerAssessmentRequest(BaseModel):
+    """Request schema for trainer assessment - matches frontend structure"""
     trainer_id: uuid.UUID
-    assessment_date: date
-    technical_score: Optional[float] = None
-    communication_score: Optional[float] = None
-    professionalism_score: Optional[float] = None
-    overall_score: Optional[float] = None
-    strengths: Optional[str] = None
-    areas_for_improvement: Optional[str] = None
-    notes: Optional[str] = None
-    status: Optional[str] = "completed"
-
+    trainer_name: str
+    scores: TrainerAssessmentScores
+    average: float
+    standing: str
+    notes: Optional[str] = ""
 
 class TrainerAssessmentResponse(BaseModel):
     id: uuid.UUID
     trainer_id: uuid.UUID
-    assessor_id: Optional[uuid.UUID] = None
+    trainer_name: str
+    performance_score: float
+    motivation_score: float
+    interaction_score: float
+    knowledge_score: float
+    punctuality_score: float
+    average_score: float
+    standing: str
     assessment_date: date
-    technical_score: Optional[float] = None
-    communication_score: Optional[float] = None
-    professionalism_score: Optional[float] = None
-    overall_score: Optional[float] = None
-    strengths: Optional[str] = None
-    areas_for_improvement: Optional[str] = None
     notes: Optional[str] = None
-    status: str
     created_at: datetime
-    updated_at: datetime
 
     model_config = {"from_attributes": True}
-
-
 # ---------------------------------------------------------------------------
 # Badge Schemas
 # ---------------------------------------------------------------------------

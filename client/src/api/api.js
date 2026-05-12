@@ -877,15 +877,6 @@ export const adminAPI = {
     }
   },
   
-  getAllTrainers: async () => {
-    try {
-      const response = await axiosInstance.get('/account/admin/all-trainers');
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch trainers' };
-    }
-  },
-  
   createExcursion: async (excursionData) => {
     try {
       const response = await axiosInstance.post('/account/admin/excursions', excursionData);
@@ -913,14 +904,7 @@ export const adminAPI = {
     }
   },
   
-  saveTrainerAssessment: async (assessmentData) => {
-    try {
-      const response = await axiosInstance.post('/account/admin/trainer-assessments', assessmentData);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to save assessment' };
-    }
-  },
+
   
   getDashboardStats: async () => {
     try {
@@ -943,18 +927,36 @@ export const adminAPI = {
   getClientsWithStatus: async () => {
     try {
       const response = await axiosInstance.get('/account/admin/clients-with-status');
-      return response.data;
+      const data = response.data;
+      
+      // Handle both nested and flat response formats
+      if (Array.isArray(data)) {
+        if (data.length > 0 && 'client' in data[0]) {
+          // Nested format: { client: {...}, status: {...} }
+          return data.map(item => ({
+            id: item.client.id,
+            name: item.client.name,
+            email: item.client.email,
+            phone_number: item.client.phone_number,
+            height: item.client.height,
+            weight: item.client.weight,
+            birthday: item.client.birthday,
+            status: item.status?.status || "Active",
+            membership_plan: item.status?.membership_type || "Standard",
+            fitness_goal: item.status?.fitness_goal || "General Fitness",
+            progress_percentage: item.status?.progress_percentage || 0,
+            last_visit: item.status?.last_active_date,
+            created_at: item.client.created_at
+          }));
+        } else {
+          // Flat format already
+          return data;
+        }
+      }
+      return [];
     } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch clients' };
-    }
-  },
-  
-  getTrainerAssessments: async (trainerId) => {
-    try {
-      const response = await axiosInstance.get(`/account/admin/trainer-assessments/${trainerId}`);
-      return response.data;
-    } catch (error) {
-      throw error.response?.data || { detail: 'Failed to fetch assessments' };
+      console.error('Get clients with status error:', error);
+      return [];
     }
   },
   
@@ -1000,6 +1002,73 @@ export const adminAPI = {
     }
   },
 
+  saveTrainerAssessment: async (assessmentData) => {
+    try {
+      // The payload already matches the backend schema
+      const response = await axiosInstance.post('/account/admin/trainer-assessments', assessmentData);
+      return response.data;
+    } catch (error) {
+      console.error('Save trainer assessment error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to save assessment' };
+    }
+  },
+
+  getTrainerAssessments: async (trainerId) => {
+    try {
+      const response = await axiosInstance.get(`/account/admin/trainer-assessments/${trainerId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get trainer assessments error:', error.response?.data);
+      return []; // Return empty array on error
+    }
+  },
+
+  getAllTrainers: async () => {
+    try {
+      const response = await axiosInstance.get('/account/admin/all-trainers');
+      return response.data;
+    } catch (error) {
+      console.error('Get all trainers error:', error.response?.data);
+      return [];
+    }
+  },
+
+  createTrainer: async (trainerData) => {
+    try {
+      const response = await axiosInstance.post('/account/admin/trainers', trainerData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to create trainer' };
+    }
+  },
+
+  updateTrainer: async (trainerId, trainerData) => {
+    try {
+      const response = await axiosInstance.put(`/account/admin/trainers/${trainerId}`, trainerData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update trainer' };
+    }
+  },
+
+  deleteTrainer: async (trainerId) => {
+    try {
+      const response = await axiosInstance.delete(`/account/admin/trainers/${trainerId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to delete trainer' };
+    }
+  },
+
+  updateClientStatus: async (clientId, statusData) => {
+    try {
+      const response = await axiosInstance.put(`/account/admin/client-status/${clientId}`, statusData);
+      return response.data;
+    } catch (error) {
+      console.error('Update client status error:', error.response?.data);
+      throw error.response?.data || { detail: 'Failed to update client status' };
+    }
+  },
   // Additional admin functions
   getMemberStats: async () => {
     try {

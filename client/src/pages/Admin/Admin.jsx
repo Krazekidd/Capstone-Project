@@ -195,6 +195,11 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
   //   }).catch(err => console.error("Failed to load grade logs:", err));
   // }, []);
 
+  // Save grade log to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('gradeLog', JSON.stringify(gradeLog));
+  }, [gradeLog]);
+
   const avg = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
   const standing = getStanding(avg.toFixed(1));
 
@@ -212,13 +217,26 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
 
   const openAssess = async (t) => {
     const status = getGradeStatus(t.id);
-    if (!status.canGrade) { toast("This trainer has already been graded this month."); return; }
-    setScores({ perf: t.rating || 8, motiv: 8, interact: 8, knowledge: 8, punct: 8 });
+    if (!status.canGrade) { 
+      toast("This trainer has already been graded this month."); 
+      return; 
+    }
+    // Set default scores - use existing rating or defaults
+    setScores({ 
+      perf: t.rating || 7, 
+      motiv: 7, 
+      interact: 7, 
+      knowledge: 7, 
+      punct: 7 
+    });
     setAssessTrainer(t);
+    // Load existing assessments for this trainer
     try {
       const assessments = await adminAPI.getTrainerAssessments(t.id);
       setTrainerAssessments(prev => ({ ...prev, [t.id]: assessments }));
-    } catch (err) { console.error("Failed to load assessments:", err); /* non-blocking */ }
+    } catch (err) { 
+      console.error("Failed to load assessments:", err); 
+    }
   };
 
   const submitAssess = async () => {
@@ -226,29 +244,55 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     const a = parseFloat(avg.toFixed(1));
     const s = getStanding(a);
     const now = new Date();
-    // Always update local state immediately
+    const assessmentDate = now.toISOString().split('T')[0];
+    
+    // Update local state immediately
     setGradeLog(prev => ({ ...prev, [assessTrainer.id]: { date: now.toISOString() } }));
     setAssessHistory(prev => [{
-      trainer: assessTrainer.name, perf: scores.perf, motiv: scores.motiv,
-      interact: scores.interact, avg: a, standing: s.label,
+      trainer: assessTrainer.name, 
+      perf: scores.perf, 
+      motiv: scores.motiv,
+      interact: scores.interact, 
+      knowledge: scores.knowledge,
+      punct: scores.punct,
+      avg: a, 
+      standing: s.label,
       month: now.toLocaleString("default", { month: "long", year: "numeric" }),
       date: now.toLocaleDateString()
     }, ...prev]);
-    // Also update trainer rating locally
+    
+    // Update trainer rating locally
     setTrainers(prev => prev.map(t => t.id === assessTrainer.id ? { ...t, rating: a } : t));
     toast(`Assessment for ${assessTrainer.name} saved — Avg: ${a}`);
     setAssessTrainer(null);
-    setLoading(false);
-    // Try to persist to backend (non-blocking)
+    
+    // Persist to backend
     try {
-      await adminAPI.saveTrainerAssessment({
-        trainer_id: assessTrainer.id, trainer_name: assessTrainer.name,
-        scores, average: a, standing: s.label, notes: ""
-      });
+      const backendPayload = {
+        trainer_id: assessTrainer.id,
+        trainer_name: assessTrainer.name,
+        scores: {
+          perf: scores.perf,
+          motiv: scores.motiv,
+          interact: scores.interact,
+          knowledge: scores.knowledge,
+          punct: scores.punct
+        },
+        average: a,
+        standing: s.label,
+        notes: ""
+      };
+      
+      console.log('Saving assessment payload:', backendPayload);
+      await adminAPI.saveTrainerAssessment(backendPayload);
+      
       const updatedAssessments = await adminAPI.getTrainerAssessments(assessTrainer.id);
       setTrainerAssessments(prev => ({ ...prev, [assessTrainer.id]: updatedAssessments }));
     } catch (err) {
       console.error("Backend save failed (grade saved locally):", err);
+      toast("Assessment saved locally only. Backend error: " + (err.detail || err.message));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -256,78 +300,112 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     if (!addForm.firstName.trim() || !addForm.lastName.trim()) { toast("Please enter first and last name"); return; }
     if (!addForm.email.trim()) { toast("Please enter an email address"); return; }
     if (!addForm.password.trim()) { toast("Please enter a password"); return; }
-    const newTrainer = {
-      id: Date.now(),
-      name: `${addForm.firstName.trim()} ${addForm.lastName.trim()}`,
-      certification: addForm.role,
-      trainer_level: addForm.role === "Senior Trainer" ? 2 : 1,
-      experience_years: parseInt(addForm.experience) || 0,
-      certification_date: addForm.certDate,
-      rating: 0,
-      email: addForm.email.trim(),
-      expertise: addForm.expertise,
-      photo: addForm.photoPreview || null,
-    };
-    // When backend is ready, uncomment this and remove the id: Date.now() above (backend will assign id):
-    // const saved = await adminAPI.createTrainer(newTrainer);
-    // newTrainer.id = saved.id;
-    setTrainers(prev => [...prev, newTrainer]);
-    toast(`Trainer ${newTrainer.name} added successfully`);
-    setShowAddTrainer(false);
-    setAddForm({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "", email: "", password: "", expertise: "Strength", photo: null, photoPreview: null });
+    
+    setLoading(true);
+    try {
+      const newTrainer = {
+        firstName: addForm.firstName.trim(),
+        lastName: addForm.lastName.trim(),
+        email: addForm.email.trim(),
+        password: addForm.password,
+        role: addForm.role,
+        experience: parseInt(addForm.experience) || 0,
+        expertise: addForm.expertise,
+        certDate: addForm.certDate
+      };
+      
+      // Try to save to backend
+      const result = await adminAPI.createTrainer(newTrainer);
+      toast(`Trainer ${newTrainer.firstName} ${newTrainer.lastName} added successfully`);
+      
+      // Refresh trainers list
+      await onRefresh();
+    } catch (err) {
+      console.error("Failed to add trainer:", err);
+      toast("Failed to add trainer: " + (err.detail || err.message));
+    } finally {
+      setLoading(false);
+      setShowAddTrainer(false);
+      setAddForm({ firstName: "", lastName: "", role: "Trainer", certDate: "", experience: "", email: "", password: "", expertise: "Strength", photo: null, photoPreview: null });
+    }
   };
 
   const openEditTrainer = (t) => {
     const nameParts = (t.name || "").split(" ");
     setEditForm({
+      id: t.id,
       firstName: nameParts[0] || "",
       lastName: nameParts.slice(1).join(" ") || "",
       role: t.certification || "Trainer",
       certDate: t.certification_date || "",
       experience: t.experience_years || "",
       email: t.email || "",
-      expertise: t.expertise || "Strength",
-      photoPreview: t.photo || null,
-      photo: null,
+      expertise: t.specialties?.[0] || "Strength",
+      photoPreview: t.profile_image || null,
     });
     setEditTrainer(t);
   };
 
-  const submitEditTrainer = () => {
+  const submitEditTrainer = async () => {
     if (!editForm.firstName.trim() || !editForm.lastName.trim()) { toast("Please enter first and last name"); return; }
     if (!editForm.email.trim()) { toast("Please enter an email address"); return; }
-    const updatedTrainer = {
-      ...editTrainer,
-      name: `${editForm.firstName.trim()} ${editForm.lastName.trim()}`,
-      certification: editForm.role,
-      trainer_level: editForm.role === "Senior Trainer" ? 2 : 1,
-      experience_years: parseInt(editForm.experience) || 0,
-      certification_date: editForm.certDate,
-      email: editForm.email.trim(),
-      expertise: editForm.expertise,
-      photo: editForm.photoPreview || editTrainer.photo || null,
-    };
-    setTrainers(prev => prev.map(t => t.id === editTrainer.id ? updatedTrainer : t));
-    toast(`Trainer ${updatedTrainer.name} updated successfully`);
-    setEditTrainer(null);
-    setEditForm({});
+    
+    setLoading(true);
+    try {
+      const updatedData = {
+        firstName: editForm.firstName.trim(),
+        lastName: editForm.lastName.trim(),
+        email: editForm.email.trim(),
+        role: editForm.role,
+        experience: parseInt(editForm.experience) || 0,
+        expertise: editForm.expertise
+      };
+      
+      await adminAPI.updateTrainer(editTrainer.id, updatedData);
+      toast(`Trainer updated successfully`);
+      await onRefresh();
+    } catch (err) {
+      console.error("Failed to update trainer:", err);
+      toast("Failed to update trainer: " + (err.detail || err.message));
+    } finally {
+      setLoading(false);
+      setEditTrainer(null);
+      setEditForm({});
+    }
   };
 
-  const deleteTrainer = (t) => {
-    setTrainers(prev => prev.filter(tr => tr.id !== t.id));
-    setAssessHistory(prev => prev.filter(a => a.trainer !== t.name));
-    toast(`Trainer ${t.name} removed`);
-    setConfirmDeleteTrainer(null);
-    // When backend is ready: await adminAPI.deleteTrainer(t.id);
+  const deleteTrainer = async (t) => {
+    setLoading(true);
+    try {
+      await adminAPI.deleteTrainer(t.id);
+      setTrainers(prev => prev.filter(tr => tr.id !== t.id));
+      setAssessHistory(prev => prev.filter(a => a.trainer !== t.name));
+      toast(`Trainer ${t.name} removed`);
+    } catch (err) {
+      console.error("Failed to delete trainer:", err);
+      toast("Failed to delete trainer: " + (err.detail || err.message));
+    } finally {
+      setLoading(false);
+      setConfirmDeleteTrainer(null);
+    }
   };
 
-  const allHistory = assessHistory.length > 0 ? assessHistory :
-    Object.values(trainerAssessments).flat().map(a => ({
-      trainer: a.trainer_name, perf: a.performance_score, motiv: a.motivation_score,
-      interact: a.interaction_score, avg: a.average_score, standing: a.standing,
+  // Build history from both local state and backend assessments
+  const allHistory = [
+    ...assessHistory,
+    ...Object.values(trainerAssessments).flat().map(a => ({
+      trainer: a.trainer_name || a.trainer_id,
+      perf: a.performance_score,
+      motiv: a.motivation_score,
+      interact: a.interaction_score,
+      knowledge: a.knowledge_score,
+      punct: a.punctuality_score,
+      avg: a.average_score,
+      standing: a.standing,
       month: new Date(a.assessment_date).toLocaleString("default", { month: "long", year: "numeric" }),
       date: new Date(a.assessment_date).toLocaleDateString()
-    }));
+    }))
+  ];
 
   const historyByMonth = {};
   allHistory.forEach(a => {
@@ -336,26 +414,11 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     historyByMonth[m].push(a);
   });
 
-  const gradeColor = (s) => {
-    if (!s || s === 0) return "var(--muted)";
-    if (s >= 8.5) return "var(--green)";
-    if (s >= 6)   return "var(--orange)";
-    return "var(--red)";
-  };
-  const gradeLabel = (s) => {
-    if (!s || s === 0) return "Not Graded";
-    if (s >= 8.5) return "Excellent";
-    if (s >= 6)   return "Good";
-    return "Needs Work";
-  };
-  const sdColor = (sd) => sd === null ? "var(--muted)" : sd < 1 ? "var(--green)" : sd <= 2 ? "#F59E0B" : "var(--red)";
-  const sdMsg   = (sd) => sd === null ? "—" : sd < 1 ? "Raters are in agreement" : sd <= 2 ? "Raters slightly disagree" : "Raters strongly disagree";
-
   const getGradeOverview = (t) => {
     const tHistory = allHistory.filter(h => h.trainer === t.name).map(h => parseFloat(h.avg)).filter(v => !isNaN(v) && v > 0);
     const baseRating = t.rating || 0;
-    const st1Avg  = baseRating > 0 ? baseRating : null;
-    const st2Avg  = tHistory.length > 1 ? +(tHistory.slice(0, -1).reduce((a, b) => a + b, 0) / tHistory.slice(0, -1).length).toFixed(2) : null;
+    const st1Avg = baseRating > 0 ? baseRating : null;
+    const st2Avg = tHistory.length > 1 ? +(tHistory.slice(0, -1).reduce((a, b) => a + b, 0) / tHistory.slice(0, -1).length).toFixed(2) : null;
     const adminAvg = tHistory.length > 0 ? +tHistory[tHistory.length - 1].toFixed(2) : null;
     const raterScores = [st1Avg, st2Avg, adminAvg].filter(v => v !== null && v > 0);
     const weights = raterScores.length === 3 ? [0.35, 0.35, 0.30] : raterScores.length === 2 ? [0.50, 0.50] : [1.00];
@@ -365,6 +428,23 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
       : null;
     return { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev };
   };
+
+  const gradeColor = (s) => {
+    if (!s || s === 0) return "var(--muted)";
+    if (s >= 8.5) return "var(--green)";
+    if (s >= 6)   return "var(--orange)";
+    return "var(--red)";
+  };
+
+  const gradeLabel = (s) => {
+    if (!s || s === 0) return "Not Graded";
+    if (s >= 8.5) return "Excellent";
+    if (s >= 6)   return "Good";
+    return "Needs Work";
+  };
+
+  const sdColor = (sd) => sd === null ? "var(--muted)" : sd < 1 ? "var(--green)" : sd <= 2 ? "#F59E0B" : "var(--red)";
+  const sdMsg = (sd) => sd === null ? "—" : sd < 1 ? "Raters are in agreement" : sd <= 2 ? "Raters slightly disagree" : "Raters strongly disagree";
 
   const EXPERTISE_OPTIONS = ["Strength", "Power Lifting", "Olympic Lifting", "HIIT & Conditioning", "Mobility & Recovery"];
 
@@ -528,6 +608,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     <div className="page-content">
       <div className="section-label">Trainer <span>Assessments</span></div>
       <div className="g2">
+        {/* Trainer list column */}
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, letterSpacing: 2, color: "var(--cyan)" }}>
@@ -541,11 +622,13 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
               <button className="btn btn-green btn-sm" onClick={onRefresh}>⟳ Refresh</button>
             </div>
           </div>
+          
           {confirmDeleteTrainer === "select" && (
             <div style={{ marginBottom: 12, padding: "8px 12px", background: "rgba(255,92,92,0.08)", border: "1px solid rgba(255,92,92,0.25)", borderRadius: 6, fontSize: 11, color: "var(--red)", fontFamily: "'JetBrains Mono',monospace", letterSpacing: 0.5 }}>
               ⚠ SELECT A TRAINER BELOW TO DELETE
             </div>
           )}
+          
           {trainers.map(t => {
             const a = t.rating || 0;
             const s = getStanding(a);
@@ -553,43 +636,31 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
             return (
               <div key={t.id} className="trainer-assess-card">
                 <div className="trainer-avatar" style={{
-                  background: t.photo ? "transparent" : "var(--bg3)",
+                  background: t.profile_image ? "transparent" : "var(--bg3)",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: t.photo ? 0 : 24, overflow: "hidden"
+                  fontSize: t.profile_image ? 0 : 24, overflow: "hidden"
                 }}>
-                  {t.photo
-                    ? <img src={t.photo} alt={t.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  {t.profile_image
+                    ? <img src={t.profile_image} alt={t.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     : (t.name?.charAt(0) || "T")}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div className="trainer-card-name">{t.name}</div>
                   <div className="trainer-card-sub">{t.certification || "Certified Trainer"} · Level {t.trainer_level || 1}</div>
-                  {t.expertise && (
+                  {t.specialties && t.specialties[0] && (
                     <span style={{ display: "inline-block", marginTop: 4, fontSize: 10, fontFamily: "'JetBrains Mono',monospace", letterSpacing: 1, color: "var(--orange)", background: "rgba(242,101,34,0.12)", border: "1px solid rgba(242,101,34,0.3)", borderRadius: 3, padding: "2px 6px" }}>
-                      {t.expertise.toUpperCase()}
+                      {t.specialties[0].toUpperCase()}
                     </span>
                   )}
                   <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ fontSize: 10, letterSpacing: 1 }}
-                      onClick={() => setOverviewTrainer(t)}
-                    >
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, letterSpacing: 1 }} onClick={() => setOverviewTrainer(t)}>
                       📊 Grade Overview
                     </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      style={{ fontSize: 10, letterSpacing: 1, color: "var(--cyan)", borderColor: "rgba(0,168,204,0.35)" }}
-                      onClick={() => openEditTrainer(t)}
-                    >
+                    <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, letterSpacing: 1, color: "var(--cyan)", borderColor: "rgba(0,168,204,0.35)" }} onClick={() => openEditTrainer(t)}>
                       ✏️ Edit
                     </button>
                     {confirmDeleteTrainer === "select" && (
-                      <button
-                        className="btn btn-sm"
-                        style={{ fontSize: 10, letterSpacing: 1, color: "var(--red)", background: "rgba(255,92,92,0.1)", border: "1px solid rgba(255,92,92,0.4)" }}
-                        onClick={() => setConfirmDeleteTrainer(t)}
-                      >
+                      <button className="btn btn-sm" style={{ fontSize: 10, letterSpacing: 1, color: "var(--red)", background: "rgba(255,92,92,0.1)", border: "1px solid rgba(255,92,92,0.4)" }} onClick={() => setConfirmDeleteTrainer(t)}>
                         🗑 Delete
                       </button>
                     )}
@@ -611,6 +682,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
           })}
         </div>
 
+        {/* History column */}
         <div className="card">
           <div className="card-title">📋 Assessment History</div>
           {Object.keys(historyByMonth).length === 0 ? (
@@ -622,7 +694,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
                 <div className="tbl-wrap">
                   <table>
                     <thead>
-                      <tr><th>Trainer</th><th>Perf</th><th>Motiv</th><th>Interact</th><th>Avg</th><th>Standing</th><th>Date</th></tr>
+                      <tr><th>Trainer</th><th>Perf</th><th>Motiv</th><th>Interact</th><th>Know</th><th>Punct</th><th>Avg</th><th>Standing</th><th>Date</th></tr>
                     </thead>
                     <tbody>
                       {entries.map((a, i) => {
@@ -630,7 +702,11 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
                         return (
                           <tr key={i}>
                             <td style={{ fontWeight: 600 }}>{a.trainer}</td>
-                            <td>{a.perf}</td><td>{a.motiv}</td><td>{a.interact}</td>
+                            <td>{a.perf}</td>
+                            <td>{a.motiv}</td>
+                            <td>{a.interact}</td>
+                            <td>{a.knowledge || "—"}</td>
+                            <td>{a.punct || "—"}</td>
                             <td style={{ fontWeight: 700, color: "var(--cyan)" }}>{a.avg}</td>
                             <td><Badge cls={st.cls}>{st.label}</Badge></td>
                             <td style={{ fontSize: 11 }}>{a.date}</td>
@@ -646,10 +722,125 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
         </div>
       </div>
 
-      {addTrainerModalJSX}
-      {editTrainerModalJSX}
-      {deleteConfirmModalJSX}
+      {/* Modals - keep your existing modal JSX */}
+      {showAddTrainer && (
+        <Modal title="Add <span style='color:var(--cyan)'>New Trainer</span>" onClose={() => setShowAddTrainer(false)}>
+          {/* Keep your existing add trainer form JSX */}
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+            <label style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 80, height: 80, borderRadius: "50%",
+                background: addForm.photoPreview ? "transparent" : "var(--bg3, #1e1e1e)",
+                border: "2px dashed var(--cyan)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden", fontSize: addForm.photoPreview ? 0 : 28
+              }}>
+                {addForm.photoPreview
+                  ? <img src={addForm.photoPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : "📷"}
+              </div>
+              <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--cyan)", fontFamily: "'JetBrains Mono',monospace" }}>
+                {addForm.photoPreview ? "CHANGE PHOTO" : "UPLOAD PHOTO"}
+              </span>
+              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => handlePhotoChange(e, setAddForm)} />
+            </label>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>First Name</label><input value={addForm.firstName} onChange={e => setAddForm(p => ({ ...p, firstName: e.target.value }))} placeholder="First name" /></div>
+            <div className="form-group"><label>Last Name</label><input value={addForm.lastName} onChange={e => setAddForm(p => ({ ...p, lastName: e.target.value }))} placeholder="Last name" /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>Email</label><input type="email" value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} placeholder="trainer@gym.com" /></div>
+            <div className="form-group"><label>Password</label><input type="password" value={addForm.password} onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))} placeholder="Set password" /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>Role</label>
+              <select value={addForm.role} onChange={e => setAddForm(p => ({ ...p, role: e.target.value }))}>
+                <option value="Trainer">Trainer</option>
+                <option value="Senior Trainer">Senior Trainer</option>
+              </select>
+            </div>
+            <div className="form-group"><label>Expertise</label>
+              <select value={addForm.expertise} onChange={e => setAddForm(p => ({ ...p, expertise: e.target.value }))}>
+                {EXPERTISE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>Certification Date</label><input type="date" value={addForm.certDate} onChange={e => setAddForm(p => ({ ...p, certDate: e.target.value }))} /></div>
+            <div className="form-group"><label>Experience (yrs)</label><input type="number" min="0" max="50" value={addForm.experience} onChange={e => setAddForm(p => ({ ...p, experience: e.target.value }))} placeholder="Years of experience" /></div>
+          </div>
+          <button className="btn btn-cyan" style={{ width: "100%", marginTop: 16, padding: 12 }} onClick={submitAddTrainer} disabled={loading}>
+            {loading ? "Adding..." : "Add Trainer"}
+          </button>
+        </Modal>
+      )}
 
+      {editTrainer && (
+        <Modal title={`Edit <span style='color:var(--cyan)'>${editTrainer.name}</span>`} onClose={() => setEditTrainer(null)}>
+          {/* Edit trainer form JSX */}
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+            <label style={{ cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 80, height: 80, borderRadius: "50%",
+                background: editForm.photoPreview ? "transparent" : "var(--bg3, #1e1e1e)",
+                border: "2px dashed var(--cyan)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden", fontSize: editForm.photoPreview ? 0 : 28
+              }}>
+                {editForm.photoPreview
+                  ? <img src={editForm.photoPreview} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : "📷"}
+              </div>
+              <span style={{ fontSize: 10, letterSpacing: 1, color: "var(--cyan)", fontFamily: "'JetBrains Mono',monospace" }}>
+                {editForm.photoPreview ? "CHANGE PHOTO" : "UPLOAD PHOTO"}
+              </span>
+              <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => handlePhotoChange(e, setEditForm)} />
+            </label>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>First Name</label><input value={editForm.firstName} onChange={e => setEditForm(p => ({ ...p, firstName: e.target.value }))} /></div>
+            <div className="form-group"><label>Last Name</label><input value={editForm.lastName} onChange={e => setEditForm(p => ({ ...p, lastName: e.target.value }))} /></div>
+          </div>
+          <div className="form-group"><label>Email</label><input type="email" value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} /></div>
+          <div className="form-row">
+            <div className="form-group"><label>Role</label>
+              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))}>
+                <option value="Trainer">Trainer</option>
+                <option value="Senior Trainer">Senior Trainer</option>
+              </select>
+            </div>
+            <div className="form-group"><label>Expertise</label>
+              <select value={editForm.expertise} onChange={e => setEditForm(p => ({ ...p, expertise: e.target.value }))}>
+                {EXPERTISE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label>Certification Date</label><input type="date" value={editForm.certDate} onChange={e => setEditForm(p => ({ ...p, certDate: e.target.value }))} /></div>
+            <div className="form-group"><label>Experience (yrs)</label><input type="number" min="0" max="50" value={editForm.experience} onChange={e => setEditForm(p => ({ ...p, experience: e.target.value }))} /></div>
+          </div>
+          <button className="btn btn-cyan" style={{ width: "100%", marginTop: 16, padding: 12 }} onClick={submitEditTrainer} disabled={loading}>
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
+        </Modal>
+      )}
+
+      {confirmDeleteTrainer && confirmDeleteTrainer !== "select" && (
+        <Modal title={`Delete <span style='color:var(--red)'>${confirmDeleteTrainer.name}</span>?`} onClose={() => setConfirmDeleteTrainer(null)}>
+          <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 8 }}>
+            This will permanently remove <strong style={{ color: "var(--off-white)" }}>{confirmDeleteTrainer.name}</strong> and all their assessment history. This action cannot be undone.
+          </p>
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button className="btn btn-ghost" style={{ flex: 1, padding: 12 }} onClick={() => setConfirmDeleteTrainer(null)}>Cancel</button>
+            <button className="btn" style={{ flex: 1, padding: 12, background: "rgba(255,92,92,0.15)", color: "var(--red)", border: "1px solid rgba(255,92,92,0.5)", fontFamily: "var(--font-condensed)", letterSpacing: 1, fontWeight: 700 }} onClick={() => deleteTrainer(confirmDeleteTrainer)}>
+              🗑 Confirm Delete
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Grade Overview Modal */}
       {overviewTrainer && (() => {
         const { st1Avg, st2Avg, adminAvg, weightedAvg, stdDev } = getGradeOverview(overviewTrainer);
         const wc = gradeColor(weightedAvg);
@@ -679,7 +870,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
               <div className="admin-raters">
                 <RaterLine label="1 · Senior Trainer" score={st1Avg} />
                 <RaterLine label="2 · Senior Trainer" score={st2Avg} />
-                <RaterLine label="3 · Admin"           score={adminAvg} />
+                <RaterLine label="3 · Admin" score={adminAvg} />
               </div>
             </div>
             <div className="admin-grade-key" style={{ marginBottom: 14 }}>
@@ -722,6 +913,7 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
         );
       })()}
 
+      {/* Assessment Modal */}
       {assessTrainer && (
         <Modal title={`Assess: <span style="color:var(--cyan)">${assessTrainer.name}</span>`} onClose={() => setAssessTrainer(null)}>
           {ASSESS_CATS.map(cat => (
@@ -750,23 +942,6 @@ const TrainersPage = ({ trainers, setTrainers, assessHistory, setAssessHistory, 
     </div>
   );
 };
-
-const ReviewsPage = () => (
-  <div className="page-content">
-    <div className="section-label">Client <span>Reviews</span></div>
-    <div className="card">
-      {ALL_REVIEWS.map(r => (
-        <div key={r.id} className="review-item">
-          <div className="review-header">
-            <span className="reviewer-name">{r.client}</span>
-            <Stars n={r.stars} />
-          </div>
-          <div className="review-text">{r.text}</div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
 
 // ═══════════════════════════════════════════════════════════
 // PURCHASES PAGE
@@ -842,7 +1017,6 @@ const ClientsPage = ({ clients, setClients, toast, onRefresh }) => {
   const [editForm, setEditForm] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // Calculate status counts from actual client data
   const statusCounts = {
     Active: clients.filter(c => c.status === "Active").length,
     Inactive: clients.filter(c => c.status === "Inactive").length,
@@ -861,21 +1035,36 @@ const ClientsPage = ({ clients, setClients, toast, onRefresh }) => {
 
   const openEdit = (c) => {
     setEditClient(c);
-    setEditForm({ ...c });
+    setEditForm({
+      id: c.id,
+      name: c.name || "",
+      email: c.email || "",
+      phone_number: c.phone_number || "",
+      status: c.status || "Active",
+      membership_plan: c.membership_plan || "Standard",
+      fitness_goal: c.fitness_goal || "General Fitness",
+      progress_percentage: c.progress_percentage || 0
+    });
   };
 
   const saveEdit = async () => {
     setLoading(true);
     try {
-      await adminAPI.updateClientStatus(editClient.id, {
+      // Only send the fields that should be updated
+      const updateData = {
+        name: editForm.name,
+        email: editForm.email,
+        phone_number: editForm.phone_number,
         status: editForm.status,
         membership_plan: editForm.membership_plan,
         fitness_goal: editForm.fitness_goal,
         progress_percentage: editForm.progress_percentage
-      });
+      };
+      
+      await adminAPI.updateClientStatus(editClient.id, updateData);
       toast(`${editForm.name} updated successfully`);
       setEditClient(null);
-      onRefresh();
+      onRefresh(); // Refresh the data from backend
     } catch (err) {
       console.error("Failed to update client:", err);
       toast("Failed to update client: " + (err.detail || err.message));
@@ -884,10 +1073,18 @@ const ClientsPage = ({ clients, setClients, toast, onRefresh }) => {
     }
   };
 
-  if (loading && clients.length === 0) {
+  if (!clients || clients.length === 0) {
     return (
       <div className="page-content">
-        <div className="loading-container">Loading clients...</div>
+        <div className="section-label">Client <span>Overview</span></div>
+        <div className="card">
+          <p style={{ textAlign: "center", padding: "40px", color: "var(--muted)" }}>
+            No clients found. Click refresh to load data.
+          </p>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <button className="btn btn-cyan" onClick={onRefresh}>⟳ Refresh</button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -896,7 +1093,6 @@ const ClientsPage = ({ clients, setClients, toast, onRefresh }) => {
     <div className="page-content">
       <div className="section-label">Client <span>Overview</span></div>
 
-      {/* Status Cards with REAL counts */}
       <div className="g4" style={{ marginBottom: 20 }}>
         {[
           { num: statusCounts.New, label: "New (This Month)", cls: "cyan", col: "var(--cyan)" },
@@ -914,19 +1110,30 @@ const ClientsPage = ({ clients, setClients, toast, onRefresh }) => {
       <div className="card">
         <div className="card-title">All Clients</div>
         <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-          <input placeholder="🔍 Search client…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ background: "var(--bg3)", border: "1px solid var(--border)", padding: "8px 14px", borderRadius: 8, width: 220 }} />
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-            style={{ background: "var(--bg3)", border: "1px solid var(--border)", padding: "8px 12px", borderRadius: 8 }}>
+          <input 
+            placeholder="🔍 Search client…" 
+            value={search} 
+            onChange={e => setSearch(e.target.value)}
+            style={{ background: "var(--bg3)", border: "1px solid var(--border)", padding: "8px 14px", borderRadius: 8, width: 220 }} 
+          />
+          <select 
+            value={statusFilter} 
+            onChange={e => setStatusFilter(e.target.value)}
+            style={{ background: "var(--bg3)", border: "1px solid var(--border)", padding: "8px 12px", borderRadius: 8 }}
+          >
             <option value="">All Status</option>
-            <option>Active</option><option>Inactive</option><option>New</option>
+            <option>Active</option>
+            <option>Inactive</option>
+            <option>New</option>
           </select>
           <button className="btn btn-ghost" onClick={onRefresh}>⟳ Refresh</button>
         </div>
         <div className="tbl-wrap">
           <table>
             <thead>
-              <tr><th>Name</th><th>Status</th><th>Email</th><th>Phone</th><th>Plan</th><th>Goal</th><th>Progress</th><th></th></tr>
+              <tr>
+                <th>Name</th><th>Status</th><th>Email</th><th>Phone</th><th>Plan</th><th>Goal</th><th>Progress</th><th></th>
+              </tr>
             </thead>
             <tbody>
               {filtered.map(c => (
@@ -946,43 +1153,107 @@ const ClientsPage = ({ clients, setClients, toast, onRefresh }) => {
         </div>
       </div>
 
+      {/* Edit Modal - Only showing editable fields */}
       {editClient && (
-        <Modal title={`Edit Client: <span>${editClient.name}</span>`} onClose={() => setEditClient(null)}>
+        <Modal title={`Edit Client: <span style="color:var(--cyan)">${editClient.name}</span>`} onClose={() => setEditClient(null)}>
           <div className="form-row">
-            <div className="form-group"><label>Name</label><input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} /></div>
-            <div className="form-group"><label>Email</label><input value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} /></div>
+            <div className="form-group">
+              <label>Full Name</label>
+              <input 
+                value={editForm.name} 
+                onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} 
+                placeholder="Client full name"
+              />
+            </div>
+            <div className="form-group">
+              <label>Email</label>
+              <input 
+                type="email" 
+                value={editForm.email} 
+                onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} 
+                placeholder="client@example.com"
+              />
+            </div>
           </div>
+          
           <div className="form-row">
-            <div className="form-group"><label>Phone</label><input value={editForm.phone_number} onChange={e => setEditForm(p => ({ ...p, phone_number: e.target.value }))} /></div>
-            <div className="form-group"><label>Status</label>
-              <select value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}>
-                <option>Active</option><option>Inactive</option><option>New</option>
+            <div className="form-group">
+              <label>Phone Number</label>
+              <input 
+                value={editForm.phone_number} 
+                onChange={e => setEditForm(p => ({ ...p, phone_number: e.target.value }))} 
+                placeholder="(876) 555-1234"
+              />
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select 
+                value={editForm.status} 
+                onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}
+              >
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="New">New</option>
               </select>
             </div>
           </div>
+          
           <div className="form-row">
-            <div className="form-group"><label>Membership Plan</label>
-              <select value={editForm.membership_plan} onChange={e => setEditForm(p => ({ ...p, membership_plan: e.target.value }))}>
-                <option>Premium</option><option>Standard</option><option>Basic</option>
+            <div className="form-group">
+              <label>Membership Plan</label>
+              <select 
+                value={editForm.membership_plan} 
+                onChange={e => setEditForm(p => ({ ...p, membership_plan: e.target.value }))}
+              >
+                <option value="Premium">Premium</option>
+                <option value="Standard">Standard</option>
+                <option value="Basic">Basic</option>
               </select>
             </div>
-            <div className="form-group"><label>Fitness Goal</label>
-              <select value={editForm.fitness_goal} onChange={e => setEditForm(p => ({ ...p, fitness_goal: e.target.value }))}>
-                <option>Weight Loss</option><option>Muscle Gain</option><option>Endurance</option><option>Flexibility</option><option>Strength</option>
+            <div className="form-group">
+              <label>Fitness Goal</label>
+              <select 
+                value={editForm.fitness_goal} 
+                onChange={e => setEditForm(p => ({ ...p, fitness_goal: e.target.value }))}
+              >
+                <option value="Weight Loss">Weight Loss</option>
+                <option value="Muscle Gain">Muscle Gain</option>
+                <option value="Endurance">Endurance</option>
+                <option value="Flexibility">Flexibility</option>
+                <option value="Strength">Strength</option>
+                <option value="General Fitness">General Fitness</option>
               </select>
             </div>
           </div>
+          
           <div className="form-group">
             <label>Progress ({editForm.progress_percentage || 0}%)</label>
-            <input type="range" className="range-slider" min="0" max="100"
+            <input 
+              type="range" 
+              className="range-slider" 
+              min="0" 
+              max="100"
               value={editForm.progress_percentage || 0}
-              onChange={e => setEditForm(p => ({ ...p, progress_percentage: parseInt(e.target.value) }))} />
+              onChange={e => setEditForm(p => ({ ...p, progress_percentage: parseInt(e.target.value) }))} 
+            />
           </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-            <button className="btn btn-cyan" style={{ flex: 1 }} onClick={saveEdit} disabled={loading}>
+          
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <button 
+              className="btn btn-cyan" 
+              style={{ flex: 1, padding: 12 }} 
+              onClick={saveEdit} 
+              disabled={loading}
+            >
               {loading ? "Saving..." : "Save Changes"}
             </button>
-            <button className="btn btn-ghost" onClick={() => setEditClient(null)}>Cancel</button>
+            <button 
+              className="btn btn-ghost" 
+              style={{ flex: 1, padding: 12 }} 
+              onClick={() => setEditClient(null)}
+            >
+              Cancel
+            </button>
           </div>
         </Modal>
       )}

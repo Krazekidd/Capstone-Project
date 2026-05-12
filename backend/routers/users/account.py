@@ -2284,11 +2284,13 @@ async def save_trainer_assessment(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    trainer_id_bytes = assessment.trainer_id.bytes
+    trainer_id = assessment.trainer_id
     
+    # Create new assessment with all 5 scores
     new_assessment = TrainerAssessment(
-        trainer_id=trainer_id_bytes,
-        trainer_name=assessment.trainer_name,
+        trainer_id=trainer_id,
+        assessor_id=current_user["user_id"],
+        assessment_date=datetime.utcnow().date(),
         performance_score=assessment.scores.perf,
         motivation_score=assessment.scores.motiv,
         interaction_score=assessment.scores.interact,
@@ -2296,23 +2298,23 @@ async def save_trainer_assessment(
         punctuality_score=assessment.scores.punct,
         average_score=assessment.average,
         standing=assessment.standing,
-        assessment_date=datetime.utcnow().date(),
         notes=assessment.notes
     )
     
     db.add(new_assessment)
     await db.commit()
+    await db.refresh(new_assessment)
     
-    # Also update trainer's overall rating (average of all assessments)
+    # Update trainer's overall rating (average of all average_scores)
     result = await db.execute(
         select(func.avg(TrainerAssessment.average_score))
-        .where(TrainerAssessment.trainer_id == trainer_id_bytes)
+        .where(TrainerAssessment.trainer_id == trainer_id)
     )
     avg_rating = result.scalar() or 0
     
     await db.execute(
         update(Trainer)
-        .where(Trainer.id == trainer_id_bytes)
+        .where(Trainer.id == trainer_id)
         .values(rating=float(avg_rating))
     )
     await db.commit()
@@ -2320,8 +2322,12 @@ async def save_trainer_assessment(
     return APIResponse(
         success=True,
         message="Assessment saved successfully",
-        data={"id": new_assessment.id, "average_rating": float(avg_rating)}
+        data={
+            "id": str(new_assessment.id), 
+            "average_rating": float(avg_rating)
+        }
     )
+
 
 @router.get("/admin/trainer-assessments/{trainer_id}", response_model=List[TrainerAssessmentResponse])
 async def get_trainer_assessments(
@@ -2332,14 +2338,18 @@ async def get_trainer_assessments(
     """Get assessment history for a trainer"""
     from models import TrainerAssessment
     
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user["role"] not in ["admin", "trainer"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
     
-    trainer_id_bytes = trainer_id.bytes
+    # First get trainer name
+    trainer_result = await db.execute(
+        select(Trainer.name).where(Trainer.id == trainer_id)
+    )
+    trainer_name = trainer_result.scalar_one_or_none() or "Unknown"
     
     result = await db.execute(
         select(TrainerAssessment)
-        .where(TrainerAssessment.trainer_id == trainer_id_bytes)
+        .where(TrainerAssessment.trainer_id == trainer_id)
         .order_by(TrainerAssessment.assessment_date.desc())
     )
     assessments = result.scalars().all()
@@ -2348,25 +2358,155 @@ async def get_trainer_assessments(
         TrainerAssessmentResponse(
             id=a.id,
             trainer_id=a.trainer_id,
-            trainer_name=a.trainer_name,
+            trainer_name=trainer_name,
             performance_score=float(a.performance_score) if a.performance_score else 0,
             motivation_score=float(a.motivation_score) if a.motivation_score else 0,
             interaction_score=float(a.interaction_score) if a.interaction_score else 0,
             knowledge_score=float(a.knowledge_score) if a.knowledge_score else 0,
             punctuality_score=float(a.punctuality_score) if a.punctuality_score else 0,
             average_score=float(a.average_score) if a.average_score else 0,
-            standing=a.standing,
+            standing=a.standing or "",
             assessment_date=a.assessment_date,
             notes=a.notes,
             created_at=a.created_at
         )
         for a in assessments
     ]
+# Add these endpoints to account.py
 
+@router.post("/admin/trainers", response_model=APIResponse)
+async def admin_create_trainer(
+    trainer_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Admin endpoint to create a new trainer"""
+    from models import Trainer, User
+    
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    try:
+        # Check if user already exists
+        existing_user = await db.execute(
+            select(User).where(User.email == trainer_data.get("email"))
+        )
+        if existing_user.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="User with this email already exists")
+        
+        # Create user account
+        from ..auth.auth import get_password_hash
+        new_user = User(
+            email=trainer_data.get("email"),
+            password_hash=get_password_hash(trainer_data.get("password")),
+            first_name=trainer_data.get("firstName"),
+            last_name=trainer_data.get("lastName"),
+            role="trainer"
+        )
+        db.add(new_user)
+        await db.flush()
+        
+        # Create trainer profile
+        new_trainer = Trainer(
+            id=new_user.id,
+            name=f"{trainer_data.get('firstName')} {trainer_data.get('lastName')}",
+            certification=trainer_data.get("role", "Trainer"),
+            trainer_level=2 if trainer_data.get("role") == "Senior Trainer" else 1,
+            experience_years=trainer_data.get("experience", 0),
+            specialties=[trainer_data.get("expertise", "Strength")],
+            rating=0
+        )
+        db.add(new_trainer)
+        await db.commit()
+        
+        return APIResponse(
+            success=True,
+            message=f"Trainer {new_trainer.name} created successfully",
+            data={"id": str(new_trainer.id)}
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating trainer: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/admin/trainers/{trainer_id}", response_model=APIResponse)
+async def admin_update_trainer(
+    trainer_id: uuid.UUID,
+    trainer_data: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Admin endpoint to update a trainer"""
+    from models import Trainer, User
+    
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    result = await db.execute(
+        select(Trainer, User).join(User, Trainer.id == User.id)
+        .where(Trainer.id == trainer_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Trainer not found")
+    
+    trainer, user = row
+    
+    # Update trainer fields
+    update_values = {}
+    if "firstName" in trainer_data and "lastName" in trainer_data:
+        trainer.name = f"{trainer_data['firstName']} {trainer_data['lastName']}"
+    if "role" in trainer_data:
+        trainer.certification = trainer_data["role"]
+        trainer.trainer_level = 2 if trainer_data["role"] == "Senior Trainer" else 1
+    if "experience" in trainer_data:
+        trainer.experience_years = trainer_data["experience"]
+    if "expertise" in trainer_data:
+        trainer.specialties = [trainer_data["expertise"]]
+    
+    # Update user email if changed
+    if "email" in trainer_data and trainer_data["email"] != user.email:
+        user.email = trainer_data["email"]
+    
+    await db.commit()
+    
+    return APIResponse(success=True, message=f"Trainer {trainer.name} updated successfully")
+
+
+@router.delete("/admin/trainers/{trainer_id}", response_model=APIResponse)
+async def admin_delete_trainer(
+    trainer_id: uuid.UUID,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_user_db)
+):
+    """Admin endpoint to delete a trainer"""
+    from models import Trainer, User
+    
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    # Check if trainer exists
+    result = await db.execute(
+        select(Trainer).where(Trainer.id == trainer_id)
+    )
+    trainer = result.scalar_one_or_none()
+    if not trainer:
+        raise HTTPException(status_code=404, detail="Trainer not found")
+    
+    trainer_name = trainer.name
+    
+    # Delete trainer (cascade will handle User due to foreign key)
+    await db.execute(delete(Trainer).where(Trainer.id == trainer_id))
+    await db.execute(delete(User).where(User.id == trainer_id))
+    await db.commit()
+    
+    return APIResponse(success=True, message=f"Trainer {trainer_name} deleted successfully")
 # ============================================================
 # ADMIN - CLIENTS WITH STATUS ENDPOINTS
 # ============================================================
-
 @router.get("/admin/clients-with-status", response_model=List[ClientWithStatusResponse])
 async def admin_get_clients_with_status(
     current_user: dict = Depends(get_current_user),
@@ -2388,24 +2528,54 @@ async def admin_get_clients_with_status(
     
     clients = []
     for client, email, status in rows:
-        clients.append(ClientWithStatusResponse(
+        # Create ClientAccount object
+        client_account = ClientAccount(
             id=client.id,
             name=client.name,
             email=email,
+            gender=client.gender,
             phone_number=client.phone_number,
+            birthday=client.birthday,
             height=client.height,
             weight=client.weight,
-            birthday=client.birthday,
+            profile_image=client.profile_image,
+            created_at=client.created_at,
+            updated_at=client.updated_at
+        )
+        
+        # Create ClientStatusResponse object
+        status_response = ClientStatusResponse(
+            id=status.id if status else uuid.uuid4(),
+            client_id=client.id,
             status=status.status if status else "Active",
-            membership_plan=status.membership_plan if status else "Standard",
-            fitness_goal=status.fitness_goal if status else "General Fitness",
-            progress_percentage=status.progress_percentage if status else 0,
-            last_visit=status.last_visit if status else None,
-            created_at=client.created_at
+            membership_type=status.membership_type if status else None,
+            membership_expiry=status.membership_expiry if status else None,
+            last_active_date=status.last_active_date if status else None,
+            notes=status.notes if status else None,
+            created_at=status.created_at if status else datetime.utcnow(),
+            updated_at=status.updated_at if status else datetime.utcnow()
+        ) if status else None
+        
+        # If no status record exists, create a default one
+        if not status_response:
+            status_response = ClientStatusResponse(
+                id=uuid.uuid4(),
+                client_id=client.id,
+                status="Active",
+                membership_type=None,
+                membership_expiry=None,
+                last_active_date=None,
+                notes=None,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+        
+        clients.append(ClientWithStatusResponse(
+            client=client_account,
+            status=status_response
         ))
     
     return clients
-
 @router.put("/admin/client-status/{client_id}", response_model=APIResponse)
 async def admin_update_client_status(
     client_id: uuid.UUID,
@@ -2413,50 +2583,92 @@ async def admin_update_client_status(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Admin endpoint to update client status"""
-    from models import ClientStatus
+    """Admin endpoint to update client details across users, clients, and client_status tables"""
+    from models import Client, User, ClientStatus
     
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    client_id_bytes = client_id.bytes
-    
-    result = await db.execute(
-        select(ClientStatus).where(ClientStatus.client_id == client_id_bytes)
-    )
-    client_status = result.scalar_one_or_none()
-    
-    if client_status:
-        if "status" in status_data:
-            client_status.status = status_data["status"]
-        if "membership_plan" in status_data:
-            client_status.membership_plan = status_data["membership_plan"]
-        if "fitness_goal" in status_data:
-            client_status.fitness_goal = status_data["fitness_goal"]
-        if "progress_percentage" in status_data:
-            client_status.progress_percentage = status_data["progress_percentage"]
-        if "assigned_trainer_id" in status_data:
-            client_status.assigned_trainer_id = uuid.UUID(status_data["assigned_trainer_id"]).bytes
-        if "last_visit" in status_data:
-            client_status.last_visit = datetime.strptime(status_data["last_visit"], "%Y-%m-%d").date()
-    else:
-        new_status = ClientStatus(
-            client_id=client_id_bytes,
-            status=status_data.get("status", "Active"),
-            membership_plan=status_data.get("membership_plan", "Standard"),
-            fitness_goal=status_data.get("fitness_goal", "General Fitness"),
-            progress_percentage=status_data.get("progress_percentage", 0)
+    try:
+        # 1. Update User table (email only)
+        if "email" in status_data:
+            await db.execute(
+                update(User)
+                .where(User.id == client_id)
+                .values(email=status_data["email"])
+            )
+        
+        # 2. Update Client table (name, phone_number)
+        client_update_fields = {}
+        if "name" in status_data:
+            client_update_fields["name"] = status_data["name"]
+        if "phone_number" in status_data:
+            client_update_fields["phone_number"] = status_data["phone_number"]
+        
+        if client_update_fields:
+            await db.execute(
+                update(Client)
+                .where(Client.id == client_id)
+                .values(**client_update_fields)
+            )
+        
+        # 3. Update or create ClientStatus table (status, membership_type, etc.)
+        result = await db.execute(
+            select(ClientStatus).where(ClientStatus.client_id == client_id)
         )
-        if "assigned_trainer_id" in status_data:
-            new_status.assigned_trainer_id = uuid.UUID(status_data["assigned_trainer_id"]).bytes
-        if "last_visit" in status_data:
-            new_status.last_visit = datetime.strptime(status_data["last_visit"], "%Y-%m-%d").date()
-        db.add(new_status)
-    
-    await db.commit()
-    
-    return APIResponse(success=True, message="Client status updated")
-
+        client_status = result.scalar_one_or_none()
+        
+        if client_status:
+            # Update existing status record
+            if "status" in status_data:
+                client_status.status = status_data["status"]
+            if "membership_plan" in status_data:
+                client_status.membership_type = status_data["membership_plan"]
+            if "fitness_goal" in status_data:
+                # Note: fitness_goal is not in ClientStatus model, so store in Client.fitness_goals instead
+                await db.execute(
+                    update(Client)
+                    .where(Client.id == client_id)
+                    .values(fitness_goals=status_data["fitness_goal"])
+                )
+            if "progress_percentage" in status_data:
+                # Note: progress_percentage is not in ClientStatus model
+                # You may need to add this column to ClientStatus or store elsewhere
+                pass  # Skip or add logic for progress tracking
+            client_status.updated_at = datetime.utcnow()
+        else:
+            # Create new ClientStatus record
+            new_status = ClientStatus(
+                client_id=client_id,
+                status=status_data.get("status", "Active"),
+                membership_type=status_data.get("membership_plan", "Standard"),
+                # Note: membership_expiry, last_active_date, notes are optional
+            )
+            db.add(new_status)
+            
+            # Set fitness_goal in Client table
+            if "fitness_goal" in status_data:
+                await db.execute(
+                    update(Client)
+                    .where(Client.id == client_id)
+                    .values(fitness_goals=status_data["fitness_goal"])
+                )
+        
+        await db.commit()
+        
+        return APIResponse(
+            success=True,
+            message="Client updated successfully",
+            data=None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating client status: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+        
 # ============================================================
 # ADMIN - ORDERS ENDPOINTS
 # ============================================================
@@ -2467,48 +2679,70 @@ async def admin_get_orders(
     db: AsyncSession = Depends(get_user_db)
 ):
     """Admin endpoint to get all shop orders"""
-    from models import ShopOrder, ShopOrderItem
+    from models import ShopOrder, ShopOrderItem, User, Client
     
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    query = select(ShopOrder).order_by(ShopOrder.created_at.desc())
-    
-    if status:
-        query = query.where(ShopOrder.status == status)
-    
-    result = await db.execute(query)
-    orders = result.scalars().all()
-    
-    order_list = []
-    for order in orders:
-        # Get items for this order
-        items_result = await db.execute(
-            select(ShopOrderItem).where(ShopOrderItem.shop_order_id == order.id)
-        )
-        items = items_result.scalars().all()
+    try:
+        # Build query with eager loading of user relationship
+        query = select(ShopOrder, User).join(User, ShopOrder.user_id == User.id)
         
-        order_list.append({
-            "id": str(order.id),
-            "order_reference": order.order_number,
-            "client_name": "",  # TODO: Get from user relationship
-            "client_email": "",  # TODO: Get from user relationship
-            "client_phone": "",  # TODO: Get from user relationship
-            "shipping_address": order.shipping_address,
-            "city": "",  # TODO: Extract from shipping_address
-            "items": [{"name": i.product_name, "quantity": i.quantity, "price": float(i.unit_price)} for i in items],
-            "subtotal": float(order.subtotal),
-            "tax": float(order.tax_amount),
-            "shipping_cost": float(order.shipping_amount),
-            "total": float(order.total_amount),
-            "order_status": order.status,
-            "payment_status": "",  # TODO: Add payment_status field to ShopOrder
-            "payment_method": "",  # TODO: Add payment_method field to ShopOrder
-            "placed_at": order.created_at.isoformat(),
-            "pickup_notes": getattr(order, "pickup_notes", None)
-        })
+        if status:
+            query = query.where(ShopOrder.status == status)
+        
+        query = query.order_by(ShopOrder.created_at.desc())
+        
+        result = await db.execute(query)
+        rows = result.all()
+        
+        order_list = []
+        for order, user in rows:
+            # Get client profile for this user
+            client_result = await db.execute(
+                select(Client).where(Client.id == user.id)
+            )
+            client = client_result.scalar_one_or_none()
+            
+            # Get items for this order
+            items_result = await db.execute(
+                select(ShopOrderItem).where(ShopOrderItem.shop_order_id == order.id)
+            )
+            items = items_result.scalars().all()
+            
+            order_list.append(AdminOrderResponse(
+                id=order.id,
+                order_number=order.order_number,
+                status=order.status,
+                subtotal=float(order.subtotal) if order.subtotal else 0,
+                tax_amount=float(order.tax_amount) if order.tax_amount else 0,
+                shipping_amount=float(order.shipping_amount) if order.shipping_amount else 0,
+                total_amount=float(order.total_amount) if order.total_amount else 0,
+                shipping_address=order.shipping_address or {},
+                notes=order.notes,
+                created_at=order.created_at,
+                updated_at=order.updated_at,
+                user_id=user.id,
+                user_email=user.email,
+                user_name=client.name if client else f"{user.first_name} {user.last_name}",
+                items=[
+                    OrderItemResponse(
+                        product_id=str(item.product_id),
+                        product_name=item.product_name,
+                        product_price=float(item.unit_price),
+                        quantity=item.quantity,
+                        total=float(item.line_total)
+                    )
+                    for item in items
+                ]
+            ))
+        
+        return order_list
     
-    return order_list
+    except Exception as e:
+        logger.error(f"Error getting admin orders: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch orders: {str(e)}")
+        
 
 @router.put("/admin/orders/{order_id}/status", response_model=APIResponse)
 async def admin_update_order_status(
@@ -2523,10 +2757,10 @@ async def admin_update_order_status(
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    order_id_bytes = order_id.bytes
+    order_id = order_id
     
     result = await db.execute(
-        select(ShopOrder).where(ShopOrder.id == order_id_bytes)
+        select(ShopOrder).where(ShopOrder.id == order_id)
     )
     order = result.scalar_one_or_none()
     
@@ -2612,8 +2846,8 @@ async def get_today_birthdays(
         select(Client, User.email)
         .join(User, Client.id == User.id)
         .where(
-            func.month(Client.birthday) == today.month,
-            func.day(Client.birthday) == today.day,
+            (Client.birthday).month == today.month,
+            (Client.birthday).day == today.day,
             Client.birthday.isnot(None)
         )
     )
@@ -2630,6 +2864,7 @@ async def get_today_birthdays(
         })
     
     return birthdays
+
 @router.post("/admin/send-birthday-email")
 async def send_birthday_email_to_client(
     request: dict,
@@ -2649,7 +2884,7 @@ async def send_birthday_email_to_client(
     client_result = await db.execute(
         select(Client, User.email)
         .join(User, Client.id == User.id)
-        .where(Client.id == client_id.bytes)
+        .where(Client.id == client_id)
     )
     row = client_result.first()
     
@@ -2781,7 +3016,7 @@ async def delete_progress_photo(
         # Get photo
         result = await db.execute(
             select(ProgressPhoto)
-            .where(ProgressPhoto.id == photo_id.bytes)
+            .where(ProgressPhoto.id == photo_id)
             .where(ProgressPhoto.client_id == user_id)
         )
         photo = result.scalar_one_or_none()

@@ -697,7 +697,144 @@ export const excursionsAPI = {
     }
   },
 };
+// Add this to api.js - Trainer API endpoints
+export const trainerAPI = {
+  // Trainer Profile
+  getProfile: async () => {
+    try {
+      const response = await axiosInstance.get('/trainers/profile');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch trainer profile' };
+    }
+  },
 
+  updateProfile: async (profileData) => {
+    try {
+      const response = await axiosInstance.put('/trainers/profile', profileData);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update profile' };
+    }
+  },
+
+  // Client Management
+  getClients: async () => {
+    try {
+      const response = await axiosInstance.get('/trainers/clients');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch clients' };
+    }
+  },
+
+  getClientDetails: async (clientId) => {
+    try {
+      const response = await axiosInstance.get(`/trainers/clients/${clientId}`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch client details' };
+    }
+  },
+
+  // Client Progress
+  updateClientProgress: async (clientId, progressData) => {
+    try {
+      const response = await axiosInstance.put(
+        `/trainers/clients/${clientId}/progress`, 
+        progressData
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to update client progress' };
+    }
+  },
+
+  getClientProgressHistory: async (clientId, limit = 10) => {
+    try {
+      const response = await axiosInstance.get(
+        `/trainers/clients/${clientId}/progress-history`,
+        { params: { limit } }
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch progress history' };
+    }
+  },
+
+  // Client Notes
+  addClientNote: async (clientId, noteData) => {
+    try {
+      const response = await axiosInstance.post(
+        `/trainers/clients/${clientId}/notes`,
+        noteData
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to add client note' };
+    }
+  },
+
+  getClientNotes: async (clientId) => {
+    try {
+      const response = await axiosInstance.get(`/trainers/clients/${clientId}/notes`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch client notes' };
+    }
+  },
+
+  // Attendance
+  getClientAttendance: async (clientId) => {
+    try {
+      const response = await axiosInstance.get(`/trainers/clients/${clientId}/attendance`);
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch attendance' };
+    }
+  },
+
+  logClientAttendance: async (clientId, attendanceData) => {
+    try {
+      const response = await axiosInstance.post(
+        `/trainers/clients/${clientId}/attendance`,
+        attendanceData
+      );
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to log attendance' };
+    }
+  },
+
+  // Risk Assessment
+  getAtRiskClients: async () => {
+    try {
+      const response = await axiosInstance.get('/trainers/at-risk-clients');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch at-risk clients' };
+    }
+  },
+
+  // Performance
+  getPerformance: async () => {
+    try {
+      const response = await axiosInstance.get('/trainers/performance');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch performance' };
+    }
+  },
+
+  getGrades: async () => {
+    try {
+      const response = await axiosInstance.get('/trainers/grades');
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { detail: 'Failed to fetch grades' };
+    }
+  },
+};
 export const shopAPI = {
   // Products
   getProducts: async (params = {}) => {
@@ -1404,13 +1541,14 @@ export const consultationsAPI = {
   },
 
   // Reschedule a consultation
-  rescheduleBooking: async (bookingId, newDate, newTime, reason = null) => {
+  rescheduleBooking: async (bookingId, payload) => {
     try {
-      const response = await axiosInstance.patch(`/consultations/bookings/reschedule/${bookingId}`, {
+      const payload ={
         new_date: newDate,
         new_time: newTime,
         reason: reason
-      });
+      }
+      const response = await axiosInstance.patch(`/consultations/bookings/reschedule/${bookingId}`, {payload});
       return response.data;
     } catch (error) {
       throw error.response?.data || { detail: 'Failed to reschedule booking' };

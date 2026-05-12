@@ -2823,7 +2823,6 @@ async def admin_update_order_status(
         data={"email_sent": new_status == "delivered"}
     )
 
-
 @router.post("/admin/orders/{order_id}/notify")
 async def admin_notify_order_ready(
     order_id: uuid.UUID,

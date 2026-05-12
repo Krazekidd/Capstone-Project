@@ -1075,7 +1075,7 @@ tbody tr:hover { background: rgba(242, 101, 34, 0.05); }
 .admin-raters { display: flex; flex-direction: column; }
 .admin-rater-row {
     display: grid;
-    grid-template-columns: 155px 1fr 54px 88px;
+    grid-template-columns: 200px 1fr 54px 88px;
     align-items: center;
     gap: 12px;
     padding: 9px 0;

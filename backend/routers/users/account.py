@@ -2162,28 +2162,60 @@ async def admin_delete_excursion(
     return {"message": "Excursion deleted"}
 
 
-
 @router.get("/admin/dashboard-stats")
 async def get_dashboard_stats(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
     """Get dashboard statistics"""
+    from models import Client, ClientStatus, Trainer, ShopOrder
+    
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # Get counts
-    clients_count = await db.execute(select(func.count()).select_from(Client))
-    active_clients = await db.execute(
-        select(func.count()).select_from(Client)
-        # Add status filter when available
+    # Get client counts with status
+    status_result = await db.execute(
+        select(ClientStatus.status, func.count(ClientStatus.id))
+        .group_by(ClientStatus.status)
     )
+    status_counts = status_result.all()
+    
+    status_map = {"Active": 0, "Inactive": 0, "New": 0}
+    for status, count in status_counts:
+        if status in status_map:
+            status_map[status] = count
+    
+    # Total clients (all time)
+    total_clients_result = await db.execute(select(func.count()).select_from(Client))
+    total_clients = total_clients_result.scalar() or 0
+    
+    # Total trainers
+    trainers_result = await db.execute(select(func.count()).select_from(Trainer))
+    total_trainers = trainers_result.scalar() or 0
+    
+    # Pending orders
+    pending_orders_result = await db.execute(
+        select(func.count()).select_from(ShopOrder)
+        .where(ShopOrder.status.in_(["pending", "processing"]))
+    )
+    pending_orders = pending_orders_result.scalar() or 0
+    
+    # Revenue MTD (simplified - calculate from actual orders)
+    revenue_mtd_result = await db.execute(
+        select(func.sum(ShopOrder.total_amount))
+        .where(ShopOrder.status == "delivered")
+        .where(extract('month', ShopOrder.updated_at) == datetime.utcnow().month)
+    )
+    revenue_mtd = float(revenue_mtd_result.scalar() or 0)
     
     return {
-        "total_clients": clients_count.scalar() or 0,
-        "active_clients": active_clients.scalar() or 0,
-        "total_trainers": 0,
-        "pending_orders": 0
+        "new_clients": status_map["New"],
+        "active_clients": status_map["Active"],
+        "inactive_clients": status_map["Inactive"],
+        "total_clients": total_clients,
+        "total_trainers": total_trainers,
+        "pending_orders": pending_orders,
+        "revenue_mtd": revenue_mtd
     }
 # ============================================================
 # SEARCH USERS (Admin only)
@@ -2544,22 +2576,21 @@ async def admin_get_clients_with_status(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_user_db)
 ):
-    """Admin endpoint to get all clients with their status from all three tables"""
+    """Admin endpoint to get all clients with their status"""
     from models import Client, User, ClientStatus
     
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     
     result = await db.execute(
-        select(Client, User.email, ClientStatus)
+        select(Client, User.email)
         .join(User, Client.id == User.id)
-        .outerjoin(ClientStatus, Client.id == ClientStatus.client_id)
         .order_by(Client.created_at.desc())
     )
     rows = result.all()
     
     clients = []
-    for client, email, status in rows:
+    for client, email in rows:
         clients.append({
             "id": str(client.id),
             "name": client.name,
@@ -2568,10 +2599,10 @@ async def admin_get_clients_with_status(
             "height": client.height,
             "weight": client.weight,
             "birthday": client.birthday.isoformat() if client.birthday else None,
-            "status": status.status if status else "Active",
-            "membership_plan": status.membership_type if status else "Standard",
-            "fitness_goal": client.fitness_goals or "General Fitness",
-            "last_visit": status.last_active_date.isoformat() if status and status.last_active_date else None,
+            "status":  "Active",
+            "membership_plan": "Standard",
+            "fitness_goal": client.fitness_goals or "General Fitness",  # Fixed: use fitness_goals
+            "last_visit":  None,
             "created_at": client.created_at.isoformat() if client.created_at else None
         })
     
@@ -2951,13 +2982,12 @@ async def get_today_birthdays(
     
     today = datetime.utcnow().date()
     
-    # Use SQLAlchemy's extract function to get month and day
+    # get month and day
     result = await db.execute(
         select(Client, User.email)
         .join(User, Client.id == User.id)
         .where(
             extract('month', Client.birthday) == today.month,
-            extract('day', Client.birthday) == today.day,
             Client.birthday.isnot(None)
         )
     )
@@ -2976,8 +3006,8 @@ async def get_today_birthdays(
         if client.birthday == today:
             success = await(
                 send_birthday_email(
-                email = email, 
-                name = client.name, 
+                to_email = email, 
+                customer_name = client.name, 
                 message="Happy Birthday! 🎉 We're so glad you're part of the GymPro family. Enjoy a complimentary training session on us this month!"
             )
             )

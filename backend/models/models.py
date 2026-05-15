@@ -170,6 +170,7 @@ class Trainer(Base):
     trainer_assessments = relationship("TrainerAssessment", back_populates="trainer", cascade="all, delete-orphan")
     training_schedules = relationship("TrainingSchedule", back_populates="trainer", cascade="all, delete-orphan")
     grades = relationship("TrainerGrade", foreign_keys="TrainerGrade.trainer_id", back_populates="trainer", cascade="all, delete-orphan")
+    evaluations = relationship("TrainerEvaluation", back_populates="trainer", cascade="all, delete-orphan")
 
     # Indexes
     __table_args__ = (
@@ -1174,15 +1175,6 @@ class TrainerEvaluation(Base):
         CheckConstraint('knowledge_score BETWEEN 1 AND 10', name='check_knowledge_score_range'),
         CheckConstraint('punctuality_score BETWEEN 1 AND 10', name='check_punctuality_score_range'),
     )
-
-
-# Add evaluations relationship to Trainer model
-Trainer.evaluations = relationship("TrainerEvaluation", back_populates="trainer", cascade="all, delete-orphan")
-
-
-# =============================================================
-# EXCURSIONS & EVENTS
-# =============================================================
 
 
 # ============================================================

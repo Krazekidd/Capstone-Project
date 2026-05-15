@@ -1771,7 +1771,7 @@ export default function Account() {
           <div className="ctitle">📊 Progress Dashboard</div>
           <p className="csub">Your journey in data — current vs goal vs predicted trajectory</p>
           <div className="chart-tabs">
-            {[["compare","Comparison"],["weight","Weight & Predicted"],["body","Body Measurements"],["ml","ML Forecast"]].map(([id,lbl])=>(
+            {[["compare","Comparison"],["weight","Weight"],["body","Body Measurements"],["ml","ML Forecast"]].map(([id,lbl])=>(
               <button key={id} className={`ctab${chartTab===id?" on":""}`} onClick={()=>setChartTab(id)}>{lbl}</button>
             ))}
           </div>
